@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Navbar } from '@/components/Navbar';
-import { sendEmailVerification, sendPhoneVerification } from 'firebase/auth';
+import { sendEmailVerification } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import toast from 'react-hot-toast';
 
@@ -22,7 +22,7 @@ export default function Verify() {
 
   const handlePhoneVerification = async () => {
     try {
-      toast.info('Phone verification coming soon');
+      toast.success('Phone verification coming soon');
     } catch (error: any) {
       toast.error(error.message);
     }
