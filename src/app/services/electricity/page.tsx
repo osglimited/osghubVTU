@@ -52,6 +52,8 @@ export default function ElectricityPage() {
                   {service.enabled ? 'Pay Bill' : 'Coming soon'}
                 </button>
               </div>
+            </>
+          )}
         </div>
       </div>
       <Footer />

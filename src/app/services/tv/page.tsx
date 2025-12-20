@@ -56,7 +56,7 @@ export default function TVPage() {
                 </button>
               </div>
             </>
-          )
+          )}
         </div>
       </div>
       <Footer />
