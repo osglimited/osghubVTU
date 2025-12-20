@@ -61,15 +61,6 @@ export default function LoginPage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
-          {errors.general && (
-            <div
-              className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm"
-              role="alert"
-              data-testid="text-login-error"
-            >
-              {errors.general}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
