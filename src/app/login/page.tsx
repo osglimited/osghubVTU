@@ -27,6 +27,7 @@ export default function LoginPage() {
     errors,
     handleLogin,
   } = useAuthForm();
+  const [socialLoading, setSocialLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,11 +35,11 @@ export default function LoginPage() {
   };
 
   const handleSocialLogin = async (provider: "google" | "apple") => {
-    setIsLoading(true);
+    setSocialLoading(true);
     try {
       console.log(`Login with ${provider}`);
     } finally {
-      setIsLoading(false);
+      setSocialLoading(false);
     }
   };
 
@@ -199,7 +200,7 @@ export default function LoginPage() {
               variant="outline"
               className="h-12"
               onClick={() => handleSocialLogin("google")}
-              disabled={isLoading}
+              disabled={isLoading || socialLoading}
               data-testid="button-google-login"
             >
               <SiGoogle className="w-4 h-4 mr-2" />
@@ -210,7 +211,7 @@ export default function LoginPage() {
               variant="outline"
               className="h-12"
               onClick={() => handleSocialLogin("apple")}
-              disabled={isLoading}
+              disabled={isLoading || socialLoading}
               data-testid="button-apple-login"
             >
               <SiApple className="w-4 h-4 mr-2" />
