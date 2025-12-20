@@ -5,15 +5,15 @@ import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { currentUser, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !currentUser) {
+    if (!loading && !user) {
       // Redirect to login if not authenticated
       router.push('/login');
     }
-  }, [currentUser, loading, router]);
+  }, [user, loading, router]);
 
   if (loading) {
     return (
@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     );
   }
 
-  if (!currentUser) {
+  if (!user) {
     return null; // or a loading spinner
   }
 
