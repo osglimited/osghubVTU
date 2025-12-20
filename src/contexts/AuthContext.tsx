@@ -173,8 +173,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         displayName: data.fullName,
       });
 
-      // Send email verification
-      await firebaseSendEmailVerification(user);
+      // Send email verification with explicit redirect URL
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://osghubvtu.onrender.com';
+      await firebaseSendEmailVerification(user, {
+        url: `${appUrl}/verify-email?email=${encodeURIComponent(data.email)}`,
+        handleCodeInApp: true,
+      });
 
       // Hash the transaction PIN
       const pinHash = await generateHash(data.transactionPin);
@@ -298,7 +302,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     try {
-      await firebaseSendEmailVerification(auth.currentUser);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://osghubvtu.onrender.com';
+      await firebaseSendEmailVerification(auth.currentUser, {
+        url: `${appUrl}/verify-email?email=${encodeURIComponent(auth.currentUser.email || '')}`,
+        handleCodeInApp: true,
+      });
     } catch (error) {
       console.error('Error sending email verification:', error);
       throw new Error('Failed to send verification email');
