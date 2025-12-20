@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Lock, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
@@ -17,7 +17,7 @@ interface ResetPasswordFormData {
   confirmPassword: string;
 }
 
-export default function ResetPasswordPage({ params }: { params: { token: string } }) {
+function ResetPasswordContent({ params }: { params: { token: string } }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email') || '';
@@ -238,5 +238,17 @@ export default function ResetPasswordPage({ params }: { params: { token: string 
         </form>
       </Card>
     </AuthLayout>
+  );
+}
+
+export default function ResetPasswordPage({ params }: { params: { token: string } }) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    }>
+      <ResetPasswordContent params={params} />
+    </Suspense>
   );
 }
