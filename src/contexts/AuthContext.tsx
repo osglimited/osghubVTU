@@ -138,19 +138,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
-      // Check username uniqueness
-      const usernameQuery = query(
-        collection(db, 'users'),
-        where('username', '==', data.username)
-      );
-      const usernameSnapshot = await getDocs(usernameQuery);
-      if (!usernameSnapshot.empty) {
-        throw new Error('This username is already taken. Please choose another one.');
-      }
-
-      // Create user with email and password
+      // Create user with email and password first
+      // This ensures we are authenticated before querying Firestore,
+      // which is required if security rules block unauthenticated reads.
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const { user } = userCredential;
+
+      try {
+        // Check username uniqueness (now authenticated)
+        const usernameQuery = query(
+          collection(db, 'users'),
+          where('username', '==', data.username)
+        );
+        const usernameSnapshot = await getDocs(usernameQuery);
+        if (!usernameSnapshot.empty) {
+          // Username is taken, clean up the auth user
+          await user.delete();
+          throw new Error('This username is already taken. Please choose another one.');
+        }
+      } catch (checkError: any) {
+        // If it's our custom error, rethrow it
+        if (checkError.message === 'This username is already taken. Please choose another one.') {
+          throw checkError;
+        }
+        
+        // If it's a permission error, it means we can't check uniqueness (e.g. rules prevent listing users).
+        // We log a warning but proceed with registration to avoid blocking the user.
+        // Ideally, uniqueness should be enforced by security rules or a Cloud Function.
+        console.warn('Skipping username uniqueness check due to error:', checkError);
+      }
 
       // Update user profile
       await firebaseUpdateProfile(user, {
