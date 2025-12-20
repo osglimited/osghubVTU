@@ -61,7 +61,6 @@ export function useAuthForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors<SignUpData & LoginCredentials>>({});
   const [showPassword, setShowPassword] = useState(false);
-  const requireEmailVerification = process.env.NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION === 'true';
 
   const validateForm = <T extends Record<string, any>>(
     data: T,
@@ -106,13 +105,9 @@ export function useAuthForm() {
       });
 
       console.log('[DEBUG] handleSignUp success', { email: data.email });
-      if (requireEmailVerification) {
-        addNotification('success', 'Account created!', 'Please check your email to verify your account.');
-        router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
-      } else {
-        addNotification('success', 'Account created!', 'You can now sign in.');
-        router.push('/login');
-      }
+      addNotification('success', 'Account created!', 'Please check your email to verify your account.');
+      // Also navigate to verify page here for redundancy
+      router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
     } catch (error: any) {
       console.error('[DEBUG] handleSignUp error', error);
       addNotification('error', 'Error', error.message || 'Failed to create account. Please try again.');
@@ -169,12 +164,8 @@ export function useAuthForm() {
 
     setIsLoading(true);
     try {
-      if (requireEmailVerification) {
-        await verifyEmail();
-        addNotification('success', 'Email sent', 'Verification email has been resent. Please check your inbox.');
-      } else {
-        addNotification('info', 'Not required', 'Email verification is disabled.');
-      }
+      await verifyEmail();
+      addNotification('success', 'Email sent', 'Verification email has been resent. Please check your inbox.');
     } catch (error: any) {
       addNotification('error', 'Error', error.message || 'Failed to resend verification email. Please try again.');
     } finally {

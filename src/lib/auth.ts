@@ -11,7 +11,6 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { generateHash } from './crypto';
-const requireEmailVerification = process.env.NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION === 'true';
 
 interface UserData {
   uid: string;
@@ -50,9 +49,8 @@ export const signUp = async (
       displayName: userData.fullName,
     });
 
-    if (requireEmailVerification) {
-      await sendEmailVerification(user);
-    }
+    // Send email verification
+    await sendEmailVerification(user);
 
     // Hash the transaction PIN
     const pinHash = await generateHash(userData.pinHash);
@@ -72,7 +70,7 @@ export const signUp = async (
       phone: userData.phone,
       pinHash,
       referral: userData.referral,
-      isVerified: requireEmailVerification ? false : true,
+      isVerified: false, // Will be true after email verification
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -91,7 +89,8 @@ export const signIn = async (email: string, password: string): Promise<UserCrede
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const { user } = userCredential;
 
-    if (requireEmailVerification && !user.emailVerified) {
+    // Check if email is verified
+    if (!user.emailVerified) {
       await signOut();
       throw new Error('Please verify your email before signing in.');
     }

@@ -65,7 +65,6 @@ export default function RegisterPage() {
   } = useAuthForm();
   
   const isLoading = isFormLoading || isSocialLoading;
-  const requireEmailVerification = process.env.NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION === 'true';
   
   // Clear errors when form data changes
   useEffect(() => {
@@ -199,11 +198,8 @@ export default function RegisterPage() {
       logger.info('User registration successful', { email: formData.email });
       addDebug(`[SUCCESS] Registration completed for ${formData.email}`);
       
-      if (requireEmailVerification) {
-        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
-      } else {
-        router.push('/login');
-      }
+      // Redirect to email verification page
+      router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
     } catch (error: unknown) {
       console.error('[DEBUG] Registration failed', error);
       addDebug(`[ERROR] Registration failed: ${String(error)}`);

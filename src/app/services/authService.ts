@@ -12,7 +12,6 @@ import {
   AuthError,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-const requireEmailVerification = process.env.NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION === 'true';
 
 interface AuthResponse {
   success: boolean;
@@ -32,9 +31,7 @@ export const registerWithEmail = async (
     // Update user profile with display name
     if (auth.currentUser) {
       await updateProfile(auth.currentUser, { displayName });
-      if (requireEmailVerification) {
-        await sendVerificationEmail();
-      }
+      await sendVerificationEmail();
     }
 
     return { success: true, user };

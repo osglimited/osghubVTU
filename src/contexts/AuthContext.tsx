@@ -21,7 +21,6 @@ import { generateHash } from '@/lib/crypto';
 import { UserProfile, SignUpData, LoginCredentials, AuthState, AuthContextType } from '@/types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const requireEmailVerification = process.env.NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION === 'true';
 
 export function useAuth() {
   const context = useContext(AuthContext);
@@ -38,13 +37,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error: null,
     initialized: false,
   });
-
-  const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T | 'timeout'> => {
-    return Promise.race([
-      promise,
-      new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), ms))
-    ]);
-  };
 
   // Load user data from Firestore
   const loadUserData = useCallback(async (firebaseUser: FirebaseUser | null) => {
@@ -146,46 +138,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5000';
-      const actionCodeSettings = { url: `${appUrl}/verify-email`, handleCodeInApp: true };
-
       // Check username uniqueness
       const usernameQuery = query(
         collection(db, 'users'),
         where('username', '==', data.username)
       );
-      try {
-        const usernameSnapshotOrTimeout = await withTimeout(getDocs(usernameQuery), 5000);
-        if (usernameSnapshotOrTimeout !== 'timeout') {
-          const usernameSnapshot = usernameSnapshotOrTimeout;
-          if (!usernameSnapshot.empty) {
-            throw new Error('This username is already taken. Please choose another one.');
-          }
-        } else {
-          console.warn('Username uniqueness check timed out, proceeding');
-        }
-      } catch (e) {
-        console.warn('Username uniqueness check failed, proceeding', e);
+      const usernameSnapshot = await getDocs(usernameQuery);
+      if (!usernameSnapshot.empty) {
+        throw new Error('This username is already taken. Please choose another one.');
       }
 
       // Create user with email and password
-      const userCredentialOrTimeout = await withTimeout(createUserWithEmailAndPassword(auth, data.email, data.password), 10000);
-      if (userCredentialOrTimeout === 'timeout') {
-        throw new Error('Network timeout while creating account. Please check your connection and try again.');
-      }
-      const { user } = userCredentialOrTimeout;
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const { user } = userCredential;
 
       // Update user profile
       await firebaseUpdateProfile(user, {
         displayName: data.fullName,
       });
 
-      if (requireEmailVerification) {
-        const sendEmailResult = await withTimeout(firebaseSendEmailVerification(user, actionCodeSettings), 8000);
-        if (sendEmailResult === 'timeout') {
-          console.warn('Email verification send timed out');
-        }
-      }
+      // Send email verification
+      await firebaseSendEmailVerification(user);
 
       // Hash the transaction PIN
       const pinHash = await generateHash(data.transactionPin);
@@ -205,26 +178,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone: data.phone,
         pinHash,
         referral: data.referralUsername,
-        isVerified: requireEmailVerification ? false : true,
+        isVerified: false,
         walletBalance: 0,
         accountStatus: 'active',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
-      try {
-        const setDocResult = await withTimeout(setDoc(doc(db, 'users', user.uid), userDoc), 8000);
-        if (setDocResult === 'timeout') {
-          console.warn('User document creation timed out');
-        }
-      } catch (e: any) {
-        const msg = e?.message || String(e);
-        if (msg.includes('Missing or insufficient permissions') || msg.includes('permission-denied')) {
-          console.warn('Skipping Firestore user document creation due to permissions during development');
-        } else {
-          throw e;
-        }
-      }
+      await setDoc(doc(db, 'users', user.uid), userDoc);
 
       // Update state with new user data
       setState(prev => ({
@@ -244,8 +205,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         errorMessage = 'Email/Password sign-in is disabled. Enable it in Firebase Auth.';
       } else if (code === 'auth/invalid-api-key' || code === 'auth/invalid-auth') {
         errorMessage = 'Invalid Firebase configuration. Check NEXT_PUBLIC_FIREBASE_* environment variables.';
-      } else if (code === 'auth/unauthorized-domain') {
-        errorMessage = 'Unauthorized domain. Add localhost and your dev host to Firebase Auth Authorized domains.';
       }
       setState(prev => ({ ...prev, error: errorMessage, loading: false }));
       throw new Error(errorMessage);
@@ -261,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user } = userCredential;
 
       // Check if email is verified
-      if (requireEmailVerification && !user.emailVerified) {
+      if (!user.emailVerified) {
         await signOut();
         throw new Error('Please verify your email before signing in.');
       }
@@ -323,15 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     try {
-      if (!requireEmailVerification) {
-        return;
-      }
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5000';
-      const actionCodeSettings = { url: `${appUrl}/verify-email`, handleCodeInApp: true };
-      const resendResult = await withTimeout(firebaseSendEmailVerification(auth.currentUser, actionCodeSettings), 8000);
-      if (resendResult === 'timeout') {
-        throw new Error('Network timeout while sending verification email. Please try again.');
-      }
+      await firebaseSendEmailVerification(auth.currentUser);
     } catch (error) {
       console.error('Error sending email verification:', error);
       throw new Error('Failed to send verification email');

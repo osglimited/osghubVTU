@@ -13,24 +13,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const requiredKeys = [
-  'apiKey',
-  'authDomain',
-  'projectId',
-  'storageBucket',
-  'messagingSenderId',
-  'appId',
-] as const;
-
-const missingKeys = requiredKeys.filter((k) => !firebaseConfig[k]);
-if (missingKeys.length > 0) {
-  throw new Error(
-    `Missing Firebase config: ${missingKeys.join(
-      ', '
-    )}. Set NEXT_PUBLIC_FIREBASE_* env vars.`
-  );
-}
-
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
