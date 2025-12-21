@@ -73,6 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await updateDoc(userRef, { accountStatus: 'active' });
           userData.accountStatus = 'active';
         }
+        
+        if (typeof (userData as any).notificationsEmailEnabled === 'undefined') {
+          await updateDoc(userRef, { notificationsEmailEnabled: true });
+          (userData as any).notificationsEmailEnabled = true;
+        }
 
         setState(prev => ({
           ...prev,
@@ -99,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isVerified: firebaseUser.emailVerified,
           walletBalance: 0,
           accountStatus: 'active',
+          notificationsEmailEnabled: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -201,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isVerified: false,
         walletBalance: 0,
         accountStatus: 'active',
+        notificationsEmailEnabled: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

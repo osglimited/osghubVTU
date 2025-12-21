@@ -20,6 +20,7 @@ export interface UserProfile {
   isVerified: boolean;
   walletBalance: number; // balance stored in Naira (plain number)
   accountStatus?: 'active' | 'suspended' | 'closed';
+  notificationsEmailEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }
