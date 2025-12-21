@@ -251,6 +251,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Please verify your email before signing in.');
       }
 
+      try {
+        await user.getIdToken(true);
+      } catch {}
+
       // If email is verified, make sure Firestore reflects it
       try {
         const userRef = doc(db, 'users', user.uid);
