@@ -32,11 +32,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex">
-      <aside className="w-64 bg-white border-r border-gray-200 hidden md:block">
-        <div className="p-4">
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 
+        transform transition-transform duration-200 ease-in-out
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:relative md:translate-x-0 md:block
+      `}>
+        <div className="p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="font-bold text-[#0A1F44]">OSGHUB VTU</span>
           </div>
+          <button 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden p-1 hover:bg-gray-100 rounded-md text-gray-500"
+          >
+            <X size={20} />
+          </button>
         </div>
         <nav className="px-2 space-y-1">
           {navItems.map(({ href, label, icon: Icon }) => (

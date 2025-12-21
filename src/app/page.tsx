@@ -4,7 +4,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Check, Zap, Smartphone, Shield, Globe, Clock, ArrowRight } from "lucide-react";
+import { Check, Zap, Smartphone, Shield, Globe, Clock, ArrowRight, Users } from "lucide-react";
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -32,7 +32,7 @@ export default function Landing() {
                 The smartest way to buy airtime, data bundles, and pay utility bills. Instant delivery, zero downtime with OSGHUB.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Link href="/auth/register">
+                <Link href="/register">
                   <Button size="lg" className="h-12 px-8 text-base">Get Started Now</Button>
                 </Link>
                 <Link href="/services/vtu">

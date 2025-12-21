@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
-import { Smartphone, Wifi, Tv, Zap, Plus, LogOut, CreditCard, GraduationCap, Eye, EyeOff, Wallet, ArrowRightLeft, Loader2 } from 'lucide-react';
+import { Smartphone, Wifi, Tv, Zap, Plus, LogOut, CreditCard, GraduationCap, Eye, EyeOff, Wallet, ArrowRightLeft, Loader2, User } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, runTransaction } from 'firebase/firestore';
