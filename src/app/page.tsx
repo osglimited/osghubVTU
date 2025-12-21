@@ -218,5 +218,4 @@ function PricingCard({ title, price, features, isPopular }: { title: string, pri
   )
 }
 
-import { Users } from "lucide-react";
-import { ServiceSlider } from "@/components/ServiceSlider";
+
