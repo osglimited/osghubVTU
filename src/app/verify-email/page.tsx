@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Mail, CheckCircle, ArrowLeft, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -14,14 +14,16 @@ import { doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 
 function VerifyEmailContent() {
-  const searchParams = useSearchParams();
-  const email = searchParams.get("email");
+  const router = useRouter();
   const { handleResendVerification, isLoading } = useAuthForm();
   const [resendCooldown, setResendCooldown] = useState(0);
   const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { refreshUser } = useAuth();
-  const [resolvedEmail, setResolvedEmail] = useState<string | null>(email || auth.currentUser?.email || null);
+  const [resolvedEmail, setResolvedEmail] = useState<string | null>(auth.currentUser?.email || null);
+  const [mode, setMode] = useState<string | null>(null);
+  const [oobCode, setOobCode] = useState<string | null>(null);
+  const [linkApiKey, setLinkApiKey] = useState<string | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -34,9 +36,22 @@ function VerifyEmailContent() {
   }, [resendCooldown]);
 
   useEffect(() => {
-    const mode = searchParams.get("mode");
-    const oobCode = searchParams.get("oobCode");
-    const linkApiKey = searchParams.get("apiKey");
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get("mode");
+      const code = params.get("oobCode");
+      const key = params.get("apiKey");
+      const em = params.get("email");
+      setMode(m);
+      setOobCode(code);
+      setLinkApiKey(key);
+      if (em && !resolvedEmail) {
+        setResolvedEmail(em);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const appApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (mode === "verifyEmail" && oobCode) {
       if (linkApiKey && appApiKey && linkApiKey !== appApiKey) {
@@ -74,18 +89,21 @@ function VerifyEmailContent() {
             await refreshUser();
           } catch {}
           setStatus("success");
+          setTimeout(() => {
+            router.push("/login");
+          }, 1500);
         } catch (err: any) {
           setErrorMessage(err?.message || "Could not verify email. The link may be invalid or expired.");
           setStatus("error");
         }
       })();
     }
-  }, [searchParams, refreshUser, resolvedEmail]);
+  }, [mode, oobCode, linkApiKey, refreshUser, resolvedEmail, router]);
 
   const onResendClick = async () => {
     if (resolvedEmail && resendCooldown === 0) {
       await handleResendVerification(resolvedEmail);
-      setResendCooldown(60); // 60 seconds cooldown
+      setResendCooldown(60);
     }
   };
 
@@ -114,7 +132,7 @@ function VerifyEmailContent() {
           </div>
           <CardTitle className="text-2xl font-bold">Email verified</CardTitle>
           <CardDescription className="text-base">
-            Your account has been verified. You can now sign in.
+            Your account has been verified. Redirecting to sign in.
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex justify-center pt-2">
@@ -147,7 +165,7 @@ function VerifyEmailContent() {
             onClick={onResendClick}
             variant="outline"
             className="w-full h-11"
-            disabled={isLoading || resendCooldown > 0 || !email}
+            disabled={isLoading || resendCooldown > 0 || !resolvedEmail}
           >
             {isLoading ? (
               <>
@@ -184,7 +202,7 @@ function VerifyEmailContent() {
         <CardDescription className="text-base">
           We've sent a verification link to
           <br />
-          <span className="font-medium text-foreground">{email || "your email address"}</span>
+          <span className="font-medium text-foreground">{resolvedEmail || "your email address"}</span>
         </CardDescription>
       </CardHeader>
       
@@ -228,13 +246,7 @@ function VerifyEmailContent() {
 export default function VerifyEmailPage() {
   return (
     <AuthLayout>
-      <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-        </div>
-      }>
-        <VerifyEmailContent />
-      </Suspense>
+      <VerifyEmailContent />
     </AuthLayout>
   );
 }
