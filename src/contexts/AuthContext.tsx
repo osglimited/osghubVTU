@@ -242,6 +242,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const { user } = userCredential;
 
+      try {
+        await user.reload();
+      } catch {}
+
       // Check if email is verified
       if (!user.emailVerified) {
         await signOut();
