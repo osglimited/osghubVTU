@@ -248,7 +248,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Check if email is verified
       if (!user.emailVerified) {
-        await signOut();
         throw new Error('Please verify your email before signing in.');
       }
 

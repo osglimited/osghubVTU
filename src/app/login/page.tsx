@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { SiGoogle, SiApple } from "react-icons/si";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { useAuthForm } from "@/hooks/useAuthForm";
+import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function LoginPage() {
     needsVerification,
     pendingEmail,
     handleResendVerificationFor,
+    handleResendVerification,
     setShowPassword: setShowPasswordFromHook,
   } = useAuthForm();
   const [socialLoading, setSocialLoading] = useState(false);
@@ -90,6 +92,27 @@ export default function LoginPage() {
                 {isLoading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>) : 'Resend verification email'}
               </Button>
             </form>
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 h-11"
+                onClick={() => handleResendVerification(pendingEmail)}
+                disabled={isLoading}
+              >
+                {isLoading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>) : 'Resend to same email'}
+              </Button>
+              <Button
+                type="button"
+                className="flex-1 h-11"
+                onClick={async () => {
+                  try { await auth.currentUser?.reload(); } catch {}
+                  router.push('/dashboard');
+                }}
+              >
+                I verified, continue
+              </Button>
+            </div>
             <div className="text-xs text-muted-foreground text-center">
               After verifying, return to sign in and try again.
             </div>
