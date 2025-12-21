@@ -35,7 +35,14 @@ function VerifyEmailContent() {
   useEffect(() => {
     const mode = searchParams.get("mode");
     const oobCode = searchParams.get("oobCode");
+    const linkApiKey = searchParams.get("apiKey");
+    const appApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (mode === "verifyEmail" && oobCode) {
+      if (linkApiKey && appApiKey && linkApiKey !== appApiKey) {
+        setErrorMessage("The verification link is for a different Firebase project. Please resend the verification email.");
+        setStatus("error");
+        return;
+      }
       setStatus("verifying");
       (async () => {
         try {
