@@ -21,6 +21,7 @@ function VerifyEmailContent() {
   const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { refreshUser } = useAuth();
+  const [resolvedEmail, setResolvedEmail] = useState<string | null>(email || auth.currentUser?.email || null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -47,7 +48,11 @@ function VerifyEmailContent() {
       (async () => {
         try {
           try {
-            await checkActionCode(auth, oobCode);
+            const info = await checkActionCode(auth, oobCode);
+            const infoEmail = (info as any)?.data?.email || (info as any)?.email;
+            if (infoEmail && !resolvedEmail) {
+              setResolvedEmail(infoEmail);
+            }
           } catch (checkErr: any) {
             setErrorMessage("This verification link is invalid or has already been used. Please resend the verification email.");
             setStatus("error");
@@ -75,11 +80,11 @@ function VerifyEmailContent() {
         }
       })();
     }
-  }, [searchParams, refreshUser]);
+  }, [searchParams, refreshUser, resolvedEmail]);
 
   const onResendClick = async () => {
-    if (email && resendCooldown === 0) {
-      await handleResendVerification(email);
+    if (resolvedEmail && resendCooldown === 0) {
+      await handleResendVerification(resolvedEmail);
       setResendCooldown(60); // 60 seconds cooldown
     }
   };
@@ -192,7 +197,7 @@ function VerifyEmailContent() {
           onClick={onResendClick}
           variant="outline"
           className="w-full h-11"
-          disabled={isLoading || resendCooldown > 0 || !email}
+          disabled={isLoading || resendCooldown > 0 || !resolvedEmail}
         >
           {isLoading ? (
             <>
