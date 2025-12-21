@@ -199,9 +199,11 @@ export default function RegisterPage() {
       <Card className="bg-card/90 border-border shadow-lg">
         <CardHeader className="space-y-1 pb-6">
           <div className="lg:hidden flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">VTU</span>
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="OSGHub VTU Logo" 
+              className="h-8 w-auto"
+            />
             <span className="font-semibold text-foreground">OSGHub VTU</span>
           </div>
           <h1 className="text-3xl font-bold text-foreground" data-testid="text-register-heading">
