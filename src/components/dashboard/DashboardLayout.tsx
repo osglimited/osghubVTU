@@ -10,14 +10,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
 
-  const navItems = [
+  const primaryItems = [
     { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
     { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
     { href: '/dashboard/transactions', label: 'Transactions', icon: List },
-    { href: '/dashboard/profile', label: 'Profile', icon: User },
-    { href: '/dashboard/settings', label: 'Settings', icon: Settings },
-    { href: '/dashboard/security', label: 'Security', icon: ShieldCheck },
-    { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
   ];
 
   const serviceItems = [
@@ -26,6 +22,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/services/cable', label: 'Cable TV', icon: Tv },
     { href: '/dashboard/services/electricity', label: 'Electricity', icon: Zap },
     { href: '/dashboard/services/exam-pins', label: 'Exam PINs', icon: FileText },
+  ];
+  
+  const accountItems = [
+    { href: '/dashboard/profile', label: 'Profile', icon: User },
+    { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+    { href: '/dashboard/security', label: 'Security', icon: ShieldCheck },
+    { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
   ];
 
   return (
@@ -37,16 +40,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
         <nav className="px-2 space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50 ${pathname === href ? 'bg-gray-100 text-[#0A1F44] font-semibold' : 'text-gray-700'}`}>
+          {primaryItems.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50 ${
+                pathname === href ? 'bg-gray-100 text-[#0A1F44] font-semibold' : 'text-gray-700'
+              }`}
+            >
               <Icon size={18} className="text-[#F97316]" />
               {label}
             </Link>
           ))}
           <div className="px-3 pt-4 text-xs font-semibold text-gray-500">Services</div>
           {serviceItems.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50 ${pathname === href ? 'bg-gray-100 text-[#0A1F44] font-semibold' : 'text-gray-700'}`}>
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50 ${
+                pathname === href ? 'bg-gray-100 text-[#0A1F44] font-semibold' : 'text-gray-700'
+              }`}
+            >
               <Icon size={18} className="text-[#F97316]" />
+              {label}
+            </Link>
+          ))}
+          <div className="my-3 border-t border-gray-200" />
+          <div className="px-3 pt-2 text-xs font-semibold text-gray-400">Account &amp; Support</div>
+          {accountItems.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50 ${
+                pathname === href ? 'bg-gray-100 text-[#0A1F44]' : 'text-gray-600'
+              } text-sm`}
+            >
+              <Icon size={16} className={`${pathname === href ? 'text-[#F97316]' : 'text-gray-400'}`} />
               {label}
             </Link>
           ))}
