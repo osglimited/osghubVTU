@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export interface ServiceDoc {
@@ -13,6 +13,74 @@ export interface ServiceDoc {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface TransactionResult {
+  success: boolean;
+  message: string;
+  transactionId?: string;
+}
+
+export const processTransaction = async (
+  userId: string, 
+  amount: number, 
+  serviceType: string, 
+  details: any
+): Promise<TransactionResult> => {
+  try {
+    return await runTransaction(db, async (transaction) => {
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await transaction.get(userRef);
+      
+      if (!userDoc.exists()) {
+        throw new Error('User not found');
+      }
+      
+      const userData = userDoc.data();
+      const currentBalance = userData.walletBalance || 0;
+      
+      if (currentBalance < amount) {
+        throw new Error('Insufficient wallet balance');
+      }
+      
+      // Calculate 3% cashback
+      const cashbackAmount = amount * 0.03;
+      
+      // Deduct amount from main wallet and add cashback to cashback wallet
+      const newBalance = currentBalance - amount;
+      const currentCashback = userData.cashbackBalance || 0;
+      const newCashback = currentCashback + cashbackAmount;
+      
+      transaction.update(userRef, {
+        walletBalance: newBalance,
+        cashbackBalance: newCashback
+      });
+      
+      // Create transaction record
+      const transactionRef = doc(collection(db, 'transactions'));
+      transaction.set(transactionRef, {
+        userId,
+        type: serviceType,
+        amount,
+        cashbackEarned: cashbackAmount,
+        details,
+        status: 'success',
+        createdAt: new Date().toISOString()
+      });
+      
+      return {
+        success: true,
+        message: 'Transaction successful',
+        transactionId: transactionRef.id
+      };
+    });
+  } catch (error: any) {
+    console.error('Transaction failed:', error);
+    return {
+      success: false,
+      message: error.message || 'Transaction failed'
+    };
+  }
+};
 
 export const getServices = async (): Promise<ServiceDoc[]> => {
   const col = collection(db, 'services');

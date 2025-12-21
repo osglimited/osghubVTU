@@ -155,7 +155,7 @@ export default function Landing() {
             Join thousands of users who trust OSGHUB for their daily transactions.
           </p>
           <div className="pt-4">
-            <Link href="/auth/register">
+            <Link href="/register">
               <Button size="lg" className="h-14 px-8 text-lg font-bold bg-accent hover:bg-accent/90 text-accent-foreground">
                 Create Free Account
               </Button>

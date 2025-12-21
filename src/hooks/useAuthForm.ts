@@ -4,8 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { SignUpData, LoginCredentials } from '@/types/auth';
-import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword, sendEmailVerification, signOut as firebaseSignOut } from 'firebase/auth';
 
 // Validation schemas
 const baseSignUpSchema = z.object({
@@ -63,8 +61,6 @@ export function useAuthForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors<SignUpData & LoginCredentials>>({});
   const [showPassword, setShowPassword] = useState(false);
-  const [needsVerification, setNeedsVerification] = useState(false);
-  const [pendingEmail, setPendingEmail] = useState<string>('');
 
   const validateForm = <T extends Record<string, any>>(
     data: T,
@@ -110,7 +106,8 @@ export function useAuthForm() {
 
       console.log('[DEBUG] handleSignUp success', { email: data.email });
       addNotification('success', 'Account created!', 'Please check your email to verify your account.');
-      router.push('/login');
+      // Also navigate to verify page here for redundancy
+      router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
     } catch (error: any) {
       console.error('[DEBUG] handleSignUp error', error);
       addNotification('error', 'Error', error.message || 'Failed to create account. Please try again.');
@@ -132,17 +129,11 @@ export function useAuthForm() {
         password: data.password,
         rememberMe: data.rememberMe,
       });
+
       addNotification('success', 'Welcome back!', 'You have been successfully logged in.');
       router.push('/dashboard');
     } catch (error: any) {
-      const msg = error.message || '';
-      if (msg.toLowerCase().includes('verify your email')) {
-        setNeedsVerification(true);
-        setPendingEmail(data.email);
-        addNotification('warning', 'Email not verified', 'Please verify your email to continue.');
-      } else {
-        addNotification('error', 'Login failed', msg || 'Invalid email or password. Please try again.');
-      }
+      addNotification('error', 'Login failed', error.message || 'Invalid email or password. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -181,24 +172,6 @@ export function useAuthForm() {
       setIsLoading(false);
     }
   };
-  
-  const handleResendVerificationFor = async (email: string, password: string) => {
-    if (!email || !password) {
-      setErrors({ email: !email ? 'Email is required' : undefined, password: !password ? 'Password is required' : undefined } as any);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      await sendEmailVerification(cred.user);
-      await firebaseSignOut(auth);
-      addNotification('success', 'Email sent', 'Verification email has been resent. Please check your inbox.');
-    } catch (error: any) {
-      addNotification('error', 'Error', error.message || 'Failed to resend verification email.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return {
     isLoading,
@@ -210,9 +183,5 @@ export function useAuthForm() {
     handleLogin,
     handleForgotPassword,
     handleResendVerification,
-    handleResendVerificationFor,
-    needsVerification,
-    pendingEmail,
-    setNeedsVerification,
   };
 }

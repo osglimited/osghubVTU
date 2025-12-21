@@ -53,6 +53,10 @@ export default function RegisterPage() {
   
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  // On-screen debug panel state (used for testing when DevTools aren't open)
+  const [debugVisible, setDebugVisible] = useState(false);
+  const [debugMessages, setDebugMessages] = useState<string[]>([]);
+  const addDebug = (msg: string) => setDebugMessages(prev => [...prev, `${new Date().toISOString()} - ${msg}`]);
   const [isSocialLoading, setIsSocialLoading] = useState(false);
 
   const { 
@@ -69,7 +73,28 @@ export default function RegisterPage() {
     }
   }, [formData]);
 
-  // Remove temporary debug capture; registration flow is stable
+  // Show validation failures in the debug panel and auto-open it
+  useEffect(() => {
+    if (Object.keys(formErrors).length > 0) {
+      const entries = Object.entries(formErrors).map(([k, v]) => `${k}: ${v}`).join(' | ');
+      addDebug(`[VALIDATION] ${entries}`);
+      setDebugVisible(true);
+    }
+  }, [formErrors]);
+
+  // Capture global errors to the debug panel (helpful while testing)
+  useEffect(() => {
+    const onError = (e: ErrorEvent) => addDebug(`[window/error] ${e?.message || 'unknown error'}`);
+    const onRejection = (e: PromiseRejectionEvent) => addDebug(`[unhandledrejection] ${e?.reason || e}`);
+
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection as any);
+
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection as any);
+    };
+  }, []);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -130,6 +155,9 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     if (e) e.preventDefault();
 
+    // Debug log to confirm submit fired
+    console.log('[DEBUG] Registration form submit fired', formData);
+    addDebug(`[SUBMIT] Registration form submit fired: ${formData.email} | ${formData.username}`);
     logger.debug('Registration form submission started', {
       email: formData.email,
       username: formData.username,
@@ -151,6 +179,10 @@ export default function RegisterPage() {
         username: formData.username
       });
 
+      // Debug log before calling handleSignUp
+      console.log('[DEBUG] Calling handleSignUp', { email: formData.email, username: formData.username });
+      addDebug(`[ACTION] Calling handleSignUp for ${formData.email}`);
+      
       await handleSignUp({
         fullName: formData.fullName,
         username: formData.username,
@@ -164,8 +196,13 @@ export default function RegisterPage() {
       });
       
       logger.info('User registration successful', { email: formData.email });
-      router.push('/login');
+      addDebug(`[SUCCESS] Registration completed for ${formData.email}`);
+      
+      // Redirect to email verification page
+      router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
     } catch (error: unknown) {
+      console.error('[DEBUG] Registration failed', error);
+      addDebug(`[ERROR] Registration failed: ${String(error)}`);
       logger.error('Registration failed', error, {
         email: formData.email,
         username: formData.username
@@ -191,19 +228,56 @@ export default function RegisterPage() {
     }
   };
 
+  // Attach capture-phase listeners to detect event interception
   const formRef = useRef<HTMLFormElement | null>(null);
   const submitButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const formEl = formRef.current;
+    const btn = submitButtonRef.current;
+    if (!formEl || !btn) return;
+
+    const onFormSubmitCapture = (e: Event) => {
+      addDebug('[CAPTURE] form submit captured');
+      console.log('[CAPTURE] form submit captured', e);
+    };
+
+    const onFormSubmitBubble = (e: Event) => {
+      addDebug('[BUBBLE] form submit bubbled');
+      console.log('[BUBBLE] form submit bubbled', e);
+    };
+
+    const onBtnClickCapture = (e: Event) => {
+      addDebug('[CAPTURE] register button click captured');
+      console.log('[CAPTURE] register button click captured', e);
+    };
+
+    const onBtnClick = (e: Event) => {
+      addDebug('[BUBBLE] register button click bubbled');
+      console.log('[BUBBLE] register button click bubbled', e);
+    };
+
+    formEl.addEventListener('submit', onFormSubmitCapture, true);
+    formEl.addEventListener('submit', onFormSubmitBubble, false);
+    btn.addEventListener('click', onBtnClickCapture, true);
+    btn.addEventListener('click', onBtnClick, false);
+
+    return () => {
+      formEl.removeEventListener('submit', onFormSubmitCapture, true);
+      formEl.removeEventListener('submit', onFormSubmitBubble, false);
+      btn.removeEventListener('click', onBtnClickCapture, true);
+      btn.removeEventListener('click', onBtnClick, false);
+    };
+  }, [formRef.current, submitButtonRef.current]);
 
   return (
     <AuthLayout>
       <Card className="bg-card/90 border-border shadow-lg">
         <CardHeader className="space-y-1 pb-6">
           <div className="lg:hidden flex items-center gap-2 mb-4">
-            <img 
-              src="/logo.png" 
-              alt="OSGHub VTU Logo" 
-              className="h-8 w-auto"
-            />
+            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">VTU</span>
+            </div>
             <span className="font-semibold text-foreground">OSGHub VTU</span>
           </div>
           <h1 className="text-3xl font-bold text-foreground" data-testid="text-register-heading">
@@ -558,7 +632,47 @@ export default function RegisterPage() {
             </Button>
           </div>
 
-          
+          {/* On-screen debug panel (visible when testing) */}
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setDebugVisible(v => !v)}
+              className="text-sm text-muted-foreground hover:underline mr-3"
+            >
+              {debugVisible ? 'Hide debug panel' : `Show debug (${debugMessages.length})`}
+            </button>
+
+            {debugVisible && (
+              <div className="mt-3 p-3 border rounded bg-gray-50 text-sm">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-xs text-muted-foreground">Debug logs (auto-captured)</div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { navigator.clipboard?.writeText(debugMessages.join('\n')); }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Copy logs
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDebugMessages([])}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-40 overflow-auto">
+                  {debugMessages.length === 0 ? (
+                    <div className="text-xs text-muted-foreground">No logs yet</div>
+                  ) : (
+                    <pre className="whitespace-pre-wrap text-xs">{debugMessages.join('\n')}</pre>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}

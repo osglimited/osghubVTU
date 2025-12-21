@@ -73,11 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await updateDoc(userRef, { accountStatus: 'active' });
           userData.accountStatus = 'active';
         }
-        
-        if (typeof (userData as any).notificationsEmailEnabled === 'undefined') {
-          await updateDoc(userRef, { notificationsEmailEnabled: true });
-          (userData as any).notificationsEmailEnabled = true;
-        }
 
         setState(prev => ({
           ...prev,
@@ -103,8 +98,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           referral: undefined,
           isVerified: firebaseUser.emailVerified,
           walletBalance: 0,
+          referralBalance: 0,
+          cashbackBalance: 0,
           accountStatus: 'active',
-          notificationsEmailEnabled: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -179,8 +175,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         displayName: data.fullName,
       });
 
-      // Send email verification using Firebase-hosted flow
-      await firebaseSendEmailVerification(user);
+      // Send email verification with explicit redirect URL
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://osghubvtu.onrender.com';
+      await firebaseSendEmailVerification(user, {
+        url: `${appUrl}/verify-email?email=${encodeURIComponent(data.email)}`,
+        handleCodeInApp: true,
+      });
 
       // Hash the transaction PIN
       const pinHash = await generateHash(data.transactionPin);
@@ -202,8 +202,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         referral: data.referralUsername,
         isVerified: false,
         walletBalance: 0,
+        referralBalance: 0,
+        cashbackBalance: 0,
         accountStatus: 'active',
-        notificationsEmailEnabled: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -242,18 +243,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const { user } = userCredential;
 
-      try {
-        await user.reload();
-      } catch {}
-
       // Check if email is verified
       if (!user.emailVerified) {
+        await signOut();
         throw new Error('Please verify your email before signing in.');
       }
-
-      try {
-        await user.getIdToken(true);
-      } catch {}
 
       // If email is verified, make sure Firestore reflects it
       try {
@@ -312,7 +306,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     try {
-      await firebaseSendEmailVerification(auth.currentUser);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://osghubvtu.onrender.com';
+      await firebaseSendEmailVerification(auth.currentUser, {
+        url: `${appUrl}/verify-email?email=${encodeURIComponent(auth.currentUser.email || '')}`,
+        handleCodeInApp: true,
+      });
     } catch (error) {
       console.error('Error sending email verification:', error);
       throw new Error('Failed to send verification email');

@@ -12,7 +12,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { SiGoogle, SiApple } from "react-icons/si";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { useAuthForm } from "@/hooks/useAuthForm";
-import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,11 +26,6 @@ export default function LoginPage() {
     isLoading,
     errors,
     handleLogin,
-    needsVerification,
-    pendingEmail,
-    handleResendVerificationFor,
-    handleResendVerification,
-    setShowPassword: setShowPasswordFromHook,
   } = useAuthForm();
   const [socialLoading, setSocialLoading] = useState(false);
 
@@ -49,90 +43,14 @@ export default function LoginPage() {
     }
   };
 
-  if (needsVerification) {
-    return (
-      <AuthLayout>
-        <Card className="bg-card/90 border-border shadow-lg max-w-md w-full">
-          <CardHeader className="space-y-1 pb-6 text-center">
-            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-              <Mail className="w-6 h-6 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Please verify your email
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              We sent a verification link to <span className="font-medium">{pendingEmail}</span>.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget as HTMLFormElement);
-                const password = String(fd.get('password') || '');
-                handleResendVerificationFor(pendingEmail, password);
-              }}
-              className="space-y-3"
-            >
-              <Label htmlFor="password" className="text-sm font-medium text-foreground">
-                Enter your password to resend verification
-              </Label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input id="password" name="password" type={showPassword ? 'text' : 'password'} className="h-12 pl-11 pr-11 bg-background border-border focus:ring-ring" />
-                <button
-                  type="button"
-                  onClick={() => { setShowPassword(!showPassword); setShowPasswordFromHook(!showPassword); }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              <Button type="submit" className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-medium" disabled={isLoading}>
-                {isLoading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>) : 'Resend verification email'}
-              </Button>
-            </form>
-            <div className="flex items-center justify-between gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1 h-11"
-                onClick={() => handleResendVerification(pendingEmail)}
-                disabled={isLoading}
-              >
-                {isLoading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>) : 'Resend to same email'}
-              </Button>
-              <Button
-                type="button"
-                className="flex-1 h-11"
-                onClick={async () => {
-                  try { await auth.currentUser?.reload(); } catch {}
-                  router.push('/dashboard');
-                }}
-              >
-                I verified, continue
-              </Button>
-            </div>
-            <div className="text-xs text-muted-foreground text-center">
-              After verifying, return to sign in and try again.
-            </div>
-          </CardContent>
-          <CardContent>
-            <Link href="/register" className="text-sm text-primary hover:underline">
-              Need an account? Sign up
-            </Link>
-          </CardContent>
-        </Card>
-      </AuthLayout>
-    );
-  }
-
   return (
     <AuthLayout>
       <Card className="bg-card/90 border-border shadow-lg">
         <CardHeader className="space-y-1 pb-6">
           <div className="lg:hidden flex items-center gap-2 mb-4">
-            <img src="/logo.png" alt="OSGHub VTU Logo" className="h-8 w-auto" />
+            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">VTU</span>
+            </div>
             <span className="font-semibold text-foreground">OSGHub VTU</span>
           </div>
           <h1 className="text-3xl font-bold text-foreground" data-testid="text-login-heading">
