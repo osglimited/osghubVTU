@@ -1,0 +1,56 @@
+[
+  {
+    "slug": "airtime",
+    "name": "Airtime",
+    "category": "vtu",
+    "description": "Instant airtime for MTN, Glo, Airtel and 9mobile.",
+    "icon": "smartphone",
+    "enabled": true,
+    "config": {
+      "networks": ["MTN", "Glo", "Airtel", "9mobile"],
+      "amounts": [500, 1000, 5000, 10000]
+    },
+    "createdAt": "2025-12-19T00:00:00Z",
+    "updatedAt": "2025-12-19T00:00:00Z"
+  },
+  {
+    "slug": "data",
+    "name": "Data",
+    "category": "vtu",
+    "description": "Purchase data bundles for all networks.",
+    "icon": "wifi",
+    "enabled": true,
+    "config": {
+      "networks": ["MTN", "Glo", "Airtel", "9mobile"],
+      "plans": ["500MB", "1GB", "3GB", "5GB"]
+    },
+    "createdAt": "2025-12-19T00:00:00Z",
+    "updatedAt": "2025-12-19T00:00:00Z"
+  },
+  {
+    "slug": "electricity",
+    "name": "Electricity",
+    "category": "utility",
+    "description": "Pay for electricity tokens and bills.",
+    "icon": "zap",
+    "enabled": true,
+    "config": {
+      "discos": ["IKEDC", "EKEDC", "AEDC", "BENDC"]
+    },
+    "createdAt": "2025-12-19T00:00:00Z",
+    "updatedAt": "2025-12-19T00:00:00Z"
+  },
+  {
+    "slug": "tv",
+    "name": "Cable TV",
+    "category": "entertainment",
+    "description": "Pay for DSTV, GOTV, Startimes and other providers.",
+    "icon": "tv",
+    "enabled": false,
+    "config": {
+      "providers": ["DSTV", "GOTV", "Startimes"]
+    },
+    "createdAt": "2025-12-19T00:00:00Z",
+    "updatedAt": "2025-12-19T00:00:00Z"
+  }
+]
