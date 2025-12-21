@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { useAuthForm } from "@/hooks/useAuthForm";
-import { applyActionCode } from "firebase/auth";
+import { applyActionCode, checkActionCode } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,6 +46,13 @@ function VerifyEmailContent() {
       setStatus("verifying");
       (async () => {
         try {
+          try {
+            await checkActionCode(auth, oobCode);
+          } catch (checkErr: any) {
+            setErrorMessage("This verification link is invalid or has already been used. Please resend the verification email.");
+            setStatus("error");
+            return;
+          }
           await applyActionCode(auth, oobCode);
           try {
             await auth.currentUser?.reload();
