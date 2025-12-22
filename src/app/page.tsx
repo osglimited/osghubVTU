@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Check, Zap, Smartphone, Shield, Globe, Clock, ArrowRight, Users } from "lucide-react";
 import Link from 'next/link';
 import Image from 'next/image';
+import { ServiceSlider } from "@/components/ServiceSlider";
 
 // Using a placeholder image from the public directory
 const heroImage = "/assets/images/hero-placeholder.png";
@@ -217,5 +218,4 @@ function PricingCard({ title, price, features, isPopular }: { title: string, pri
     </Card>
   )
 }
-
 
