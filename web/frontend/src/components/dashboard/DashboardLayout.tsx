@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
-import { LayoutDashboard, Wallet, List, User, Settings, ShieldCheck, LifeBuoy, Smartphone, Wifi, Tv, Zap, FileText, LogOut, Bell } from 'lucide-react';
+import { LayoutDashboard, Wallet, List, User, Settings, ShieldCheck, LifeBuoy, Smartphone, Wifi, Tv, Zap, FileText, LogOut, Bell, Menu, Eye, EyeOff, X } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
@@ -33,6 +34,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
+      {/** Mobile drawer */}
+      <MobileSidebar
+        openLabel="Menu"
+        pathname={pathname}
+        onLogout={async () => { await signOut(); router.push('/'); }}
+        items={{ primary: primaryItems, services: serviceItems, account: accountItems }}
+      />
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex-col overflow-y-auto">
         <div className="flex flex-col h-full">
           <div className="p-4">
@@ -97,15 +105,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <header className="bg-white border-b border-gray-200">
           <div className="container-main py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
+              <button className="md:hidden p-2 rounded-md border border-gray-200" onClick={() => (document.getElementById('mobile-sidebar-toggle') as HTMLButtonElement)?.click()}>
+                <Menu className="text-[#0A1F44]" />
+              </button>
               <Bell className="text-[#F97316]" />
               <div>
                 <div className="font-semibold text-[#0A1F44]">{user?.fullName || 'User'}</div>
                 <div className="text-sm text-gray-500">@{user?.username}</div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-500">Wallet Balance</div>
-              <div className="text-2xl font-bold">₦{(user?.walletBalance || 0).toLocaleString()}</div>
+            <WalletBalanceHeader />
             </div>
           </div>
         </header>
@@ -114,5 +123,96 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </main>
     </div>
+  );
+}
+
+function WalletBalanceHeader() {
+  const { user } = useAuth();
+  const [show, setShow] = useState<boolean>(false);
+  useEffect(() => {
+    const v = sessionStorage.getItem('showMainBalance');
+    setShow(v === 'true');
+  }, []);
+  useEffect(() => {
+    sessionStorage.setItem('showMainBalance', String(show));
+  }, [show]);
+  const amount = `₦${(user?.walletBalance || 0).toLocaleString()}`;
+  return (
+    <div className="text-right">
+      <div className="flex items-center justify-end gap-2">
+        <div className="text-xs text-gray-500">Wallet Balance</div>
+        <button className="p-1 rounded-md border border-gray-200" onClick={() => setShow(s => !s)}>
+          {show ? <Eye size={16} /> : <EyeOff size={16} />}
+        </button>
+      </div>
+      <div className="text-2xl font-bold">{show ? amount : '••••••'}</div>
+    </div>
+  );
+}
+
+function MobileSidebar({
+  pathname,
+  items,
+  onLogout,
+  openLabel,
+}: {
+  pathname: string;
+  items: { primary: { href: string; label: string; icon: any }[]; services: { href: string; label: string; icon: any }[]; account: { href: string; label: string; icon: any }[] };
+  onLogout: () => void;
+  openLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const btn = document.getElementById('mobile-sidebar-toggle');
+    if (!btn) return;
+    btn.onclick = () => setOpen(true);
+  }, []);
+  return (
+    <>
+      <button id="mobile-sidebar-toggle" style={{ position: 'absolute', left: -9999, top: -9999 }} aria-label={openLabel}></button>
+      {open && (
+        <>
+          <div className="fixed inset-0 bg-black/30 z-50" onClick={() => setOpen(false)} />
+          <div className="fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 z-50 flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <span className="font-bold text-[#0A1F44]">OSGHUB VTU</span>
+              <button className="p-2 rounded-md border border-gray-200" onClick={() => setOpen(false)}>
+                <X />
+              </button>
+            </div>
+            <nav className="px-2 py-2 space-y-1 overflow-y-auto">
+              {items.primary.map(({ href, label, icon: Icon }) => (
+                <Link key={href} href={href} className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50 ${pathname === href ? 'bg-gray-100 text-[#0A1F44] font-semibold' : 'text-gray-700'}`} onClick={() => setOpen(false)}>
+                  <Icon size={18} className="text-[#F97316]" />
+                  {label}
+                </Link>
+              ))}
+              <div className="px-3 pt-4 text-xs font-semibold text-gray-500">Services</div>
+              {items.services.map(({ href, label, icon: Icon }) => (
+                <Link key={href} href={href} className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50 ${pathname === href ? 'bg-gray-100 text-[#0A1F44] font-semibold' : 'text-gray-700'}`} onClick={() => setOpen(false)}>
+                  <Icon size={18} className="text-[#F97316]" />
+                  {label}
+                </Link>
+              ))}
+            </nav>
+            <div className="mt-auto border-t border-gray-200">
+              <div className="px-3 pt-3 text-[11px] font-semibold text-gray-500">Account & Support</div>
+              <nav className="px-2 space-y-1 pb-3">
+                {items.account.map(({ href, label, icon: Icon }) => (
+                  <Link key={href} href={href} className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50 ${pathname === href ? 'bg-gray-50 text-[#0A1F44]' : 'text-gray-600'} text-sm`} onClick={() => setOpen(false)}>
+                    <Icon size={18} className="text-[#F97316] opacity-80" />
+                    {label}
+                  </Link>
+                ))}
+                <button onClick={() => { onLogout(); setOpen(false); }} className="flex items-center gap-3 px-3 py-2 mt-1 rounded-md hover:bg-gray-50 text-red-600 text-sm">
+                  <LogOut size={18} />
+                  Logout
+                </button>
+              </nav>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }

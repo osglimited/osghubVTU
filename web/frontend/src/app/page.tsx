@@ -32,7 +32,7 @@ export default function Landing() {
                 The smartest way to buy airtime, data bundles, and pay utility bills. Instant delivery, zero downtime with OSGHUB.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Link href="/auth/register">
+                <Link href="/register">
                   <Button size="lg" className="h-12 px-8 text-base">Get Started Now</Button>
                 </Link>
                 <Link href="/services/vtu">
