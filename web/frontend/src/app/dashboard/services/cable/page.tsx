@@ -6,12 +6,14 @@ import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { processTransaction } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 const CABLE_PROVIDERS = ['DSTV', 'GOTV', 'Startimes'];
 
 export default function CablePage() {
   const { user } = useAuth();
   const { service, loading, error } = useService('tv');
+  const { addNotification } = useNotifications();
   const [provider, setProvider] = useState(CABLE_PROVIDERS[0]);
   const [smartcardNumber, setSmartcardNumber] = useState('');
   const [amount, setAmount] = useState('');
@@ -41,14 +43,14 @@ export default function CablePage() {
       );
 
       if (result.success) {
-        alert('Cable subscription successful!');
+        addNotification('success', 'Cable subscription successful', `${provider} ₦${Number(amount).toLocaleString()}`);
         setSmartcardNumber('');
         setAmount('');
       } else {
-        alert(`Transaction failed: ${result.message}`);
+        addNotification('error', 'Transaction failed', result.message);
       }
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      addNotification('error', 'Error', err.message);
     } finally {
       setProcessing(false);
     }

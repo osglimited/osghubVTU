@@ -2,19 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Smartphone, Wifi, Tv, Zap, Plus, LogOut, CreditCard, GraduationCap, Eye, EyeOff, Wallet, ArrowRightLeft, Loader2 } from 'lucide-react';
+import { Smartphone, Wifi, Tv, Zap, Plus, CreditCard, GraduationCap, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, refreshUser } = useAuth();
   const [showMain, setShowMain] = useState(false);
   const [showCashback, setShowCashback] = useState(false);
   const [showReferral, setShowReferral] = useState(false);
   const [processingWithdrawal, setProcessingWithdrawal] = useState(false);
+  const { addNotification } = useNotifications();
 
   useEffect(() => {
     if (loading) return;
@@ -38,7 +40,7 @@ export default function Dashboard() {
     
     const amount = type === 'referral' ? (user.referralBalance ?? 0) : (user.cashbackBalance ?? 0);
     if (amount <= 0) {
-      alert('Insufficient balance to withdraw');
+      addNotification('warning', 'Insufficient balance', 'No funds available to withdraw');
       return;
     }
 
@@ -67,10 +69,11 @@ export default function Dashboard() {
             walletBalance: newMainBalance
         });
       });
-      alert(`Successfully withdrew ₦${amount.toLocaleString()} to main wallet!`);
+      addNotification('success', 'Withdrawal successful', `₦${amount.toLocaleString()} moved to main wallet`);
+      await refreshUser();
     } catch (error) {
       console.error("Withdrawal failed: ", error);
-      alert("Withdrawal failed. Please try again.");
+      addNotification('error', 'Withdrawal failed', 'Please try again');
     } finally {
       setProcessingWithdrawal(false);
     }
@@ -94,21 +97,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-[#0A1F44]">Welcome, {user.fullName}!</h1>
-            <p className="text-gray-600">@{user.username}</p>
-          </div>
-          <button
-            onClick={async () => {
-              await signOut();
-              router.push('/');
-            }}
-            className="flex items-center gap-2 text-red-500 hover:text-red-700"
-          >
-            <LogOut size={20} /> Logout
-          </button>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-gradient-to-r from-[#0A1F44] to-[#020617] text-white rounded-2xl p-8 shadow-lg">

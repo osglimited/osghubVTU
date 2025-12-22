@@ -5,11 +5,14 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { LayoutDashboard, Wallet, List, User, Settings, ShieldCheck, LifeBuoy, Smartphone, Wifi, Tv, Zap, FileText, LogOut, Bell, Menu, Eye, EyeOff, X } from 'lucide-react';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { notifications, removeNotification, clearNotifications } = useNotifications();
+  const [notifOpen, setNotifOpen] = useState(false);
 
   const primaryItems = [
     { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -108,7 +111,54 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button className="md:hidden p-2 rounded-md border border-gray-200" onClick={() => (document.getElementById('mobile-sidebar-toggle') as HTMLButtonElement)?.click()}>
                 <Menu className="text-[#0A1F44]" />
               </button>
-              <Bell className="text-[#F97316]" />
+              <div className="relative">
+                <button className="p-2 rounded-md border border-gray-200" onClick={() => setNotifOpen((v) => !v)}>
+                  <Bell className="text-[#F97316]" />
+                </button>
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                    {Math.min(notifications.length, 9)}
+                  </span>
+                )}
+                {notifOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                    <div className="absolute right-0 top-10 z-50 w-[90vw] sm:w-80 bg-white border border-gray-200 rounded-lg shadow-lg">
+                      <div className="flex items-center justify-between px-3 py-2 border-b">
+                        <div className="text-sm font-semibold text-[#0A1F44]">Notifications</div>
+                        <button
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                          onClick={() => clearNotifications()}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <div className="max-h-[60vh] sm:max-h-96 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="px-4 py-6 text-sm text-gray-500">No notifications</div>
+                        ) : (
+                          notifications.map((n) => (
+                            <div key={n.id} className="px-4 py-3 border-b last:border-b-0">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-medium">{n.title}</div>
+                                  {n.message && <div className="text-xs text-gray-600 mt-0.5">{n.message}</div>}
+                                </div>
+                                <button
+                                  className="text-xs text-gray-500 hover:text-gray-700"
+                                  onClick={() => removeNotification(n.id)}
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
               <div>
                 <div className="font-semibold text-[#0A1F44]">{user?.fullName || 'User'}</div>
                 <div className="text-sm text-gray-500">@{user?.username}</div>

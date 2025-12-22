@@ -6,6 +6,7 @@ import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { processTransaction } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 export default function AirtimePage() {
   const { user } = useAuth();
@@ -15,6 +16,7 @@ export default function AirtimePage() {
   const [amount, setAmount] = useState('100');
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const { addNotification } = useNotifications();
 
   const handlePurchase = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,14 +41,14 @@ export default function AirtimePage() {
       );
 
       if (result.success) {
-        alert('Airtime purchase successful!');
+        addNotification('success', 'Airtime purchase successful', `₦${Number(amount).toLocaleString()} on ${network}`);
         setPhone('');
         setAmount('100');
       } else {
-        alert(`Transaction failed: ${result.message}`);
+        addNotification('error', 'Transaction failed', result.message);
       }
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      addNotification('error', 'Error', err.message);
     } finally {
       setProcessing(false);
     }

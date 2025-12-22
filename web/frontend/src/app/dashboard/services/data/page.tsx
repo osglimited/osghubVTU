@@ -6,6 +6,7 @@ import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { processTransaction } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 const DATA_PLANS = [
   { id: '500mb', name: '500MB', price: 100 },
@@ -22,6 +23,7 @@ export default function DataPage() {
   const [selectedPlan, setSelectedPlan] = useState(DATA_PLANS[0]);
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const { addNotification } = useNotifications();
 
   const handlePurchase = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,13 +49,13 @@ export default function DataPage() {
       );
 
       if (result.success) {
-        alert('Data purchase successful!');
+        addNotification('success', 'Data purchase successful', `${selectedPlan.name} on ${network}`);
         setPhone('');
       } else {
-        alert(`Transaction failed: ${result.message}`);
+        addNotification('error', 'Transaction failed', result.message);
       }
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      addNotification('error', 'Error', err.message);
     } finally {
       setProcessing(false);
     }
