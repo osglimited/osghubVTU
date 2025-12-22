@@ -11,7 +11,9 @@ import { db } from '@/lib/firebase';
 export default function Dashboard() {
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
-  const [showBalance, setShowBalance] = useState(true);
+  const [showMain, setShowMain] = useState(false);
+  const [showCashback, setShowCashback] = useState(false);
+  const [showReferral, setShowReferral] = useState(false);
   const [processingWithdrawal, setProcessingWithdrawal] = useState(false);
 
   useEffect(() => {
@@ -23,6 +25,12 @@ export default function Dashboard() {
     if (!user.isVerified) {
       router.push('/verify');
     }
+    const sm = sessionStorage.getItem('showMainBalance') === 'true';
+    const sc = sessionStorage.getItem('showCashbackBalance') === 'true';
+    const sr = sessionStorage.getItem('showReferralBalance') === 'true';
+    setShowMain(sm);
+    setShowCashback(sc);
+    setShowReferral(sr);
   }, [user, loading, router]);
 
   const handleWithdraw = async (type: 'referral' | 'cashback') => {
@@ -105,7 +113,12 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-gradient-to-r from-[#0A1F44] to-[#020617] text-white rounded-2xl p-8 shadow-lg">
             <p className="text-blue-200 mb-2">Total Balance</p>
-            <h2 className="text-5xl font-bold mb-8">₦{(user.walletBalance || 0).toLocaleString()}</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-5xl font-bold">{showMain ? `₦${(user.walletBalance || 0).toLocaleString()}` : '••••••'}</h2>
+              <button className="p-2 rounded-md bg-white/10" onClick={() => { setShowMain(s => !s); sessionStorage.setItem('showMainBalance', String(!showMain)); }}>
+                {showMain ? <Eye size={20} /> : <EyeOff size={20} />}
+              </button>
+            </div>
             <button className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-6 py-2 rounded-lg transition">
               <Plus size={20} /> Fund Wallet
             </button>
@@ -118,6 +131,48 @@ export default function Dashboard() {
             </div>
             <p className="text-sm text-gray-600">Status: <span className="font-medium capitalize">{user.accountStatus}</span></p>
             <p className="text-sm text-gray-600 mt-2">Verified: <span className="font-medium">{user.isVerified ? 'Yes' : 'No'}</span></p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-[#0A1F44]">Cashback Balance</h3>
+              <button className="p-2 rounded-md border" onClick={() => { setShowCashback(s => !s); sessionStorage.setItem('showCashbackBalance', String(!showCashback)); }}>
+                {showCashback ? <Eye size={18} /> : <EyeOff size={18} />}
+              </button>
+            </div>
+            <div className="text-3xl font-bold text-[#0A1F44] mb-2">{showCashback ? `₦${(user.cashbackBalance || 0).toLocaleString()}` : '••••••'}</div>
+            <p className="text-sm text-gray-500">Earned from transactions (3% per transaction)</p>
+            <div className="mt-3">
+              <button
+                className="bg-[#F97316] hover:bg-[#ea6d0f] text-white px-4 py-2 rounded-md text-sm"
+                onClick={() => handleWithdraw('cashback')}
+                disabled={processingWithdrawal || (user.cashbackBalance || 0) <= 0}
+              >
+                Transfer to Wallet
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-[#0A1F44]">Referral Balance</h3>
+              <button className="p-2 rounded-md border" onClick={() => { setShowReferral(s => !s); sessionStorage.setItem('showReferralBalance', String(!showReferral)); }}>
+                {showReferral ? <Eye size={18} /> : <EyeOff size={18} />}
+              </button>
+            </div>
+            <div className="text-3xl font-bold text-[#0A1F44] mb-2">{showReferral ? `₦${(user.referralBalance || 0).toLocaleString()}` : '••••••'}</div>
+            <p className="text-sm text-gray-500">Earned from referrals</p>
+            <div className="mt-3">
+              <button
+                className="bg-[#F97316] hover:bg-[#ea6d0f] text-white px-4 py-2 rounded-md text-sm"
+                onClick={() => handleWithdraw('referral')}
+                disabled={processingWithdrawal || (user.referralBalance || 0) <= 0}
+              >
+                Transfer to Wallet
+              </button>
+            </div>
           </div>
         </div>
 
