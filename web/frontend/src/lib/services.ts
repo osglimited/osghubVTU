@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs, query, where, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import sampleServices from '@/data/services.sample.json';
 
 export interface ServiceDoc {
   id: string;
@@ -83,17 +84,35 @@ export const processTransaction = async (
 };
 
 export const getServices = async (): Promise<ServiceDoc[]> => {
-  const col = collection(db, 'services');
-  const snap = await getDocs(col);
-  return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) } as ServiceDoc));
+  try {
+    const col = collection(db, 'services');
+    const snap = await getDocs(col);
+    if (!snap.empty) {
+      return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) } as ServiceDoc));
+    }
+  } catch (e) {
+    // fall through to sample fallback
+  }
+  return (sampleServices as any[]).map((s) => ({
+    id: s.slug,
+    ...s,
+  })) as ServiceDoc[];
 };
 
 export const getServiceBySlug = async (slug: string): Promise<ServiceDoc | null> => {
-  const q = query(collection(db, 'services'), where('slug', '==', slug));
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  const d = snap.docs[0];
-  return { id: d.id, ...(d.data() as any) } as ServiceDoc;
+  try {
+    const q = query(collection(db, 'services'), where('slug', '==', slug));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const d = snap.docs[0];
+      return { id: d.id, ...(d.data() as any) } as ServiceDoc;
+    }
+  } catch (e) {
+    // fall through to sample lookup
+  }
+  const local = (sampleServices as any[]).find((s) => s.slug === slug);
+  if (!local) return null;
+  return { id: local.slug, ...(local as any) } as ServiceDoc;
 };
 
 export const getServiceById = async (id: string): Promise<ServiceDoc | null> => {
