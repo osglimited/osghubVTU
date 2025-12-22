@@ -25,7 +25,9 @@ export default function LoginPage() {
   const {
     isLoading,
     errors,
+    needsVerification,
     handleLogin,
+    handleResendVerification,
   } = useAuthForm();
   const [socialLoading, setSocialLoading] = useState(false);
 
@@ -173,6 +175,29 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          {errors.general && (
+            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              {errors.general}
+            </div>
+          )}
+
+          {needsVerification && (
+            <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
+              <div className="text-sm text-blue-900 mb-2">
+                Please verify your email to continue. Check your inbox for the verification link.
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                onClick={() => handleResendVerification(formData.email)}
+                disabled={isLoading}
+              >
+                Resend verification email
+              </Button>
+            </div>
+          )}
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">

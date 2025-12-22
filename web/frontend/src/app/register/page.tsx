@@ -165,8 +165,7 @@ export default function RegisterPage() {
       
       logger.info('User registration successful', { email: formData.email });
       
-      // Redirect to email verification page
-      router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+      // Inform user to check email for verification; no custom page redirect
     } catch (error: unknown) {
       console.error('Registration failed', error);
       logger.error('Registration failed', error, {

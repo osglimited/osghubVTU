@@ -60,6 +60,7 @@ export function useAuthForm() {
   const { signUp, signIn, resetPassword, verifyEmail } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors<SignUpData & LoginCredentials>>({});
+  const [needsVerification, setNeedsVerification] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const validateForm = <T extends Record<string, any>>(
@@ -105,9 +106,7 @@ export function useAuthForm() {
       });
 
       console.log('[DEBUG] handleSignUp success', { email: data.email });
-      addNotification('success', 'Account created!', 'Please check your email to verify your account.');
-      // Also navigate to verify page here for redundancy
-      router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
+      addNotification('success', 'Account created!', 'Please check your inbox for the verification email.');
     } catch (error: any) {
       console.error('[DEBUG] handleSignUp error', error);
       addNotification('error', 'Error', error.message || 'Failed to create account. Please try again.');
@@ -133,7 +132,14 @@ export function useAuthForm() {
       addNotification('success', 'Welcome back!', 'You have been successfully logged in.');
       router.push('/dashboard');
     } catch (error: any) {
-      addNotification('error', 'Login failed', error.message || 'Invalid email or password. Please try again.');
+      const msg = error.message || 'Invalid email or password. Please try again.';
+      addNotification('error', 'Login failed', msg);
+      setErrors(prev => ({ ...prev, general: msg }));
+      if (msg.toLowerCase().includes('verify your email')) {
+        setNeedsVerification(true);
+      } else {
+        setNeedsVerification(false);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -176,6 +182,7 @@ export function useAuthForm() {
   return {
     isLoading,
     errors,
+    needsVerification,
     showPassword,
     setShowPassword,
     setErrors,
