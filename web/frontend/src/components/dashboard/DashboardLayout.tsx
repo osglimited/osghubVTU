@@ -1,14 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
-import { LayoutDashboard, Wallet, List, User, Settings, ShieldCheck, LifeBuoy, Smartphone, Wifi, Tv, Zap, FileText, LogOut, Bell, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Wallet, List, User, Settings, ShieldCheck, LifeBuoy, Smartphone, Wifi, Tv, Zap, FileText, LogOut, Bell } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -62,15 +60,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
       </aside>
       <main className="flex-1">
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <header className="bg-white border-b border-gray-200">
           <div className="container-main py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button 
-                className="md:hidden p-1 hover:bg-gray-100 rounded-md" 
-                onClick={() => setIsMobileMenuOpen(true)}
-              >
-                <Menu size={24} className="text-[#0A1F44]" />
-              </button>
               <Bell className="text-[#F97316]" />
               <div>
                 <div className="font-semibold text-[#0A1F44]">{user?.fullName || 'User'}</div>

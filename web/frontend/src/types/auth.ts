@@ -19,8 +19,8 @@ export interface UserProfile {
   referral?: string;
   isVerified: boolean;
   walletBalance: number; // balance stored in Naira (plain number)
-  referralBalance: number;
-  cashbackBalance: number;
+  referralBalance?: number;
+  cashbackBalance?: number;
   accountStatus?: 'active' | 'suspended' | 'closed';
   createdAt: string;
   updatedAt: string;

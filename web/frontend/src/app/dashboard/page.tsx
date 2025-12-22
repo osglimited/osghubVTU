@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Navbar } from '@/components/Navbar';
-import { Footer } from '@/components/Footer';
 import { Smartphone, Wifi, Tv, Zap, Plus, LogOut, CreditCard, GraduationCap, Eye, EyeOff, Wallet, ArrowRightLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,7 +28,7 @@ export default function Dashboard() {
   const handleWithdraw = async (type: 'referral' | 'cashback') => {
     if (!user || processingWithdrawal) return;
     
-    const amount = type === 'referral' ? (user.referralBalance || 0) : (user.cashbackBalance || 0);
+    const amount = type === 'referral' ? (user.referralBalance ?? 0) : (user.cashbackBalance ?? 0);
     if (amount <= 0) {
       alert('Insufficient balance to withdraw');
       return;
@@ -72,27 +70,23 @@ export default function Dashboard() {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC]">
-        <Navbar />
-        <div className="container-main py-12">
-          <div className="h-48 rounded-2xl bg-gray-100 animate-pulse" />
-        </div>
+      <div className="py-12">
+        <div className="h-48 rounded-2xl bg-gray-100 animate-pulse" />
       </div>
     );
   }
 
   const actions = [
-    { icon: Smartphone, label: 'Airtime', href: '/services/airtime' },
-    { icon: Wifi, label: 'Data', href: '/services/data' },
-    { icon: Tv, label: 'Cable TV', href: '/services/tv' },
-    { icon: Zap, label: 'Electricity', href: '/services/electricity' },
+    { icon: Smartphone, label: 'Airtime', href: '/dashboard/services/airtime' },
+    { icon: Wifi, label: 'Data', href: '/dashboard/services/data' },
+    { icon: Tv, label: 'Cable TV', href: '/dashboard/services/cable' },
+    { icon: Zap, label: 'Electricity', href: '/dashboard/services/electricity' },
+    { icon: GraduationCap, label: 'Exam PINs', href: '/dashboard/services/exam-pins' },
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
-      <Navbar />
-      <div className="container-main py-8 space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-[#0A1F44]">Welcome, {user.fullName}!</h1>
             <p className="text-gray-600">@{user.username}</p>
@@ -150,8 +144,6 @@ export default function Dashboard() {
             <p>No transactions yet</p>
           </div>
         </div>
-      </div>
-      <Footer />
     </div>
   );
 }
