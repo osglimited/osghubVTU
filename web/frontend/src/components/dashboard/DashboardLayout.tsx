@@ -29,8 +29,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex">
-      <aside className="w-64 bg-white border-r border-gray-200 hidden md:block">
+    <div className="min-h-screen bg-[#F8FAFC]">
+      <aside className="hidden md:flex fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex-col overflow-y-auto">
         <div className="p-4">
           <div className="flex items-center gap-2">
             <span className="font-bold text-[#0A1F44]">OSGHUB VTU</span>
@@ -59,7 +59,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
         </nav>
       </aside>
-      <main className="flex-1">
+      <main className="md:ml-64">
         <header className="bg-white border-b border-gray-200">
           <div className="container-main py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
