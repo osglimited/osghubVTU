@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { format } from 'date-fns';
 import { ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react';
 
 export default function TransactionsPage() {
