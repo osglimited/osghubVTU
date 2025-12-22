@@ -116,7 +116,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <WalletBalanceHeader />
             </div>
-          </div>
         </header>
         <div className="container-main py-6">
           {children}
