@@ -52,7 +52,7 @@ const loginSchema = z.object({
   rememberMe: z.boolean().optional(),
 });
 
-type FormErrors<T> = Partial<Record<keyof T, string>>;
+type FormErrors<T> = Partial<Record<keyof T | 'general', string>>;
 
 export function useAuthForm() {
   const { addNotification } = useNotifications();
