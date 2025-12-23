@@ -4,6 +4,7 @@ import cors from 'cors';
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import type { Transaction } from 'firebase-admin/firestore';
 
 initializeApp({
   credential: applicationDefault(),
@@ -62,7 +63,7 @@ app.post('/v1/airtime', verifyIdToken, async (req: express.Request, res: express
 
     // Pre-authorize: debit wallet and create provider_pending transaction
     let txId = '';
-    await db.runTransaction(async (t: FirebaseFirestore.Transaction) => {
+    await db.runTransaction(async (t: Transaction) => {
       const userRef = db.collection('users').doc(userId);
       const userSnap = await t.get(userRef);
       if (!userSnap.exists) throw new Error('user-not-found');
@@ -87,7 +88,7 @@ app.post('/v1/airtime', verifyIdToken, async (req: express.Request, res: express
     const providerKey = process.env.VTU_PROVIDER_API_KEY;
     if (!providerBase || !providerKey) {
       // Refund if provider not configured
-      await db.runTransaction(async (t: FirebaseFirestore.Transaction) => {
+      await db.runTransaction(async (t: Transaction) => {
         const userRef = db.collection('users').doc(userId);
         const userSnap = await t.get(userRef);
         const u = userSnap.data()!;
@@ -128,7 +129,7 @@ app.post('/v1/airtime', verifyIdToken, async (req: express.Request, res: express
 
     // Success: add cashback and mark transaction success
     const cashback = amount * 0.03;
-    await db.runTransaction(async (t: FirebaseFirestore.Transaction) => {
+    await db.runTransaction(async (t: Transaction) => {
       const userRef = db.collection('users').doc(userId);
       const userSnap = await t.get(userRef);
       const u = userSnap.data()!;
