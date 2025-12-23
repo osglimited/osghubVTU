@@ -1,6 +1,8 @@
 import { collection, doc, getDoc, getDocs, query, where, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import sampleServices from '@/data/services.sample.json';
+import app from '@/lib/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 export interface ServiceDoc {
   id: string;
@@ -20,6 +22,17 @@ export interface TransactionResult {
   message: string;
   transactionId?: string;
 }
+
+export const purchaseAirtimeViaCloud = async (
+  userId: string,
+  amount: number,
+  details: { network: string; phone: string; provider: string }
+): Promise<TransactionResult> => {
+  const functions = getFunctions(app);
+  const fn = httpsCallable(functions, 'purchaseAirtime');
+  const res = await fn({ userId, amount, ...details });
+  return res.data as TransactionResult;
+};
 
 export const processTransaction = async (
   userId: string, 

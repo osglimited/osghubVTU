@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { processTransaction } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { purchaseAirtimeViaCloud } from '@/lib/services';
 
 export default function AirtimePage() {
   const { user } = useAuth();
@@ -29,16 +30,7 @@ export default function AirtimePage() {
     
     setProcessing(true);
     try {
-      const result = await processTransaction(
-        user.uid,
-        Number(amount),
-        'airtime',
-        {
-          network,
-          phone,
-          provider: service.slug
-        }
-      );
+      const result = await purchaseAirtimeViaCloud(user.uid, Number(amount), { network, phone, provider: service.slug });
 
       if (result.success) {
         addNotification('success', 'Airtime purchase successful', `₦${Number(amount).toLocaleString()} on ${network}`);
