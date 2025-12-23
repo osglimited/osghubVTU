@@ -112,7 +112,7 @@ app.post('/v1/airtime', verifyIdToken, async (req: express.Request, res: express
 
     if (!resp.ok) {
       // Refund wallet on failure
-      await db.runTransaction(async (t) => {
+      await db.runTransaction(async (t: Transaction) => {
         const userRef = db.collection('users').doc(userId);
         const userSnap = await t.get(userRef);
         const u = userSnap.data()!;
