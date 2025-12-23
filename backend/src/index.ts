@@ -29,11 +29,11 @@ async function verifyIdToken(req: express.Request, res: express.Response, next: 
   }
 }
 
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: express.Request, res: express.Response) => {
   res.json({ status: 'ok' });
 });
 
-app.post('/v1/airtime', verifyIdToken, async (req, res) => {
+app.post('/v1/airtime', verifyIdToken, async (req: express.Request, res: express.Response) => {
   try {
     const uid = (req as any).uid as string;
     const { userId, amount, network, phone, provider, clientRequestId } = req.body as {
@@ -62,7 +62,7 @@ app.post('/v1/airtime', verifyIdToken, async (req, res) => {
 
     // Pre-authorize: debit wallet and create provider_pending transaction
     let txId = '';
-    await db.runTransaction(async (t) => {
+    await db.runTransaction(async (t: FirebaseFirestore.Transaction) => {
       const userRef = db.collection('users').doc(userId);
       const userSnap = await t.get(userRef);
       if (!userSnap.exists) throw new Error('user-not-found');
@@ -87,7 +87,7 @@ app.post('/v1/airtime', verifyIdToken, async (req, res) => {
     const providerKey = process.env.VTU_PROVIDER_API_KEY;
     if (!providerBase || !providerKey) {
       // Refund if provider not configured
-      await db.runTransaction(async (t) => {
+      await db.runTransaction(async (t: FirebaseFirestore.Transaction) => {
         const userRef = db.collection('users').doc(userId);
         const userSnap = await t.get(userRef);
         const u = userSnap.data()!;
@@ -128,7 +128,7 @@ app.post('/v1/airtime', verifyIdToken, async (req, res) => {
 
     // Success: add cashback and mark transaction success
     const cashback = amount * 0.03;
-    await db.runTransaction(async (t) => {
+    await db.runTransaction(async (t: FirebaseFirestore.Transaction) => {
       const userRef = db.collection('users').doc(userId);
       const userSnap = await t.get(userRef);
       const u = userSnap.data()!;
@@ -152,4 +152,3 @@ const port = Number(process.env.PORT || 8080);
 app.listen(port, () => {
   console.log(`Backend listening on port ${port}`);
 });
-
