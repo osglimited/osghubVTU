@@ -3,6 +3,7 @@ import { db } from '@/lib/firebase';
 import sampleServices from '@/data/services.sample.json';
 import app from '@/lib/firebase';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { auth } from '@/lib/firebase';
 
 export interface ServiceDoc {
   id: string;
@@ -32,6 +33,34 @@ export const purchaseAirtimeViaCloud = async (
   const fn = httpsCallable(functions, 'purchaseAirtime');
   const res = await fn({ userId, amount, ...details });
   return res.data as TransactionResult;
+};
+
+export const purchaseAirtime = async (
+  userId: string,
+  amount: number,
+  details: { network: string; phone: string; provider: string }
+): Promise<TransactionResult> => {
+  const backendUrl = process.env.NEXT_PUBLIC_VTU_BACKEND_URL;
+  if (backendUrl) {
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+    const res = await fetch(`${backendUrl}/v1/airtime`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ userId, amount, ...details }),
+    });
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch {}
+    if (!res.ok) {
+      return { success: false, message: (data && data.message) || 'Transaction failed' };
+    }
+    return data as TransactionResult;
+  }
+  return purchaseAirtimeViaCloud(userId, amount, details);
 };
 
 export const processTransaction = async (
