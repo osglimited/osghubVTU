@@ -6,12 +6,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useService } from '@/hooks/useServices';
 import { processTransaction } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
-import { useNotifications } from '@/contexts/NotificationContext';
 
 export default function ElectricityPage() {
   const { user, refreshUser } = useAuth();
   const { service, loading, error } = useService('electricity');
-  const { addNotification } = useNotifications();
   
   const [provider, setProvider] = useState('ikedc');
   const [meterNumber, setMeterNumber] = useState('');
@@ -24,7 +22,7 @@ export default function ElectricityPage() {
     if (!user) return;
     
     if (user.walletBalance < Number(amount)) {
-      addNotification('warning', 'Insufficient wallet balance', 'Top up your wallet to continue');
+      alert('Insufficient wallet balance');
       return;
     }
 
@@ -43,15 +41,15 @@ export default function ElectricityPage() {
       );
       
       if (result.success) {
-        addNotification('success', 'Electricity payment successful', `₦${Number(amount).toLocaleString()} to ${provider.toUpperCase()}`);
+        alert('Payment successful!');
         setMeterNumber('');
         setAmount('');
         refreshUser();
       } else {
-        addNotification('error', 'Transaction failed', result.message);
+        alert(`Transaction failed: ${result.message}`);
       }
     } catch (err: any) {
-      addNotification('error', 'Error', err.message);
+      alert(`Error: ${err.message}`);
     } finally {
       setProcessing(false);
     }

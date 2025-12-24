@@ -29,7 +29,7 @@ export default function Notification() {
   };
 
   return (
-    <div className="fixed z-50 space-y-2 left-1/2 -translate-x-1/2 top-16 w-[95vw] max-w-md sm:left-auto sm:translate-x-0 sm:right-4 sm:top-4">
+    <div className="fixed z-30 space-y-2 left-1/2 -translate-x-1/2 top-16 w-[95vw] max-w-md sm:left-auto sm:translate-x-0 sm:right-4 sm:top-4">
       {notifications.map((notification) => (
         <div
           key={notification.id}
