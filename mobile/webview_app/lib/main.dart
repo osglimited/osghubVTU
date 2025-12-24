@@ -7,7 +7,7 @@ import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_links/app_links.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/animation.dart';
+import 'dart:io';
 
 void main() {
   runApp(MaterialApp(
@@ -42,7 +42,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _fade = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
     _controller.forward();
     Future.delayed(const Duration(milliseconds: 1400), () {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const WebViewApp()));
+      if (mounted) {
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const WebViewApp()));
+      }
     });
   }
 
@@ -88,6 +90,18 @@ class _WebViewAppState extends State<WebViewApp> {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isLoading = true;
   bool _isOffline = false;
+  Future<bool> _hasRealConnection() async {
+    try {
+      final result = await InternetAddress.lookup('osghubvtu.onrender.com');
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) return true;
+    } catch (_) {}
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   void initState() {
@@ -138,8 +152,12 @@ class _WebViewAppState extends State<WebViewApp> {
             if (error.errorType == WebResourceErrorType.connect ||
                 error.errorType == WebResourceErrorType.hostLookup ||
                 error.errorType == WebResourceErrorType.timeout) {
-              setState(() {
-                _isOffline = true;
+              _hasRealConnection().then((ok) {
+                if (!ok) {
+                  if (mounted) {
+                    setState(() { _isOffline = true; });
+                  }
+                }
               });
             }
           },
@@ -179,20 +197,23 @@ class _WebViewAppState extends State<WebViewApp> {
 
   Future<void> _initConnectivity() async {
     final initial = await Connectivity().checkConnectivity();
-    final initialHas = initial != ConnectivityResult.none;
-    setState(() {
-      _isOffline = !initialHas;
-    });
+    final initialHas = !initial.contains(ConnectivityResult.none);
+    if (!initialHas) {
+      final ok = await _hasRealConnection();
+      setState(() { _isOffline = !ok; });
+    } else {
+      setState(() { _isOffline = false; });
+    }
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       bool hasConnection = results.any((result) => result != ConnectivityResult.none);
-      if (hasConnection && _isOffline) {
-        setState(() {
-          _isOffline = false;
-        });
-        _controller.reload();
-      } else if (!hasConnection) {
-        setState(() {
-          _isOffline = true;
+      if (hasConnection) {
+        if (_isOffline) {
+          setState(() { _isOffline = false; });
+          _controller.reload();
+        }
+      } else {
+        _hasRealConnection().then((ok) {
+          if (mounted) setState(() { _isOffline = !ok; });
         });
       }
     });
