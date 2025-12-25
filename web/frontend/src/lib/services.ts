@@ -43,22 +43,34 @@ export const purchaseAirtime = async (
   const backendUrl = process.env.NEXT_PUBLIC_VTU_BACKEND_URL;
   if (backendUrl) {
     const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-    const res = await fetch(`${backendUrl}/v1/airtime`, {
+    const res = await fetch(`${backendUrl}/api/transactions/purchase`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ userId, amount, ...details }),
+      body: JSON.stringify({ 
+        type: 'airtime',
+        amount, 
+        details: {
+          network: details.network,
+          phone: details.phone,
+          provider: details.provider
+        }
+      }),
     });
     let data: any = null;
     try {
       data = await res.json();
     } catch {}
     if (!res.ok) {
-      return { success: false, message: (data && data.message) || 'Transaction failed' };
+      return { success: false, message: (data && data.error) || 'Transaction failed' };
     }
-    return data as TransactionResult;
+    return {
+      success: true,
+      message: 'Airtime purchase successful',
+      transactionId: data.id
+    };
   }
   return purchaseAirtimeViaCloud(userId, amount, details);
 };
@@ -69,6 +81,46 @@ export const processTransaction = async (
   serviceType: string, 
   details: any
 ): Promise<TransactionResult> => {
+  const backendUrl = process.env.NEXT_PUBLIC_VTU_BACKEND_URL;
+  if (backendUrl) {
+    try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+      const res = await fetch(`${backendUrl}/api/transactions/purchase`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ 
+          type: serviceType,
+          amount, 
+          details 
+        }),
+      });
+      
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {}
+
+      if (!res.ok) {
+        throw new Error((data && data.error) || 'Transaction failed');
+      }
+
+      return {
+        success: true,
+        message: 'Transaction successful',
+        transactionId: data.id
+      };
+    } catch (error: any) {
+      console.error('Transaction failed:', error);
+      return {
+        success: false,
+        message: error.message || 'Transaction failed'
+      };
+    }
+  }
+
   try {
     return await runTransaction(db, async (transaction) => {
       const userRef = doc(db, 'users', userId);
