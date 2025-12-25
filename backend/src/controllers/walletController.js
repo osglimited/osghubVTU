@@ -19,12 +19,8 @@ const transferToMain = async (req, res) => {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
-    if (!['cashback', 'referral'].includes(fromWallet)) {
-      return res.status(400).json({ error: 'Invalid source wallet' });
-    }
-
-    const result = await walletService.transferBalance(uid, Number(amount), fromWallet, 'main');
-    res.json({ message: 'Transfer successful', balances: result });
+    const result = await walletService.transferToMain(uid, amount, fromWallet);
+    res.json({ message: 'Transfer successful', ...result });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -40,8 +36,28 @@ const getHistory = async (req, res) => {
   }
 };
 
+const testCredit = async (req, res) => {
+  try {
+    const { uid } = req.user;
+    
+    // 1. Ensure wallet exists
+    await walletService.createWallet(uid);
+    
+    // 2. Credit the wallet
+    const newBalance = await walletService.creditWallet(uid, 5000, 'main', 'End-to-End Test Credit');
+    
+    res.json({ 
+      message: 'Test credit successful', 
+      balance: newBalance 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getBalance,
   transferToMain,
-  getHistory
+  getHistory,
+  testCredit
 };

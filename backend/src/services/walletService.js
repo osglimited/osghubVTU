@@ -93,7 +93,7 @@ class WalletService {
       const currentBalance = data[field] || 0;
 
       if (currentBalance < amount) {
-        throw new Error(`Insufficient funds in ${walletType} wallet`);
+        throw new Error('Insufficient funds');
       }
 
       const newBalance = currentBalance - amount;
@@ -117,64 +117,6 @@ class WalletService {
       });
 
       return newBalance;
-    });
-  }
-
-  async transferBalance(userId, amount, fromType, toType) {
-    const walletRef = db.collection(WALLET_COLLECTION).doc(userId);
-    
-    return db.runTransaction(async (t) => {
-      const doc = await t.get(walletRef);
-      if (!doc.exists) {
-        throw new Error('Wallet not found');
-      }
-
-      const data = doc.data();
-      const fromField = `${fromType}Balance`;
-      const toField = `${toType}Balance`;
-
-      const currentFromBalance = data[fromField] || 0;
-      
-      if (currentFromBalance < amount) {
-        throw new Error(`Insufficient funds in ${fromType} wallet`);
-      }
-
-      const newFromBalance = currentFromBalance - amount;
-      const newToBalance = (data[toField] || 0) + amount;
-
-      t.update(walletRef, { 
-        [fromField]: newFromBalance,
-        [toField]: newToBalance,
-        updatedAt: new Date()
-      });
-
-      // Ledger for Debit
-      const debitRef = db.collection(TRANSACTION_COLLECTION).doc();
-      t.set(debitRef, {
-        userId,
-        type: 'debit',
-        amount,
-        walletType: fromType,
-        description: `Transfer to ${toType}`,
-        balanceBefore: currentFromBalance,
-        balanceAfter: newFromBalance,
-        createdAt: new Date()
-      });
-
-      // Ledger for Credit
-      const creditRef = db.collection(TRANSACTION_COLLECTION).doc();
-      t.set(creditRef, {
-        userId,
-        type: 'credit',
-        amount,
-        walletType: toType,
-        description: `Transfer from ${fromType}`,
-        balanceBefore: data[toField] || 0,
-        balanceAfter: newToBalance,
-        createdAt: new Date()
-      });
-
-      return { [fromType]: newFromBalance, [toType]: newToBalance };
     });
   }
 

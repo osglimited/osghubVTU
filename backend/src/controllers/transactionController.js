@@ -2,7 +2,7 @@ const transactionService = require('../services/transactionService');
 const Joi = require('joi');
 
 const purchaseSchema = Joi.object({
-  type: Joi.string().valid('airtime', 'data', 'bill', 'cable', 'electricity').required(),
+  type: Joi.string().valid('airtime', 'data', 'bill').required(),
   amount: Joi.number().positive().required(),
   details: Joi.object().required(), // Validate details based on type if needed
   requestId: Joi.string().optional()

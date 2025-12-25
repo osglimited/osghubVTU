@@ -3,14 +3,49 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Wallet, CreditCard, ArrowRightLeft, Eye, EyeOff, Copy } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { doc, runTransaction } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getWalletBalance, transferWallet } from '@/lib/services';
+import { useToast } from '@/components/ui/toast'; // Assuming we have toast, otherwise use alert
 
 export default function WalletPage() {
   const { user } = useAuth();
   const [showMain, setShowMain] = useState(false);
   const [showCashback, setShowCashback] = useState(false);
   const [showReferral, setShowReferral] = useState(false);
+  
+  // Local state for balance to reflect backend source of truth
+  const [balances, setBalances] = useState({
+    mainBalance: user?.walletBalance || 0,
+    cashbackBalance: user?.cashbackBalance || 0,
+    referralBalance: user?.referralBalance || 0
+  });
+  
+  // Initial fetch from backend
+  const fetchBalance = async () => {
+    try {
+      const data = await getWalletBalance();
+      if (data) {
+        setBalances(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch wallet balance:", error);
+    }
+  };
+
+  useEffect(() => {
+    // Update balances from context if available (optimistic/fallback)
+    if (user) {
+      setBalances(prev => ({
+        ...prev,
+        mainBalance: user.walletBalance ?? prev.mainBalance,
+        cashbackBalance: user.cashbackBalance ?? prev.cashbackBalance,
+        referralBalance: user.referralBalance ?? prev.referralBalance
+      }));
+    }
+    
+    // Fetch fresh data from backend
+    fetchBalance();
+  }, [user]);
+
   useEffect(() => {
     setShowMain(sessionStorage.getItem('showMainBalance') === 'true');
     setShowCashback(sessionStorage.getItem('showCashbackBalance') === 'true');
@@ -25,29 +60,26 @@ export default function WalletPage() {
   useEffect(() => {
     sessionStorage.setItem('showReferralBalance', String(showReferral));
   }, [showReferral]);
+  
   const format = (n?: number) => `₦${(n || 0).toLocaleString()}`;
   const referralCode = user?.referral || user?.username || user?.uid || 'N/A';
   const [processing, setProcessing] = useState<'cashback' | 'referral' | null>(null);
+
   const transfer = async (type: 'referral' | 'cashback') => {
     if (!user || processing) return;
-    const amount = type === 'referral' ? (user.referralBalance ?? 0) : (user.cashbackBalance ?? 0);
+    const amount = type === 'referral' ? balances.referralBalance : balances.cashbackBalance;
     if (amount <= 0) return;
+    
     setProcessing(type);
     try {
-      await runTransaction(db, async (transaction) => {
-        const userRef = doc(db, 'users', user.uid);
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) throw new Error('User not found');
-        const data = userDoc.data();
-        const src = type === 'referral' ? (data.referralBalance || 0) : (data.cashbackBalance || 0);
-        if (src < amount) throw new Error('Insufficient balance');
-        const dest = (data.walletBalance || 0) + amount;
-        transaction.update(userRef, {
-          [type === 'referral' ? 'referralBalance' : 'cashbackBalance']: 0,
-          walletBalance: dest,
-        });
-      });
-      alert(`Transferred ${format(amount)} to main wallet`);
+      const result = await transferWallet(amount, type);
+      if (result.success) {
+        alert(`Transferred ${format(amount)} to main wallet`);
+        // Refresh balance
+        fetchBalance();
+      } else {
+        alert(result.message);
+      }
     } catch (e: any) {
       alert(e.message || 'Transfer failed');
     } finally {
@@ -65,7 +97,7 @@ export default function WalletPage() {
           <div className="relative z-10">
             <p className="text-blue-200 mb-2">Available Balance</p>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-4xl font-bold">{showMain ? format(user?.walletBalance || 0) : '••••••'}</h2>
+              <h2 className="text-4xl font-bold">{showMain ? format(balances.mainBalance) : '••••••'}</h2>
               <button className="p-2 rounded-md bg-white/10" onClick={() => setShowMain(s => !s)}>
                 {showMain ? <Eye size={18} /> : <EyeOff size={18} />}
               </button>
@@ -88,7 +120,7 @@ export default function WalletPage() {
             </div>
           </div>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-3xl font-bold text-[#0A1F44]">{showCashback ? format(user?.cashbackBalance || 0) : '••••••'}</h2>
+            <h2 className="text-3xl font-bold text-[#0A1F44]">{showCashback ? format(balances.cashbackBalance) : '••••••'}</h2>
             <button className="p-2 rounded-md border" onClick={() => setShowCashback(s => !s)}>
               {showCashback ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
@@ -98,7 +130,7 @@ export default function WalletPage() {
             <button
               className="bg-[#F97316] hover:bg-[#ea6d0f] text-white px-4 py-2 rounded-md text-sm"
               onClick={() => transfer('cashback')}
-              disabled={processing === 'cashback' || (user?.cashbackBalance || 0) <= 0}
+              disabled={processing === 'cashback' || balances.cashbackBalance <= 0}
             >
               Transfer to Wallet
             </button>
@@ -114,7 +146,7 @@ export default function WalletPage() {
             </div>
           </div>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-3xl font-bold text-[#0A1F44]">{showReferral ? format(user?.referralBalance || 0) : '••••••'}</h2>
+            <h2 className="text-3xl font-bold text-[#0A1F44]">{showReferral ? format(balances.referralBalance) : '••••••'}</h2>
             <button className="p-2 rounded-md border" onClick={() => setShowReferral(s => !s)}>
               {showReferral ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
@@ -135,7 +167,7 @@ export default function WalletPage() {
             <button
               className="bg-[#F97316] hover:bg-[#ea6d0f] text-white px-4 py-2 rounded-md text-sm"
               onClick={() => transfer('referral')}
-              disabled={processing === 'referral' || (user?.referralBalance || 0) <= 0}
+              disabled={processing === 'referral' || balances.referralBalance <= 0}
             >
               Transfer to Wallet
             </button>

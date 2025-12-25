@@ -35,42 +35,89 @@ export const purchaseAirtimeViaCloud = async (
   return res.data as TransactionResult;
 };
 
+export const getWalletBalance = async (token?: string): Promise<{ mainBalance: number; cashbackBalance: number; referralBalance: number } | null> => {
+  const backendUrl =
+    process.env.NEXT_PUBLIC_VTU_BACKEND_URL ||
+    (typeof window !== 'undefined' && window.location.hostname.includes('osghub.com')
+      ? 'https://osghubvtu.onrender.com'
+      : '');
+  if (!backendUrl) return null;
+
+  try {
+    const idToken = token || (auth.currentUser ? await auth.currentUser.getIdToken() : '');
+    const res = await fetch(`${backendUrl}/api/wallet`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+      },
+    });
+
+    if (!res.ok) throw new Error('Failed to fetch balance');
+    return await res.json();
+  } catch (error) {
+    console.error('Get Balance Error:', error);
+    return null;
+  }
+};
+
+export const transferWallet = async (amount: number, fromWallet: 'cashback' | 'referral'): Promise<TransactionResult> => {
+    const backendUrl =
+      process.env.NEXT_PUBLIC_VTU_BACKEND_URL ||
+      (typeof window !== 'undefined' && window.location.hostname.includes('osghub.com')
+        ? 'https://osghubvtu.onrender.com'
+        : '');
+    if (!backendUrl) return { success: false, message: 'Backend URL not configured' };
+
+    try {
+        const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+        const res = await fetch(`${backendUrl}/api/wallet/transfer`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ amount, fromWallet }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            return { success: false, message: data.error || 'Transfer failed' };
+        }
+        return { success: true, message: data.message };
+    } catch (error: any) {
+        return { success: false, message: error.message || 'Transfer failed' };
+    }
+};
+
 export const purchaseAirtime = async (
   userId: string,
   amount: number,
   details: { network: string; phone: string; provider: string }
 ): Promise<TransactionResult> => {
-  const backendUrl = process.env.NEXT_PUBLIC_VTU_BACKEND_URL;
+  const backendUrl =
+    process.env.NEXT_PUBLIC_VTU_BACKEND_URL ||
+    (typeof window !== 'undefined' && window.location.hostname.includes('osghub.com')
+      ? 'https://osghubvtu.onrender.com'
+      : '');
   if (backendUrl) {
     const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-    const res = await fetch(`${backendUrl}/api/transactions/purchase`, {
+    const res = await fetch(`${backendUrl}/v1/airtime`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ 
-        type: 'airtime',
-        amount, 
-        details: {
-          network: details.network,
-          phone: details.phone,
-          provider: details.provider
-        }
-      }),
+      body: JSON.stringify({ userId, amount, ...details }),
     });
     let data: any = null;
     try {
       data = await res.json();
     } catch {}
     if (!res.ok) {
-      return { success: false, message: (data && data.error) || 'Transaction failed' };
+      return { success: false, message: (data && data.message) || 'Transaction failed' };
     }
-    return {
-      success: true,
-      message: 'Airtime purchase successful',
-      transactionId: data.id
-    };
+    return data as TransactionResult;
   }
   return purchaseAirtimeViaCloud(userId, amount, details);
 };
@@ -81,46 +128,6 @@ export const processTransaction = async (
   serviceType: string, 
   details: any
 ): Promise<TransactionResult> => {
-  const backendUrl = process.env.NEXT_PUBLIC_VTU_BACKEND_URL;
-  if (backendUrl) {
-    try {
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-      const res = await fetch(`${backendUrl}/api/transactions/purchase`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ 
-          type: serviceType,
-          amount, 
-          details 
-        }),
-      });
-      
-      let data: any = null;
-      try {
-        data = await res.json();
-      } catch {}
-
-      if (!res.ok) {
-        throw new Error((data && data.error) || 'Transaction failed');
-      }
-
-      return {
-        success: true,
-        message: 'Transaction successful',
-        transactionId: data.id
-      };
-    } catch (error: any) {
-      console.error('Transaction failed:', error);
-      return {
-        success: false,
-        message: error.message || 'Transaction failed'
-      };
-    }
-  }
-
   try {
     return await runTransaction(db, async (transaction) => {
       const userRef = doc(db, 'users', userId);

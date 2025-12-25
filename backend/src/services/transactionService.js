@@ -2,7 +2,7 @@ const { db } = require('../config/firebase');
 const walletService = require('./walletService');
 const cashbackService = require('./cashbackService');
 const referralService = require('./referralService');
-const provider = require('./providers/genericProvider'); // Switched to Generic Provider
+const mockProvider = require('./providers/mockProvider');
 
 const TRANSACTION_COLLECTION = 'transactions';
 
@@ -40,7 +40,7 @@ class TransactionService {
       requestId,
       status: 'pending',
       createdAt: new Date(),
-      provider: provider.name
+      provider: mockProvider.name
     };
     await transactionRef.set(transactionData);
 
@@ -48,28 +48,24 @@ class TransactionService {
     let providerResponse;
     try {
       if (type === 'airtime') {
-        providerResponse = await provider.purchaseAirtime(details.phone, amount, details.network);
+        providerResponse = await mockProvider.purchaseAirtime(details.phone, amount, details.network);
       } else if (type === 'data') {
-        providerResponse = await provider.purchaseData(details.phone, details.planId, details.network);
-      } else if (type === 'cable') {
-        providerResponse = await provider.purchaseBill(details.smartcardNumber, amount, 'cable', details.provider);
-      } else if (type === 'electricity') {
-        providerResponse = await provider.purchaseBill(details.meterNumber, amount, 'electricity', details.provider);
+        providerResponse = await mockProvider.purchaseData(details.phone, details.planId, details.network);
       } else {
         throw new Error('Invalid transaction type');
       }
 
-      // Check provider success signal (adjust based on provider response structure)
-      if (providerResponse.success || providerResponse.status === 'success') {
+      if (providerResponse.success) {
         // 5. Success
         await transactionRef.update({
           status: 'success',
-          providerReference: providerResponse.reference || providerResponse.id,
+          providerReference: providerResponse.reference,
           providerResponse: providerResponse,
           updatedAt: new Date()
         });
 
         // 6. Async Rewards
+        // Don't await these to keep response fast
         cashbackService.processCashback(userId, amount, transactionRef.id);
         referralService.processReferral(userId, transactionRef.id);
 

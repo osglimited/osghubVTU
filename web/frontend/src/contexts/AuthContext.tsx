@@ -18,6 +18,7 @@ import {
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { generateHash } from '@/lib/crypto';
+import { getWalletBalance } from '@/lib/services';
 import { UserProfile, SignUpData, LoginCredentials, AuthState, AuthContextType } from '@/types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -65,8 +66,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Ensure walletBalance and accountStatus exist
         if (typeof userData.walletBalance === 'undefined') {
-          await updateDoc(userRef, { walletBalance: 0 });
+          // await updateDoc(userRef, { walletBalance: 0 }); // DEPRECATED: Balance is now in backend
           userData.walletBalance = 0;
+        }
+
+        // Sync balance from Backend (Source of Truth)
+        try {
+           const token = await firebaseUser.getIdToken();
+           const backendBalances = await getWalletBalance(token);
+           if (backendBalances) {
+             userData.walletBalance = backendBalances.mainBalance;
+             userData.cashbackBalance = backendBalances.cashbackBalance;
+             userData.referralBalance = backendBalances.referralBalance;
+           }
+        } catch (err) {
+           console.error('Failed to sync wallet balance from backend', err);
         }
 
         if (!userData.accountStatus) {

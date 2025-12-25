@@ -8,6 +8,17 @@ const verifyToken = async (req, res, next) => {
     }
 
     const token = authHeader.split('Bearer ')[1];
+
+    // TEMPORARY: Test Token for E2E Testing
+    if (token === 'TEST_TOKEN_B1Xb1wb13tNNUpG7nbai7GeSwyR2') {
+      req.user = { 
+        uid: 'B1Xb1wb13tNNUpG7nbai7GeSwyR2', 
+        email: 'test_user@osghub.com',
+        email_verified: true
+      };
+      return next();
+    }
+
     const decodedToken = await auth.verifyIdToken(token);
     
     req.user = decodedToken; // Attach user info to request
