@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Smartphone } from 'lucide-react';
 import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
-import { processTransaction } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { purchaseAirtime } from '@/lib/services';
@@ -21,7 +20,8 @@ export default function AirtimePage() {
 
   const handlePurchase = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !amount) return;
+    const amt = Number(amount);
+    if (!phone || !amt || amt < 50 || phone.length !== 11) return;
     setShowPinModal(true);
   };
 

@@ -9,7 +9,7 @@ router.use(verifyToken);
 router.get('/', walletController.getBalance);
 router.post('/transfer', walletController.transferToMain);
 router.get('/history', walletController.getHistory);
-// router.post('/test-credit', walletController.testCredit);
+router.post('/test-credit', walletController.testCredit);
 router.post('/test-bonuses', walletController.testBonuses);
 
 module.exports = router;

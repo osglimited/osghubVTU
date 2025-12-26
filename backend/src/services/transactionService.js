@@ -28,9 +28,10 @@ class TransactionService {
       }
     }
 
-    // 2. Check Balance & Debit
+    // 2. Ensure wallet exists, Check Balance & Debit
     // We debit first. If provider fails, we refund.
     try {
+      await walletService.createWallet(userId);
       await walletService.debitWallet(userId, amount, 'main', `${type} purchase`);
     } catch (error) {
       throw new Error(`Transaction failed: ${error.message}`);
