@@ -48,22 +48,23 @@ class SublinkngProvider {
   _normalizeNetwork(network) {
     const n = String(network || '').toLowerCase();
     const map = {
-      mtn: 'mtn',
-      'mtn nigeria': 'mtn',
-      glo: 'glo',
-      'glo nigeria': 'glo',
-      airtel: 'airtel',
-      'airtel nigeria': 'airtel',
-      '9mobile': '9mobile',
-      etisalat: '9mobile'
+      mtn: 'MTN',
+      'mtn nigeria': 'MTN',
+      glo: 'GLO',
+      'glo nigeria': 'GLO',
+      airtel: 'AIRTEL',
+      'airtel nigeria': 'AIRTEL',
+      '9mobile': '9MOBILE',
+      etisalat: '9MOBILE'
     };
-    return map[n] || n || 'mtn';
+    return map[n] || (n ? n.toUpperCase() : 'MTN');
   }
 
   _normalizePhone(phone) {
     const digits = String(phone || '').replace(/\D/g, '');
-    if (digits.startsWith('234') && digits.length >= 13) return digits;
-    if (digits.length === 11 && digits.startsWith('0')) return digits;
+    if (digits.startsWith('234')) return digits;
+    if (digits.length === 11 && digits.startsWith('0')) return `234${digits.slice(1)}`;
+    if (digits.length === 10) return `234${digits}`;
     return digits;
   }
 
@@ -71,8 +72,12 @@ class SublinkngProvider {
     this._assertConfigured();
     const payload = {
       phone: this._normalizePhone(phone),
+      mobile_number: this._normalizePhone(phone),
+      msisdn: this._normalizePhone(phone),
       amount,
+      value: amount,
       network: this._normalizeNetwork(network),
+      operator: this._normalizeNetwork(network),
       requestId,
       api_key: this.apiKey
     };
@@ -94,8 +99,12 @@ class SublinkngProvider {
     this._assertConfigured();
     const payload = {
       phone: this._normalizePhone(phone),
+      mobile_number: this._normalizePhone(phone),
+      msisdn: this._normalizePhone(phone),
       planId,
+      product_code: planId,
       network: this._normalizeNetwork(network),
+      operator: this._normalizeNetwork(network),
       requestId,
       api_key: this.apiKey
     };
