@@ -8,7 +8,19 @@ let db, auth, messaging;
 try {
   // Check if firebase is already initialized to avoid errors
   if (!admin.apps.length) {
-    console.log('Firebase Project ID:', process.env.FIREBASE_PROJECT_ID);
+    // Sanitize env variables that may be pasted with quotes/commas from UIs
+    const sanitize = (val) => {
+      if (!val || typeof val !== 'string') return val;
+      let s = val.trim();
+      if (s.startsWith('"')) s = s.slice(1);
+      if (s.endsWith('"')) s = s.slice(0, -1);
+      // Remove trailing commas sometimes copied from JSON
+      if (s.endsWith(',')) s = s.slice(0, -1);
+      return s;
+    };
+    const projectId = sanitize(process.env.FIREBASE_PROJECT_ID);
+    const clientEmail = sanitize(process.env.FIREBASE_CLIENT_EMAIL);
+    console.log('Firebase Project ID:', projectId);
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
     if (privateKey) {
@@ -39,8 +51,8 @@ try {
 
     admin.initializeApp({
       credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        projectId,
+        clientEmail,
         privateKey: privateKey,
       }),
     });

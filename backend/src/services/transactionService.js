@@ -3,12 +3,19 @@ const walletService = require('./walletService');
 const cashbackService = require('./cashbackService');
 const referralService = require('./referralService');
 const mockProvider = require('./providers/mockProvider');
+const sublinkngProvider = require('./providers/sublinkngProvider');
 
 const TRANSACTION_COLLECTION = 'transactions';
 
 class TransactionService {
   
   async initiateTransaction(userId, type, amount, details, requestId) {
+    const useMock = String(process.env.USE_MOCK_PROVIDER || '').toLowerCase() === 'true';
+    const provider = !useMock && process.env.VTU_PROVIDER_API_KEY && process.env.VTU_PROVIDER_URL
+      ? sublinkngProvider
+      : mockProvider;
+    const providerName = provider.name;
+    const idempotencyKey = requestId || `REQ-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
     // 1. Idempotency Check
     if (requestId) {
       const existing = await db.collection(TRANSACTION_COLLECTION)
@@ -37,10 +44,10 @@ class TransactionService {
       type,
       amount,
       details,
-      requestId,
+      requestId: idempotencyKey,
       status: 'pending',
       createdAt: new Date(),
-      provider: mockProvider.name
+      provider: providerName
     };
     await transactionRef.set(transactionData);
 
@@ -48,9 +55,10 @@ class TransactionService {
     let providerResponse;
     try {
       if (type === 'airtime') {
-        providerResponse = await mockProvider.purchaseAirtime(details.phone, amount, details.network);
+        providerResponse = await provider.purchaseAirtime(details.phone, amount, details.network, idempotencyKey);
       } else if (type === 'data') {
-        providerResponse = await mockProvider.purchaseData(details.phone, details.planId, details.network);
+        const planId = details.planId || details.plan || details.bundleId || details.planCode;
+        providerResponse = await provider.purchaseData(details.phone, planId, details.network, idempotencyKey);
       } else {
         throw new Error('Invalid transaction type');
       }

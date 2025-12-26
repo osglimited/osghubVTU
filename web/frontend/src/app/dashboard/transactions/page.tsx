@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { getWalletHistory } from '@/lib/services';
 import { ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react';
 
 export default function TransactionsPage() {
@@ -15,13 +14,8 @@ export default function TransactionsPage() {
     const fetchTransactions = async () => {
       if (!user) return;
       try {
-        const q = query(
-          collection(db, 'transactions'),
-          where('userId', '==', user.uid),
-          orderBy('createdAt', 'desc')
-        );
-        const snapshot = await getDocs(q);
-        setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const history = await getWalletHistory();
+        setTransactions(history);
       } catch (error) {
         console.error('Error fetching transactions:', error);
       } finally {
@@ -93,7 +87,7 @@ export default function TransactionsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center gap-2">
                         <Clock size={14} />
-                        {tx.createdAt ? new Date(tx.createdAt).toLocaleString('en-US', {
+                        {tx.createdAt ? new Date(tx.createdAt._seconds ? tx.createdAt._seconds * 1000 : tx.createdAt).toLocaleString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',

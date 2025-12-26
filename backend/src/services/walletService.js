@@ -4,6 +4,11 @@ const WALLET_COLLECTION = 'wallets';
 const TRANSACTION_COLLECTION = 'wallet_transactions';
 
 class WalletService {
+  _genRef(prefix = 'WTX') {
+    const ts = Date.now().toString(36).toUpperCase();
+    const rnd = Math.random().toString(36).slice(2, 7).toUpperCase();
+    return `${prefix}-${ts}-${rnd}`;
+  }
   /**
    * Initialize wallet for a new user
    */
@@ -67,6 +72,8 @@ class WalletService {
         amount,
         walletType,
         description,
+        status: 'success',
+        reference: this._genRef('CR'),
         balanceBefore: data[field] || 0,
         balanceAfter: newBalance,
         createdAt: new Date()
@@ -111,6 +118,8 @@ class WalletService {
         amount,
         walletType,
         description,
+        status: 'success',
+        reference: this._genRef('DB'),
         balanceBefore: currentBalance,
         balanceAfter: newBalance,
         createdAt: new Date()
@@ -164,6 +173,8 @@ class WalletService {
         amount,
         walletType: fromWalletType,
         description: `Transfer to Main Wallet`,
+        status: 'success',
+        reference: this._genRef('TR-D'),
         balanceBefore: sourceBalance,
         balanceAfter: newSourceBalance,
         createdAt: new Date()
@@ -177,6 +188,8 @@ class WalletService {
         amount,
         walletType: 'main',
         description: `Transfer from ${fromWalletType}`,
+        status: 'success',
+        reference: this._genRef('TR-C'),
         balanceBefore: mainBalance,
         balanceAfter: newMainBalance,
         createdAt: new Date()
@@ -187,13 +200,27 @@ class WalletService {
   }
 
   async getHistory(userId) {
-    const snapshot = await db.collection(TRANSACTION_COLLECTION)
-      .where('userId', '==', userId)
-      .orderBy('createdAt', 'desc')
-      .limit(20)
-      .get();
-    
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    try {
+      const snapshot = await db.collection(TRANSACTION_COLLECTION)
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc')
+        .limit(20)
+        .get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (e) {
+      // Fallback without composite index: fetch by userId and sort in memory
+      const snapshot = await db.collection(TRANSACTION_COLLECTION)
+        .where('userId', '==', userId)
+        .limit(50)
+        .get();
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      items.sort((a, b) => {
+        const ta = a.createdAt?._seconds ? a.createdAt._seconds : new Date(a.createdAt).getTime() / 1000;
+        const tb = b.createdAt?._seconds ? b.createdAt._seconds : new Date(b.createdAt).getTime() / 1000;
+        return tb - ta;
+      });
+      return items.slice(0, 20);
+    }
   }
 }
 

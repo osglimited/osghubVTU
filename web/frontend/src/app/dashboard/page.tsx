@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { getWalletHistory } from '@/lib/services';
 import { useNotifications } from '@/contexts/NotificationContext';
 
 export default function Dashboard() {
@@ -17,6 +18,7 @@ export default function Dashboard() {
   const [showReferral, setShowReferral] = useState(false);
   const [processingWithdrawal, setProcessingWithdrawal] = useState(false);
   const { addNotification } = useNotifications();
+  const [recent, setRecent] = useState<any[]>([]);
 
   useEffect(() => {
     if (loading) return;
@@ -35,6 +37,18 @@ export default function Dashboard() {
     setShowReferral(sr);
   }, [user, loading, router]);
 
+  useEffect(() => {
+    const loadRecent = async () => {
+      if (!user) return;
+      try {
+        const items = await getWalletHistory();
+        setRecent(items.slice(0, 5));
+      } catch (e) {
+        console.error('Recent history load failed', e);
+      }
+    };
+    loadRecent();
+  }, [user]);
   const handleWithdraw = async (type: 'referral' | 'cashback') => {
     if (!user || processingWithdrawal) return;
     
@@ -183,9 +197,32 @@ export default function Dashboard() {
             <GraduationCap className="text-[#F97316]" />
             <h3 className="text-2xl font-bold text-[#0A1F44]">Recent Transactions</h3>
           </div>
-          <div className="text-center py-12 text-gray-500">
-            <p>No transactions yet</p>
-          </div>
+          {recent.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <p>No transactions yet</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {recent.map((tx) => (
+                <li key={tx.id} className="py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-[#0A1F44]">
+                      {tx.description || tx.walletType ? `${tx.type} ${tx.walletType ? `(${tx.walletType})` : ''}` : tx.type}
+                    </p>
+                    <p className="text-xs text-gray-500">{tx.reference}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-semibold ${tx.type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
+                      {tx.type === 'credit' ? '+' : '-'}₦{(tx.amount || 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {tx.createdAt ? new Date(tx.createdAt._seconds ? tx.createdAt._seconds * 1000 : tx.createdAt).toLocaleString() : '-'}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
     </div>
   );

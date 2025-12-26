@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Wifi } from 'lucide-react';
 import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
-import { processTransaction } from '@/lib/services';
+import { purchaseData } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 
 const DATA_PLANS = [
@@ -34,14 +34,13 @@ export default function DataPage() {
     
     setProcessing(true);
     try {
-      const result = await processTransaction(
+      const result = await purchaseData(
         user.uid,
         selectedPlan.price,
-        'data',
         {
           network,
           phone,
-          plan: selectedPlan.name,
+          planId: selectedPlan.id,
           provider: service.slug
         }
       );
