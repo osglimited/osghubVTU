@@ -28,18 +28,27 @@ class SublinkngProvider {
   }
 
   async _post(paths, payload) {
-    const base = this.baseUrl.replace(/\/+$/, '');
+    const basePrimary = this.baseUrl.replace(/\/+$/, '');
+    const baseCandidates = [
+      basePrimary,
+      'https://app.sublinkng.com/api',
+      'https://app.sublinkng.com',
+      'https://api.sublinkng.com',
+      'https://sublinkng.com/api'
+    ].filter(Boolean);
     const body = { ...payload };
     const headers = this._headers();
     let lastErr;
-    for (const p of paths) {
-      const url = `${base}${p}?api_key=${encodeURIComponent(this.apiKey)}`;
-      try {
-        const res = await axios.post(url, body, { headers, timeout: 12000 });
-        return res.data || {};
-      } catch (e) {
-        lastErr = e;
-        continue;
+    for (const base of baseCandidates) {
+      for (const p of paths) {
+        const url = `${base.replace(/\/+$/, '')}${p}?api_key=${encodeURIComponent(this.apiKey)}`;
+        try {
+          const res = await axios.post(url, body, { headers, timeout: 15000 });
+          return res.data || {};
+        } catch (e) {
+          lastErr = e;
+          continue;
+        }
       }
     }
     throw lastErr || new Error('Provider request failed');
