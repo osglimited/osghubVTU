@@ -41,7 +41,8 @@ class SublinkngProvider {
     let lastErr;
     for (const base of baseCandidates) {
       for (const p of paths) {
-        const url = `${base.replace(/\/+$/, '')}${p}?api_key=${encodeURIComponent(this.apiKey)}`;
+        let url = `${base.replace(/\/+$/, '')}${p}?api_key=${encodeURIComponent(this.apiKey)}`;
+        url = url.replace(/[`'"\s]+/g, ''); // sanitize accidental quotes/backticks/spaces
         try {
           const res = await axios.post(url, body, { headers, timeout: 15000 });
           return res.data || {};
@@ -91,7 +92,18 @@ class SublinkngProvider {
       api_key: this.apiKey
     };
     const data = await this._post(
-      [this.airtimePath, '/v1/airtime', '/buy-airtime', '/airtime/purchase'],
+      [
+        this.airtimePath,
+        '/airtime',
+        '/v1/airtime',
+        '/buy-airtime',
+        '/airtime/purchase',
+        '/developer/airtime',
+        '/developer/airtime/purchase',
+        '/vtu/airtime',
+        '/api/v1/airtime',
+        '/api/v1/airtime/purchase'
+      ],
       payload
     );
     const success = data.success === true || String(data.status || '').toLowerCase() === 'success';
@@ -118,7 +130,18 @@ class SublinkngProvider {
       api_key: this.apiKey
     };
     const data = await this._post(
-      [this.dataPath, '/v1/data', '/buy-data', '/data/purchase'],
+      [
+        this.dataPath,
+        '/data',
+        '/v1/data',
+        '/buy-data',
+        '/data/purchase',
+        '/developer/data',
+        '/developer/data/purchase',
+        '/vtu/data',
+        '/api/v1/data',
+        '/api/v1/data/purchase'
+      ],
       payload
     );
     const success = data.success === true || String(data.status || '').toLowerCase() === 'success';
