@@ -5,8 +5,11 @@ class SublinkngProvider {
     this.name = 'SublinkNG';
     this.baseUrl = process.env.VTU_PROVIDER_URL || '';
     this.apiKey = process.env.VTU_PROVIDER_API_KEY || '';
-    this.airtimePath = process.env.VTU_PROVIDER_AIRTIME_PATH || '/airtime';
-    this.dataPath = process.env.VTU_PROVIDER_DATA_PATH || '/data';
+    this.airtimePath = process.env.VTU_PROVIDER_AIRTIME_PATH || '/airtime/purchase';
+    this.dataPath = process.env.VTU_PROVIDER_DATA_PATH || '/data/purchase';
+    this.authMethod = (process.env.VTU_PROVIDER_AUTH_METHOD || 'query').toLowerCase();
+    this.includeAliases = String(process.env.VTU_PROVIDER_INCLUDE_ALIASES || 'false').toLowerCase() === 'true';
+    this.networkMode = (process.env.VTU_PROVIDER_NETWORK_MODE || 'alpha').toLowerCase();
   }
 
   _headers() {
@@ -14,9 +17,9 @@ class SublinkngProvider {
       'Content-Type': 'application/json',
     };
     if (this.apiKey) {
-      headers['x-api-key'] = this.apiKey;
-      headers['api-key'] = this.apiKey;
-      headers['Authorization'] = `Bearer ${this.apiKey}`;
+      if (this.authMethod === 'header:x-api-key') headers['x-api-key'] = this.apiKey;
+      if (this.authMethod === 'header:api-key') headers['api-key'] = this.apiKey;
+      if (this.authMethod === 'header:authorization') headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
     return headers;
   }
@@ -25,6 +28,20 @@ class SublinkngProvider {
     if (!this.baseUrl || !this.apiKey) {
       throw new Error('VTU provider not configured');
     }
+  }
+
+  _buildUrl(base, path) {
+    const b = base.replace(/\/+$/, '');
+    let p = path.startsWith('/') ? path : `/${path}`;
+    if (b.endsWith('/api') && p.startsWith('/api')) {
+      p = p.replace(/^\/api(\/|$)/, '/');
+    }
+    let url = `${b}${p}`;
+    if (this.authMethod === 'query') {
+      url += (url.includes('?') ? '&' : '?') + `api_key=${encodeURIComponent(this.apiKey)}`;
+    }
+    url = url.replace(/[`'"\s]+/g, '');
+    return url;
   }
 
   async _post(paths, payload) {
@@ -41,8 +58,7 @@ class SublinkngProvider {
     let lastErr;
     for (const base of baseCandidates) {
       for (const p of paths) {
-        let url = `${base.replace(/\/+$/, '')}${p}?api_key=${encodeURIComponent(this.apiKey)}`;
-        url = url.replace(/[`'"\s]+/g, ''); // sanitize accidental quotes/backticks/spaces
+        const url = this._buildUrl(base, p);
         try {
           const res = await axios.post(url, body, { headers, timeout: 15000 });
           return res.data || {};
@@ -67,7 +83,12 @@ class SublinkngProvider {
       '9mobile': '9MOBILE',
       etisalat: '9MOBILE'
     };
-    return map[n] || (n ? n.toUpperCase() : 'MTN');
+    const alpha = map[n] || (n ? n.toUpperCase() : 'MTN');
+    if (this.networkMode === 'numeric') {
+      const numMap = { MTN: 1, GLO: 2, AIRTEL: 3, '9MOBILE': 4 };
+      return numMap[alpha] || alpha;
+    }
+    return alpha;
   }
 
   _normalizePhone(phone) {
@@ -82,15 +103,17 @@ class SublinkngProvider {
     this._assertConfigured();
     const payload = {
       phone: this._normalizePhone(phone),
-      mobile_number: this._normalizePhone(phone),
-      msisdn: this._normalizePhone(phone),
       amount,
-      value: amount,
       network: this._normalizeNetwork(network),
-      operator: this._normalizeNetwork(network),
-      requestId,
-      api_key: this.apiKey
+      requestId
     };
+    if (this.authMethod === 'body') payload.api_key = this.apiKey;
+    if (this.includeAliases) {
+      payload.mobile_number = this._normalizePhone(phone);
+      payload.msisdn = this._normalizePhone(phone);
+      payload.value = amount;
+      payload.operator = this._normalizeNetwork(network);
+    }
     const data = await this._post(
       [
         this.airtimePath,
@@ -120,15 +143,17 @@ class SublinkngProvider {
     this._assertConfigured();
     const payload = {
       phone: this._normalizePhone(phone),
-      mobile_number: this._normalizePhone(phone),
-      msisdn: this._normalizePhone(phone),
       planId,
-      product_code: planId,
       network: this._normalizeNetwork(network),
-      operator: this._normalizeNetwork(network),
-      requestId,
-      api_key: this.apiKey
+      requestId
     };
+    if (this.authMethod === 'body') payload.api_key = this.apiKey;
+    if (this.includeAliases) {
+      payload.mobile_number = this._normalizePhone(phone);
+      payload.msisdn = this._normalizePhone(phone);
+      payload.product_code = planId;
+      payload.operator = this._normalizeNetwork(network);
+    }
     const data = await this._post(
       [
         this.dataPath,

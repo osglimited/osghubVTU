@@ -84,14 +84,14 @@ class TransactionService {
       }
 
     } catch (error) {
-      // 7. Failure - Refund
       console.error('Provider Error:', error);
+      const providerData = error?.response?.data;
       
       await walletService.creditWallet(userId, amount, 'main', `Refund: Failed ${type}`);
       
       await transactionRef.update({
         status: 'failed',
-        failureReason: error.message,
+        failureReason: providerData ? JSON.stringify(providerData) : error.message,
         updatedAt: new Date()
       });
 
