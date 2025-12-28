@@ -29,8 +29,6 @@ const nextConfig = {
         "https://firestore.googleapis.com",
         "https://identitytoolkit.googleapis.com",
         "https://securetoken.googleapis.com",
-        "https://app.sublinkng.com",
-        "https://apps.sublinkng.com",
         "http://localhost:5000",
         "https://osghubvtubackend.onrender.com",
       ].join(' '),
