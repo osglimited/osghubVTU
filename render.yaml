@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: osghub-frontend
+    env: node
+    rootDirectory: web/frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    autoDeploy: true
