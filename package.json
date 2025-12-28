@@ -1,0 +1,12 @@
+{
+  "name": "osghub-root",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd web/frontend && npm install && npm run build",
+    "start": "cd web/frontend && npm run start"
+  },
+  "engines": {
+    "node": ">=18.18.0 <23.0.0"
+  }
+}
