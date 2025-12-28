@@ -44,7 +44,6 @@ class TransactionService {
     };
     await transactionRef.set(transactionData);
 
-    // Provider integration intentionally disabled
     await transactionRef.update({
       status: 'failed',
       failureReason: 'Provider disabled',
