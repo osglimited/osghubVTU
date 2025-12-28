@@ -36,42 +36,8 @@ const getHistory = async (req, res) => {
   }
 };
 
-const testCredit = async (req, res) => {
-  try {
-    const { uid } = req.user;
-    
-    // 1. Ensure wallet exists
-    await walletService.createWallet(uid);
-    
-    // 2. Credit the wallet
-    const newBalance = await walletService.creditWallet(uid, 5000, 'main', 'End-to-End Test Credit');
-    
-    res.json({ 
-      message: 'Test credit successful', 
-      balance: newBalance 
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const testBonuses = async (req, res) => {
-  try {
-    const { uid } = req.user;
-    await walletService.createWallet(uid);
-    await walletService.creditWallet(uid, 2000, 'cashback', 'Test Cashback Credit');
-    await walletService.creditWallet(uid, 1000, 'referral', 'Test Referral Credit');
-    const balance = await walletService.getBalance(uid);
-    res.json({ message: 'Bonuses credited', balance });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
 module.exports = {
   getBalance,
   transferToMain,
-  getHistory,
-  testCredit,
-  testBonuses
+  getHistory
 };

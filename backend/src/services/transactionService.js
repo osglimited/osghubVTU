@@ -1,7 +1,5 @@
 const { db } = require('../config/firebase');
 const walletService = require('./walletService');
-const cashbackService = require('./cashbackService');
-const referralService = require('./referralService');
 
 const TRANSACTION_COLLECTION = 'transactions';
 

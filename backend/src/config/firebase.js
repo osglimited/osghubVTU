@@ -65,28 +65,7 @@ try {
 
 } catch (error) {
   console.error('Firebase Admin Initialization Error:', error.message);
-  console.warn('Running in MOCK mode due to missing/invalid credentials');
-  
-  // Mock implementations to allow server start
-  const mockFn = () => ({ 
-    get: async () => ({ exists: false, data: () => ({}) }),
-    set: async () => {},
-    update: async () => {},
-    doc: () => mockFn(),
-    collection: () => mockFn(),
-    where: () => mockFn(),
-    orderBy: () => mockFn(),
-    limit: () => mockFn(),
-    verifyIdToken: async () => ({ uid: 'mock-user', email: 'mock@test.com' })
-  });
-  
-  db = { 
-    collection: () => mockFn(), 
-    doc: () => mockFn(), 
-    runTransaction: async (cb) => cb({ get: async () => ({ exists: true, data: () => ({}) }), update: () => {}, set: () => {} }) 
-  };
-  auth = { verifyIdToken: async () => ({ uid: 'mock-user', email: 'mock@test.com' }) };
-  messaging = { send: async () => console.log('Mock Notification Sent') };
+  throw error;
 }
 
 module.exports = { admin, db, auth, messaging };
