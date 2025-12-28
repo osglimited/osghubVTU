@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Smartphone, Wifi, Tv, Zap, Plus, CreditCard, GraduationCap, Eye, EyeOff } from 'lucide-react';
+import { Smartphone, Wifi, Tv, Zap, CreditCard, GraduationCap, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, runTransaction } from 'firebase/firestore';
@@ -121,9 +121,7 @@ export default function Dashboard() {
                 {showMain ? <Eye size={20} /> : <EyeOff size={20} />}
               </button>
             </div>
-            <button className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-6 py-2 rounded-lg transition">
-              <Plus size={20} /> Fund Wallet
-            </button>
+            <div />
           </div>
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -138,43 +136,13 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-[#0A1F44]">Cashback Balance</h3>
-              <button className="p-2 rounded-md border" onClick={() => { setShowCashback(s => !s); sessionStorage.setItem('showCashbackBalance', String(!showCashback)); }}>
-                {showCashback ? <Eye size={18} /> : <EyeOff size={18} />}
-              </button>
-            </div>
-            <div className="text-3xl font-bold text-[#0A1F44] mb-2">{showCashback ? `₦${(user.cashbackBalance || 0).toLocaleString()}` : '••••••'}</div>
-            <p className="text-sm text-gray-500">Earned from transactions (3% per transaction)</p>
-            <div className="mt-3">
-              <button
-                className="bg-[#F97316] hover:bg-[#ea6d0f] text-white px-4 py-2 rounded-md text-sm"
-                onClick={() => handleWithdraw('cashback')}
-                disabled={processingWithdrawal || (user.cashbackBalance || 0) <= 0}
-              >
-                Transfer to Wallet
-              </button>
-            </div>
+            <h3 className="font-semibold text-[#0A1F44]">Cashback</h3>
+            <p className="text-sm text-gray-500">Disabled pending verified programs.</p>
           </div>
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-[#0A1F44]">Referral Balance</h3>
-              <button className="p-2 rounded-md border" onClick={() => { setShowReferral(s => !s); sessionStorage.setItem('showReferralBalance', String(!showReferral)); }}>
-                {showReferral ? <Eye size={18} /> : <EyeOff size={18} />}
-              </button>
-            </div>
-            <div className="text-3xl font-bold text-[#0A1F44] mb-2">{showReferral ? `₦${(user.referralBalance || 0).toLocaleString()}` : '••••••'}</div>
-            <p className="text-sm text-gray-500">Earned from referrals</p>
-            <div className="mt-3">
-              <button
-                className="bg-[#F97316] hover:bg-[#ea6d0f] text-white px-4 py-2 rounded-md text-sm"
-                onClick={() => handleWithdraw('referral')}
-                disabled={processingWithdrawal || (user.referralBalance || 0) <= 0}
-              >
-                Transfer to Wallet
-              </button>
-            </div>
+            <h3 className="font-semibold text-[#0A1F44]">Referral</h3>
+            <p className="text-sm text-gray-500">Disabled pending verified programs.</p>
           </div>
         </div>
 

@@ -61,34 +61,6 @@ export const getWalletBalance = async (token?: string): Promise<{ mainBalance: n
   }
 };
 
-export const transferWallet = async (amount: number, fromWallet: 'cashback' | 'referral'): Promise<TransactionResult> => {
-    const backendUrl =
-      process.env.NEXT_PUBLIC_VTU_BACKEND_URL ||
-      (typeof window !== 'undefined' && window.location.hostname.includes('osghub.com')
-        ? 'https://osghubvtubackend.onrender.com'
-        : '');
-    if (!backendUrl) return { success: false, message: 'Backend URL not configured' };
-
-    try {
-        const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-        const res = await fetch(`${backendUrl}/api/wallet/transfer`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({ amount, fromWallet }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-            return { success: false, message: data.error || 'Transfer failed' };
-        }
-        return { success: true, message: data.message };
-    } catch (error: any) {
-        return { success: false, message: error.message || 'Transfer failed' };
-    }
-};
 
 export const getWalletHistory = async (): Promise<any[]> => {
   const backendUrl =

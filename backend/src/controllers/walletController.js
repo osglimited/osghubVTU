@@ -10,21 +10,6 @@ const getBalance = async (req, res) => {
   }
 };
 
-const transferToMain = async (req, res) => {
-  try {
-    const { uid } = req.user;
-    const { amount, fromWallet } = req.body;
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error: 'Invalid amount' });
-    }
-
-    const result = await walletService.transferToMain(uid, amount, fromWallet);
-    res.json({ message: 'Transfer successful', ...result });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-};
 
 const getHistory = async (req, res) => {
   try {
@@ -38,6 +23,5 @@ const getHistory = async (req, res) => {
 
 module.exports = {
   getBalance,
-  transferToMain,
   getHistory
 };
