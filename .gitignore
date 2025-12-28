@@ -2,7 +2,6 @@ backend/.env
 **/.env
 backend/node_modules/
 web/frontend/node_modules/
-web/frontend/.next/
 *.log
 Thumbs.db
 .DS_Store

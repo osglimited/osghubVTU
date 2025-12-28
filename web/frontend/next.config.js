@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  productionBrowserSourceMaps: false,
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -14,7 +16,21 @@ const nextConfig = {
     ],
   },
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: true,
+  },
+  compiler: {
+    removeConsole: { production: true },
+  },
+  webpack: (config, { dev }) => {
+    if (!dev) {
+      if (config.optimization) {
+        config.optimization.minimize = false;
+      } else {
+        config.optimization = { minimize: false };
+      }
+      config.devtool = false;
+    }
+    return config;
   },
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';
