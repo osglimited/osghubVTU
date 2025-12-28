@@ -7,19 +7,39 @@ import { useAuth } from '@/contexts/AuthContext';
 import { purchaseData } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 
-const DATA_PLANS = [
-  { id: '500mb', name: '500MB', price: 100 },
-  { id: '1gb', name: '1GB', price: 200 },
-  { id: '5gb', name: '5GB', price: 1000 },
-  { id: '10gb', name: '10GB', price: 2000 },
+const NETWORKS = [
+  { label: 'MTN', value: 'MTN', id: 1 },
+  { label: 'Glo', value: 'GLO', id: 2 },
+  { label: 'Airtel', value: 'AIRTEL', id: 3 },
+  { label: '9mobile', value: '9MOBILE', id: 4 },
 ];
+
+const PLAN_CATALOG: Record<string, Array<{ id: string; name: string; price: number }>> = {
+  MTN: [
+    { id: 'mtn_sme_500mb_30days', name: 'MTN SME 500MB (30 days)', price: 350 },
+    { id: 'mtn_sme_1gb_30days', name: 'MTN SME 1GB (30 days)', price: 1000 },
+    { id: 'mtn_sme_2gb_30days', name: 'MTN SME 2GB (30 days)', price: 1900 },
+  ],
+  GLO: [
+    { id: 'glo_1gb_30days', name: 'GLO 1GB (30 days)', price: 1000 },
+    { id: 'glo_2gb_30days', name: 'GLO 2GB (30 days)', price: 1900 },
+  ],
+  AIRTEL: [
+    { id: 'airtel_1gb_30days', name: 'Airtel 1GB (30 days)', price: 1000 },
+    { id: 'airtel_2gb_30days', name: 'Airtel 2GB (30 days)', price: 1900 },
+  ],
+  '9MOBILE': [
+    { id: '9mobile_1gb_30days', name: '9mobile 1GB (30 days)', price: 1000 },
+    { id: '9mobile_2gb_30days', name: '9mobile 2GB (30 days)', price: 1900 },
+  ],
+};
 
 export default function DataPage() {
   const { user } = useAuth();
   const { service, loading, error } = useService('data');
-  const [network, setNetwork] = useState('MTN');
+  const [network, setNetwork] = useState(NETWORKS[0]);
   const [phone, setPhone] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState(DATA_PLANS[0]);
+  const [selectedPlan, setSelectedPlan] = useState(PLAN_CATALOG[NETWORKS[0].value][0]);
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
 
@@ -34,17 +54,16 @@ export default function DataPage() {
     
     setProcessing(true);
     try {
+      const planId = selectedPlan.id;
       const result = await purchaseData(
         user.uid,
         selectedPlan.price,
         {
-          network,
+          planId,
           phone,
-          planId: selectedPlan.id,
-          provider: service.slug
+          networkId: network.id
         }
       );
-
       if (result.success) {
         alert('Data purchase successful!');
         setPhone('');
@@ -79,13 +98,17 @@ export default function DataPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Select Network</label>
                   <select 
                     className="input-field"
-                    value={network}
-                    onChange={(e) => setNetwork(e.target.value)}
+                    value={network.value}
+                    onChange={(e) => {
+                      const n = NETWORKS.find(nn => nn.value === e.target.value) || NETWORKS[0];
+                      setNetwork(n);
+                      const plans = PLAN_CATALOG[n.value] || PLAN_CATALOG[NETWORKS[0].value];
+                      setSelectedPlan(plans[0]);
+                    }}
                   >
-                    <option value="MTN">MTN</option>
-                    <option value="Glo">Glo</option>
-                    <option value="Airtel">Airtel</option>
-                    <option value="9mobile">9mobile</option>
+                    {NETWORKS.map(n => (
+                      <option key={n.value} value={n.value}>{n.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -108,14 +131,15 @@ export default function DataPage() {
                     className="input-field"
                     value={selectedPlan.id}
                     onChange={(e) => {
-                        const plan = DATA_PLANS.find(p => p.id === e.target.value);
-                        if (plan) setSelectedPlan(plan);
+                        const plans = PLAN_CATALOG[network.value] || [];
+                        const plan = plans.find(p => p.id === e.target.value) || plans[0];
+                        setSelectedPlan(plan);
                     }}
                   >
-                    {DATA_PLANS.map(plan => (
-                        <option key={plan.id} value={plan.id}>
-                            {plan.name} - ₦{plan.price.toLocaleString()}
-                        </option>
+                    {(PLAN_CATALOG[network.value] || []).map(plan => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} - ₦{plan.price.toLocaleString()}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -130,7 +154,7 @@ export default function DataPage() {
                     className="btn-accent w-full" 
                     disabled={!service.enabled || processing}
                 >
-                  {processing ? 'Processing...' : service.enabled ? 'Buy Data' : 'Coming soon'}
+                  {processing ? 'Processing...' : service.enabled ? `Buy ${selectedPlan.name.split('(')[0]}` : 'Coming soon'}
                 </button>
               </form>
             </>

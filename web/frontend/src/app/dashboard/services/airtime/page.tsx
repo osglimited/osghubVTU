@@ -30,7 +30,7 @@ export default function AirtimePage() {
     
     setProcessing(true);
     try {
-      const result = await purchaseAirtime(user.uid, Number(amount), { network, phone, provider: service.slug });
+      const result = await purchaseAirtime(user.uid, Number(amount), { network, phone });
 
       if (result.success) {
         addNotification('success', 'Airtime purchase successful', `₦${Number(amount).toLocaleString()} on ${network}`);

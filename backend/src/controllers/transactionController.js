@@ -19,7 +19,10 @@ const purchase = async (req, res) => {
     const result = await transactionService.initiateTransaction(uid, type, amount, details, requestId);
     res.json(result);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    const statusCode = error.statusCode && Number.isInteger(error.statusCode) ? error.statusCode : 400;
+    const payload = { error: error.message };
+    if (error.providerError) payload.providerError = error.providerError;
+    res.status(statusCode).json(payload);
   }
 };
 

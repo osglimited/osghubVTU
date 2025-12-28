@@ -14,7 +14,6 @@ app.use(cors({
   origin: [
     'https://osghub.com', 
     'https://osghubvtu.onrender.com', 
-    'https://osghubvtubackend.onrender.com',
     'http://localhost:3000', 
     'http://localhost:5000',
     'http://localhost:5001'
@@ -33,12 +32,12 @@ app.get('/', (req, res) => {
 const walletRoutes = require('./routes/walletRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-const webhookRoutes = require('./routes/webhookRoutes');
+// const webhookRoutes = require('./routes/webhookRoutes');
 
 app.use('/api/wallet', walletRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/webhook', webhookRoutes);
+// app.use('/api/webhooks', webhookRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

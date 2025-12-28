@@ -28,13 +28,11 @@ class TransactionService {
       }
     }
 
-    // 2. Ensure wallet exists, Check Balance & Debit
-    // We debit first. If provider fails, we refund.
-    try {
-      await walletService.createWallet(userId);
-      await walletService.debitWallet(userId, amount, 'main', `${type} purchase`);
-    } catch (error) {
-      throw new Error(`Transaction failed: ${error.message}`);
+    // 2. Ensure wallet exists & has sufficient balance (do not debit yet)
+    await walletService.createWallet(userId);
+    const bal = await walletService.getBalance(userId);
+    if ((bal.mainBalance || 0) < amount) {
+      throw new Error('Insufficient funds');
     }
 
     // 3. Create Transaction Record (Pending)
@@ -56,15 +54,17 @@ class TransactionService {
     let providerResponse;
     try {
       if (type === 'airtime') {
-        providerResponse = await provider.purchaseAirtime(details.phone, amount, details.network, idempotencyKey);
+        providerResponse = await provider.purchaseAirtime(details.phone, amount, (details.networkId ?? details.network), idempotencyKey);
       } else if (type === 'data') {
         const planId = details.planId || details.plan || details.bundleId || details.planCode;
-        providerResponse = await provider.purchaseData(details.phone, planId, details.network, idempotencyKey);
+        providerResponse = await provider.purchaseData(details.phone, planId, (details.networkId ?? details.network), idempotencyKey);
       } else {
         throw new Error('Invalid transaction type');
       }
 
       if (providerResponse.success) {
+        // Debit AFTER provider confirms
+        await walletService.debitWallet(userId, amount, 'main', `${type} purchase`);
         // 5. Success
         await transactionRef.update({
           status: 'success',
@@ -86,16 +86,17 @@ class TransactionService {
     } catch (error) {
       console.error('Provider Error:', error);
       const providerData = error?.response?.data;
-      
-      await walletService.creditWallet(userId, amount, 'main', `Refund: Failed ${type}`);
-      
+      const providerStatus = error?.response?.status;
+      const providerMessage = (providerData && (providerData.message || providerData.error)) || error.message;
       await transactionRef.update({
         status: 'failed',
         failureReason: providerData ? JSON.stringify(providerData) : error.message,
         updatedAt: new Date()
       });
-
-      throw new Error(`Transaction failed: ${error.message}`);
+      const err = new Error(`Transaction failed: ${providerMessage}`);
+      err.statusCode = providerStatus || 400;
+      err.providerError = providerData || null;
+      throw err;
     }
   }
 
