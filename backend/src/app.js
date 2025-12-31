@@ -18,7 +18,17 @@ const origins = originsEnv ? originsEnv.split(',').map(s => s.trim()).filter(Boo
   'http://localhost:5000',
   'http://localhost:5001'
 ];
-app.use(cors({ origin: origins, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (origins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 
