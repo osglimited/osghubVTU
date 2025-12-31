@@ -242,33 +242,3 @@ export const transferWallet = async (amount: number, fromWalletType: 'cashback' 
   }
   return { success: true, message: 'Transfer successful' };
 };
-
-export const processTransaction = async (
-  userId: string,
-  amount: number,
-  type: 'cable' | 'electricity' | 'airtime' | 'data',
-  details: Record<string, any>
-): Promise<TransactionResult> => {
-  const backendUrl = resolveBackendUrl();
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-  const res = await fetch(`${backendUrl}/api/transactions/purchase`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({
-      type,
-      amount,
-      details: {
-        userId,
-        ...details,
-      },
-    }),
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
-  }
-  return { success: true, message: 'Transaction initiated', transactionId: data?.transactionId };
-};

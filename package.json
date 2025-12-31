@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "build": "cd web/frontend && npm install && npm run build",
-    "start": "cd web/frontend && npm run start"
+    "prestart": "cd web/frontend && npm run build",
+    "start": "npm run build && cd web/frontend && npm run start"
   },
   "engines": {
     "node": ">=18.18.0 <23.0.0"
