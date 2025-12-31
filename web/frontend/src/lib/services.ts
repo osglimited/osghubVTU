@@ -149,6 +149,33 @@ export const purchaseData = async (
   return { success: true, message: 'Data initiated' };
 };
 
+export const processTransaction = async (
+  userId: string,
+  amount: number,
+  type: 'cable' | 'electricity' | 'tv',
+  details: Record<string, any>
+): Promise<TransactionResult> => {
+  const backendUrl = resolveBackendUrl();
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  const res = await fetch(`${backendUrl}/api/transactions/purchase`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      type,
+      amount,
+      details,
+    }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
+  }
+  return { success: true, message: 'Transaction initiated' };
+};
+
 
 export const getServices = async (): Promise<ServiceDoc[]> => {
   try {

@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { verifyFunding, getWalletBalance } from '@/lib/services';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
-export default function PaymentCompletePage() {
+function PaymentCompleteContent() {
   const router = useRouter();
   const params = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'failed'>('loading');
@@ -23,7 +23,7 @@ export default function PaymentCompletePage() {
       if (res.success) {
         setStatus('success');
         setMessage('Wallet credited successfully');
-        await getWalletBalance(); // refresh cache/contexts if any
+        await getWalletBalance();
         setTimeout(() => router.replace('/dashboard/wallet'), 1500);
       } else {
         setStatus('failed');
@@ -66,5 +66,23 @@ export default function PaymentCompletePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PaymentCompletePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 max-w-md w-full text-center space-y-4">
+            <Loader2 className="animate-spin mx-auto text-[#0A1F44]" size={40} />
+            <h1 className="text-xl font-semibold text-[#0A1F44]">Loading</h1>
+            <p className="text-gray-600">Preparing verification...</p>
+          </div>
+        </div>
+      }
+    >
+      <PaymentCompleteContent />
+    </Suspense>
   );
 }
