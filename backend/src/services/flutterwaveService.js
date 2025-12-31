@@ -5,6 +5,12 @@ const walletService = require('./walletService');
 const FLW_API = 'https://api.flutterwave.com/v3';
 
 class FlutterwaveService {
+  constructor() {
+    if (!process.env.FLW_SECRET_KEY) {
+      console.warn('Warning: FLW_SECRET_KEY is not set. Payments will fail.');
+    }
+  }
+
   _headers() {
     return {
       'Content-Type': 'application/json',

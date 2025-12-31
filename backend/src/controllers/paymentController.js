@@ -6,7 +6,9 @@ const initiate = async (req, res) => {
   try {
     const { uid, email } = req.user;
     const { amount } = req.body;
-    if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'Invalid amount' });
+    if (!amount || isNaN(amount) || Number(amount) < 100) {
+      return res.status(400).json({ error: 'Invalid amount. Minimum is ₦100.' });
+    }
     const origin = (req.headers.origin || '').toLowerCase();
     const isLocal = origin.includes('localhost');
     const isRenderFrontend = origin.includes('osghubvtu.onrender.com');
