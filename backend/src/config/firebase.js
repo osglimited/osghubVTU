@@ -20,7 +20,6 @@ try {
     };
     const projectId = sanitize(process.env.FIREBASE_PROJECT_ID);
     const clientEmail = sanitize(process.env.FIREBASE_CLIENT_EMAIL);
-    console.log('Firebase Project ID:', projectId);
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
     if (privateKey) {
@@ -40,23 +39,19 @@ try {
         // Handle newlines
         privateKey = privateKey.replace(/\\n/g, '\n');
     }
-    
-    // console.log('Private Key Start:', privateKey ? privateKey.substring(0, 50) : 'None');
-    if (privateKey) {
-       console.log('Private Key Length:', privateKey.length);
-       console.log('Private Key Header:', privateKey.substring(0, 40));
-       console.log('Private Key Line Count:', privateKey.split('\n').length);
-       console.log('Private Key First 3 Lines:', privateKey.split('\n').slice(0, 3));
-    }
 
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId,
-        clientEmail,
-        privateKey: privateKey,
-      }),
-    });
-    console.log('Firebase Admin Initialized');
+    const hasValidKey = Boolean(privateKey && /BEGIN PRIVATE KEY/.test(privateKey));
+    if (projectId && clientEmail && hasValidKey) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+      });
+    } else {
+      admin.initializeApp();
+    }
   }
   
   db = admin.firestore();

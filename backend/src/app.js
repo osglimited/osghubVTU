@@ -10,16 +10,15 @@ const app = express();
 
 // Middleware
 app.use(helmet());
-app.use(cors({
-  origin: [
-    'https://osghub.com', 
-    'https://osghubvtu.onrender.com', 
-    'http://localhost:3000', 
-    'http://localhost:5000',
-    'http://localhost:5001'
-  ],
-  credentials: true
-}));
+const originsEnv = process.env.CORS_ALLOWED_ORIGINS;
+const origins = originsEnv ? originsEnv.split(',').map(s => s.trim()).filter(Boolean) : [
+  'https://osghub.com',
+  'https://osghubvtu.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'http://localhost:5001'
+];
+app.use(cors({ origin: origins, credentials: true }));
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -32,12 +31,14 @@ app.get('/', (req, res) => {
 const walletRoutes = require('./routes/walletRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-// const webhookRoutes = require('./routes/webhookRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 
 app.use('/api/wallet', walletRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/admin', adminRoutes);
-// app.use('/api/webhooks', webhookRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

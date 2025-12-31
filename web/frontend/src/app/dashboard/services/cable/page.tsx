@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Tv } from 'lucide-react';
 import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
+import { processTransaction } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 
 const CABLE_PROVIDERS = ['DSTV', 'GOTV', 'Startimes'];
@@ -24,9 +25,30 @@ export default function CablePage() {
   };
 
   const onPinSuccess = async () => {
+    if (!user || !service) return;
+    
     setProcessing(true);
     try {
-      alert('Service temporarily unavailable. Please try again later.');
+      const result = await processTransaction(
+        user.uid,
+        Number(amount),
+        'cable',
+        {
+          provider,
+          smartcardNumber,
+          serviceProvider: service.slug
+        }
+      );
+
+      if (result.success) {
+        alert('Cable subscription successful!');
+        setSmartcardNumber('');
+        setAmount('');
+      } else {
+        alert(`Transaction failed: ${result.message}`);
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
     } finally {
       setProcessing(false);
     }
@@ -92,8 +114,12 @@ export default function CablePage() {
                     <span className="font-bold">₦{user?.walletBalance?.toLocaleString() ?? '0.00'}</span>
                 </div>
 
-                <button type="submit" className="btn-accent w-full" disabled>
-                  Service Unavailable
+                <button 
+                    type="submit" 
+                    className="btn-accent w-full" 
+                    disabled={!service.enabled || processing}
+                >
+                  {processing ? 'Processing...' : service.enabled ? 'Subscribe' : 'Coming soon'}
                 </button>
               </form>
             </>

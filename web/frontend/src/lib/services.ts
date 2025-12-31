@@ -5,6 +5,18 @@ import app from '@/lib/firebase';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { auth } from '@/lib/firebase';
 
+const resolveBackendUrl = (): string => {
+  const envUrl = process.env.NEXT_PUBLIC_VTU_BACKEND_URL;
+  const envUrlLocal = process.env.NEXT_PUBLIC_VTU_BACKEND_URL_LOCAL;
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase();
+    if (host.includes('localhost')) return envUrlLocal || 'http://localhost:5000';
+    if (envUrl) return envUrl;
+    if (host.includes('osghubvtu.onrender.com')) return 'https://osghubvtubackend.onrender.com';
+  }
+  return envUrl || 'https://osghubvtubackend.onrender.com';
+};
+
 export interface ServiceDoc {
   id: string;
   name: string;
@@ -36,13 +48,7 @@ export const purchaseAirtimeViaCloud = async (
 };
 
 export const getWalletBalance = async (token?: string): Promise<{ mainBalance: number; cashbackBalance: number; referralBalance: number } | null> => {
-  const backendUrl =
-    process.env.NEXT_PUBLIC_VTU_BACKEND_URL ||
-    (typeof window !== 'undefined' && window.location.hostname.includes('osghub.com')
-      ? 'https://osghubvtubackend.onrender.com'
-      : '');
-  if (!backendUrl) return null;
-
+  const backendUrl = resolveBackendUrl();
   try {
     const idToken = token || (auth.currentUser ? await auth.currentUser.getIdToken() : '');
     const res = await fetch(`${backendUrl}/api/wallet`, {
@@ -63,13 +69,7 @@ export const getWalletBalance = async (token?: string): Promise<{ mainBalance: n
 
 
 export const getWalletHistory = async (): Promise<any[]> => {
-  const backendUrl =
-    process.env.NEXT_PUBLIC_VTU_BACKEND_URL ||
-    (typeof window !== 'undefined' && window.location.hostname.includes('osghub.com')
-      ? 'https://osghubvtubackend.onrender.com'
-      : '');
-  if (!backendUrl) return [];
-
+  const backendUrl = resolveBackendUrl();
   try {
     const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
     const res = await fetch(`${backendUrl}/api/wallet/history`, {
@@ -93,14 +93,7 @@ export const purchaseAirtime = async (
   amount: number,
   details: { network?: string; networkId?: number | string; phone: string }
 ): Promise<TransactionResult> => {
-  const backendUrl =
-    process.env.NEXT_PUBLIC_VTU_BACKEND_URL ||
-    (typeof window !== 'undefined' && window.location.hostname.includes('osghub.com')
-      ? 'https://osghubvtubackend.onrender.com'
-      : '');
-  if (!backendUrl) {
-    return { success: false, message: 'Backend URL not configured' };
-  }
+  const backendUrl = resolveBackendUrl();
   const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
   const res = await fetch(`${backendUrl}/api/transactions/purchase`, {
     method: 'POST',
@@ -130,14 +123,7 @@ export const purchaseData = async (
   amount: number,
   details: { planId: string; phone: string; network?: string; networkId?: number | string }
 ): Promise<TransactionResult> => {
-  const backendUrl =
-    process.env.NEXT_PUBLIC_VTU_BACKEND_URL ||
-    (typeof window !== 'undefined' && window.location.hostname.includes('osghub.com')
-      ? 'https://osghubvtubackend.onrender.com'
-      : '');
-  if (!backendUrl) {
-    return { success: false, message: 'Backend URL not configured' };
-  }
+  const backendUrl = resolveBackendUrl();
   const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
   const res = await fetch(`${backendUrl}/api/transactions/purchase`, {
     method: 'POST',
@@ -201,4 +187,58 @@ export const getServiceById = async (id: string): Promise<ServiceDoc | null> => 
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
   return { id: snap.id, ...(snap.data() as any) } as ServiceDoc;
+};
+
+export const initiateFunding = async (amount: number): Promise<{ tx_ref?: string; link?: string; error?: string }> => {
+  const backendUrl = resolveBackendUrl();
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  const res = await fetch(`${backendUrl}/api/payments/initiate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ amount }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    return { error: (data && (data.error || data.message)) || 'Failed to initiate payment' };
+  }
+  return { tx_ref: data.tx_ref, link: data.link };
+};
+
+export const verifyFunding = async (tx_ref: string): Promise<{ success: boolean; message?: string }> => {
+  const backendUrl = resolveBackendUrl();
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  const res = await fetch(`${backendUrl}/api/payments/verify`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ tx_ref }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    return { success: false, message: (data && (data.error || data.message)) || 'Verification failed' };
+  }
+  return { success: Boolean(data?.success), message: data?.message || (data?.success ? 'Wallet credited' : 'Not credited') };
+};
+
+export const transferWallet = async (amount: number, fromWalletType: 'cashback' | 'referral'): Promise<{ success: boolean; message?: string }> => {
+  const backendUrl = resolveBackendUrl();
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  const res = await fetch(`${backendUrl}/api/wallet/transfer`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ amount, fromWalletType }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    return { success: false, message: (data && (data.error || data.message)) || 'Transfer failed' };
+  }
+  return { success: true, message: 'Transfer successful' };
 };

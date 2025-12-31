@@ -1,5 +1,6 @@
 backend/.env
 **/.env
+web/frontend/.env.local
 backend/node_modules/
 web/frontend/node_modules/
 web/frontend/.next/
