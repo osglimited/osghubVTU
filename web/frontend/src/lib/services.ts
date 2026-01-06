@@ -220,19 +220,31 @@ export const getServiceById = async (id: string): Promise<ServiceDoc | null> => 
 export const initiateFunding = async (amount: number): Promise<{ tx_ref?: string; link?: string; error?: string }> => {
   const backendUrl = resolveBackendUrl();
   const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-  const res = await fetch(`${backendUrl}/api/payments/initiate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ amount }),
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    return { error: (data && (data.error || data.message)) || 'Failed to initiate payment' };
+  const paths = [
+    `${backendUrl}/api/payments/initiate`,
+    typeof window !== 'undefined' ? `${window.location.origin.replace(/\/+$/,'')}/api/payments/initiate` : ''
+  ].filter(Boolean);
+  for (const url of paths) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ amount }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { error: (data && (data.error || data.message)) || 'Failed to initiate payment' };
+      }
+      return { tx_ref: data.tx_ref, link: data.link };
+    } catch (e: any) {
+      // Try next candidate on network/CORS failure
+      continue;
+    }
   }
-  return { tx_ref: data.tx_ref, link: data.link };
+  return { error: 'Network error contacting payment service. Please retry shortly.' };
 };
 
 export const verifyFunding = async (tx_ref: string): Promise<{ success: boolean; message?: string }> => {

@@ -19,7 +19,22 @@ const origins = originsEnv ? originsEnv.split(',').map(s => s.trim()).filter(Boo
   'http://localhost:5000',
   'http://localhost:5001'
 ];
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests without origin (e.g., mobile apps, curl) and from known origins
+    if (!origin || origins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  maxAge: 86400
+}));
+// Ensure preflight requests are handled early
+app.options('*', cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
