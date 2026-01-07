@@ -8,14 +8,20 @@ import { auth } from '@/lib/firebase';
 const resolveBackendUrl = (): string => {
   const envUrl = process.env.NEXT_PUBLIC_VTU_BACKEND_URL;
   const envUrlLocal = process.env.NEXT_PUBLIC_VTU_BACKEND_URL_LOCAL;
+  const isNonLocal = (url?: string) => !!url && !/localhost|127\.0\.0\.1/i.test(url);
   if (typeof window !== 'undefined') {
     const host = window.location.hostname.toLowerCase();
-    if (host.includes('localhost')) return envUrlLocal || 'http://localhost:5000';
-    if (envUrl) return envUrl;
-    if (host.includes('osghub.com')) return 'https://osghubvtubackend.onrender.com';
-    if (host.includes('osghubvtu.onrender.com')) return 'https://osghubvtubackend.onrender.com';
+    if (host.includes('localhost')) {
+      return envUrlLocal || 'http://localhost:5000';
+    }
+    if (host.includes('osghub.com') || host.includes('osghubvtu.onrender.com')) {
+      return 'https://osghubvtubackend.onrender.com';
+    }
+    if (isNonLocal(envUrl)) {
+      return envUrl as string;
+    }
   }
-  return envUrl || 'https://osghubvtubackend.onrender.com';
+  return isNonLocal(envUrl) ? (envUrl as string) : 'https://osghubvtubackend.onrender.com';
 };
 
 export interface ServiceDoc {
@@ -220,31 +226,23 @@ export const getServiceById = async (id: string): Promise<ServiceDoc | null> => 
 export const initiateFunding = async (amount: number): Promise<{ tx_ref?: string; link?: string; error?: string }> => {
   const backendUrl = resolveBackendUrl();
   const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-  const paths = [
-    `${backendUrl}/api/payments/initiate`,
-    typeof window !== 'undefined' ? `${window.location.origin.replace(/\/+$/,'')}/api/payments/initiate` : ''
-  ].filter(Boolean);
-  for (const url of paths) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ amount }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        return { error: (data && (data.error || data.message)) || 'Failed to initiate payment' };
-      }
-      return { tx_ref: data.tx_ref, link: data.link };
-    } catch (e: any) {
-      // Try next candidate on network/CORS failure
-      continue;
+  try {
+    const res = await fetch(`${backendUrl}/api/payments/initiate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ amount }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      return { error: (data && (data.error || data.message)) || 'Failed to initiate payment' };
     }
+    return { tx_ref: data.tx_ref, link: data.link };
+  } catch (e: any) {
+    return { error: 'Network error contacting payment service. Please retry shortly.' };
   }
-  return { error: 'Network error contacting payment service. Please retry shortly.' };
 };
 
 export const verifyFunding = async (tx_ref: string): Promise<{ success: boolean; message?: string }> => {

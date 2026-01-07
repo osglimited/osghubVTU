@@ -16,46 +16,47 @@ interface Service {
   category?: string;
 }
 
+const placeholder = '/assets/images/hero-placeholder.png';
 const services: Service[] = [
   // Mobile Networks - Airtime & Data
-  { id: 'mtn', name: 'MTN', icon: '/images/networks/mtn.png', category: 'Airtime & Data' },
-  { id: 'airtel', name: 'Airtel', icon: '/images/networks/airtel.png', category: 'Airtime & Data' },
-  { id: 'glo', name: 'Glo', icon: '/images/networks/glo.png', category: 'Airtime & Data' },
-  { id: '9mobile', name: '9mobile', icon: '/images/networks/9mobile.png', category: 'Airtime & Data' },
+  { id: 'mtn', name: 'MTN', icon: placeholder, category: 'Airtime & Data' },
+  { id: 'airtel', name: 'Airtel', icon: placeholder, category: 'Airtime & Data' },
+  { id: 'glo', name: 'Glo', icon: placeholder, category: 'Airtime & Data' },
+  { id: '9mobile', name: '9mobile', icon: placeholder, category: 'Airtime & Data' },
   
   // Data Bundles
-  { id: 'mtn-data', name: 'MTN Data', icon: '/images/icons/data.png', category: 'Data Plans' },
-  { id: 'airtel-data', name: 'Airtel Data', icon: '/images/icons/data.png', category: 'Data Plans' },
-  { id: 'glo-data', name: 'Glo Data', icon: '/images/icons/data.png', category: 'Data Plans' },
-  { id: '9mobile-data', name: '9mobile Data', icon: '/images/icons/data.png', category: 'Data Plans' },
+  { id: 'mtn-data', name: 'MTN Data', icon: placeholder, category: 'Data Plans' },
+  { id: 'airtel-data', name: 'Airtel Data', icon: placeholder, category: 'Data Plans' },
+  { id: 'glo-data', name: 'Glo Data', icon: placeholder, category: 'Data Plans' },
+  { id: '9mobile-data', name: '9mobile Data', icon: placeholder, category: 'Data Plans' },
   
   // Exam Pins
-  { id: 'waec', name: 'WAEC', icon: '/images/icons/waec.png', category: 'Exam PINs' },
-  { id: 'neco', name: 'NECO', icon: '/images/icons/neco.png', category: 'Exam PINs' },
-  { id: 'nabteb', name: 'NABTEB', icon: '/images/icons/nabteb.png', category: 'Exam PINs' },
+  { id: 'waec', name: 'WAEC', icon: placeholder, category: 'Exam PINs' },
+  { id: 'neco', name: 'NECO', icon: placeholder, category: 'Exam PINs' },
+  { id: 'nabteb', name: 'NABTEB', icon: placeholder, category: 'Exam PINs' },
   
   // Electricity Bills
-  { id: 'ibedc', name: 'IBEDC', icon: '/images/bills/ibedc.png', category: 'Electricity' },
-  { id: 'ekedc', name: 'EKEDC', icon: '/images/bills/ekedc.png', category: 'Electricity' },
-  { id: 'ikedc', name: 'IKEDC', icon: '/images/bills/ikedc.png', category: 'Electricity' },
-  { id: 'phed', name: 'PHED', icon: '/images/bills/phed.png', category: 'Electricity' },
-  { id: 'aedc', name: 'AEDC', icon: '/images/bills/aedc.png', category: 'Electricity' },
-  { id: 'eedc', name: 'EEDC', icon: '/images/bills/eedc.png', category: 'Electricity' },
-  { id: 'kedco', name: 'KEDCO', icon: '/images/bills/kedco.png', category: 'Electricity' },
+  { id: 'ibedc', name: 'IBEDC', icon: placeholder, category: 'Electricity' },
+  { id: 'ekedc', name: 'EKEDC', icon: placeholder, category: 'Electricity' },
+  { id: 'ikedc', name: 'IKEDC', icon: placeholder, category: 'Electricity' },
+  { id: 'phed', name: 'PHED', icon: placeholder, category: 'Electricity' },
+  { id: 'aedc', name: 'AEDC', icon: placeholder, category: 'Electricity' },
+  { id: 'eedc', name: 'EEDC', icon: placeholder, category: 'Electricity' },
+  { id: 'kedco', name: 'KEDCO', icon: placeholder, category: 'Electricity' },
   
   // Cable TV
-  { id: 'dstv', name: 'DStv', icon: '/images/tv/dstv.png', category: 'Cable TV' },
-  { id: 'gotv', name: 'GOtv', icon: '/images/tv/gotv.png', category: 'Cable TV' },
-  { id: 'startimes', name: 'Startimes', icon: '/images/tv/startimes.png', category: 'Cable TV' },
+  { id: 'dstv', name: 'DStv', icon: placeholder, category: 'Cable TV' },
+  { id: 'gotv', name: 'GOtv', icon: placeholder, category: 'Cable TV' },
+  { id: 'startimes', name: 'Startimes', icon: placeholder, category: 'Cable TV' },
   
   // Internet Services
-  { id: 'spectranet', name: 'Spectranet', icon: '/images/internet/spectranet.png', category: 'Internet' },
-  { id: 'smiile', name: 'SMILE', icon: '/images/internet/smile.png', category: 'Internet' },
+  { id: 'spectranet', name: 'Spectranet', icon: placeholder, category: 'Internet' },
+  { id: 'smiile', name: 'SMILE', icon: placeholder, category: 'Internet' },
   
   // Betting
-  { id: 'bet9ja', name: 'Bet9ja', icon: '/images/betting/bet9ja.png', category: 'Betting' },
-  { id: 'betking', name: 'BetKing', icon: '/images/betting/betking.png', category: 'Betting' },
-  { id: 'sportybet', name: 'SportyBet', icon: '/images/betting/sportybet.png', category: 'Betting' }
+  { id: 'bet9ja', name: 'Bet9ja', icon: placeholder, category: 'Betting' },
+  { id: 'betking', name: 'BetKing', icon: placeholder, category: 'Betting' },
+  { id: 'sportybet', name: 'SportyBet', icon: placeholder, category: 'Betting' }
 ];
 
 export function ServiceSlider() {
@@ -134,10 +135,9 @@ export function ServiceSlider() {
                     className="object-contain w-full h-full"
                     loading="lazy"
                     onError={(e) => {
-                      // Fallback to a placeholder if image fails to load
                       const target = e.target as HTMLImageElement;
                       target.onerror = null;
-                      target.src = '/images/placeholder-service.png';
+                      target.src = placeholder;
                     }}
                   />
                 </div>

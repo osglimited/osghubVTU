@@ -12,6 +12,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5000'),
   title: 'OSGHUB VTU - Instant Digital Services',
   description: 'Buy airtime, data, electricity and more instantly with OSGHUB VTU',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
   openGraph: {
     title: 'OSGHUB VTU',
     description: 'Instant digital services platform',

@@ -35,7 +35,7 @@ export default function Landing() {
                 <Link href="/register">
                   <Button size="lg" className="h-12 px-8 text-base">Get Started Now</Button>
                 </Link>
-                <Link href="/services/vtu">
+                <Link href="/register">
                   <Button size="lg" variant="outline" className="h-12 px-8 text-base">Buy Data Guest</Button>
                 </Link>
               </div>
@@ -69,7 +69,9 @@ export default function Landing() {
       </section>
 
       {/* Services Slider */}
-      <ServiceSlider />
+      <section id="services">
+        <ServiceSlider />
+      </section>
 
       {/* Features Section */}
       <section id="features" className="pt-16 pb-24 bg-muted/50">
