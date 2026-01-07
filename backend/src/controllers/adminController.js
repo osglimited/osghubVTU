@@ -42,8 +42,26 @@ const getAllTransactions = async (req, res) => {
   }
 };
 
+const walletService = require('../services/walletService');
+
+const creditWallet = async (req, res) => {
+  try {
+    const { userId, amount, walletType, description } = req.body || {};
+    if (!userId) return res.status(400).json({ error: 'userId is required' });
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return res.status(400).json({ error: 'Valid amount is required' });
+    const wtype = ['main', 'cashback', 'referral'].includes(walletType) ? walletType : 'main';
+    await walletService.createWallet(userId);
+    const newBalance = await walletService.creditWallet(userId, amt, wtype, description || 'Admin Credit');
+    res.json({ success: true, userId, newBalance, walletType: wtype });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   updateSettings,
   getSettings,
-  getAllTransactions
+  getAllTransactions,
+  creditWallet
 };

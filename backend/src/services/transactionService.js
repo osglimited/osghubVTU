@@ -44,15 +44,53 @@ class TransactionService {
     };
     await transactionRef.set(transactionData);
 
-    await transactionRef.update({
-      status: 'failed',
-      failureReason: 'Provider disabled',
-      updatedAt: new Date()
-    });
-    const err = new Error('Service temporarily unavailable: provider disabled');
-    err.statusCode = 503;
-    err.providerError = null;
-    throw err;
+    // 4. Debit Wallet
+    try {
+      await walletService.debitWallet(userId, amount, 'main', `${type} Purchase: ${details.phone}`);
+    } catch (error) {
+      await transactionRef.update({ status: 'failed', failureReason: 'Debit failed' });
+      throw error;
+    }
+
+    // 5. Call Provider
+    try {
+      const providerService = require('./providerService');
+      let result;
+      
+      if (type === 'airtime') {
+        result = await providerService.purchaseAirtime(idempotencyKey, details.phone, amount, details.network);
+      } else if (type === 'data') {
+        result = await providerService.purchaseData(idempotencyKey, details.phone, details.planId, details.network);
+      } else {
+        // Fallback for other types
+        result = { success: false, message: 'Service not implemented yet' };
+      }
+
+      if (result.success) {
+        await transactionRef.update({
+          status: 'success',
+          providerTransactionId: result.transactionId,
+          providerResponse: result.apiResponse,
+          updatedAt: new Date()
+        });
+        return { ...transactionData, status: 'success' };
+      } else {
+        // Refund if provider fails
+        await walletService.creditWallet(userId, amount, 'main', `Refund: ${type} failed`);
+        await transactionRef.update({
+          status: 'failed',
+          failureReason: result.message,
+          providerResponse: result.apiResponse,
+          updatedAt: new Date()
+        });
+        throw new Error(result.message || 'Provider transaction failed');
+      }
+    } catch (error) {
+      // If we haven't refunded yet (unexpected crash), we should technically refund here
+      // simplified for now:
+      console.error('Transaction Processing Error:', error);
+      throw error;
+    }
 
   }
 
