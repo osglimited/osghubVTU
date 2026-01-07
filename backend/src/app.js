@@ -22,10 +22,17 @@ const origins = originsEnv ? originsEnv.split(',').map(s => s.trim()).filter(Boo
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests without origin (e.g., mobile apps, curl) and from known origins
-    if (!origin || origins.includes(origin)) {
+    const isAllowed = !origin || origins.includes(origin);
+    
+    if (!isAllowed) {
+      console.log(`[CORS] Blocked origin: ${origin}`);
+      console.log(`[CORS] Allowed origins: ${origins.join(', ')}`);
+    }
+
+    if (isAllowed) {
       return callback(null, true);
     }
-    return callback(null, false);
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

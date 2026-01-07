@@ -12,9 +12,11 @@ const initiate = async (req, res) => {
     const origin = (req.headers.origin || '').toLowerCase();
     const isLocal = origin.includes('localhost');
     const isRenderFrontend = origin.includes('osghubvtu.onrender.com');
+    const isOsghub = origin.includes('osghub.com');
     const base =
       (isLocal && 'http://localhost:3000') ||
       (isRenderFrontend && 'https://osghubvtu.onrender.com') ||
+      (isOsghub && 'https://osghub.com') ||
       (process.env.FLW_REDIRECT_URL ? process.env.FLW_REDIRECT_URL.replace(/\/+$/,'') : 'https://osghubvtu.onrender.com');
     const redirectUrl = `${base}/payment-complete`;
     const result = await flutterwaveService.initiatePayment(

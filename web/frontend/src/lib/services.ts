@@ -14,7 +14,10 @@ const resolveBackendUrl = (): string => {
     if (host.includes('localhost')) {
       return envUrlLocal || 'http://localhost:5000';
     }
-    if (host.includes('osghub.com') || host.includes('osghubvtu.onrender.com')) {
+    if (host.includes('osghub.com')) {
+      return '';
+    }
+    if (host.includes('osghubvtu.onrender.com')) {
       return 'https://osghubvtubackend.onrender.com';
     }
     if (isNonLocal(envUrl)) {

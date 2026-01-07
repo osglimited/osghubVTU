@@ -42,25 +42,30 @@ try {
 
     const hasValidKey = Boolean(privateKey && /BEGIN PRIVATE KEY/.test(privateKey));
     if (projectId && clientEmail && hasValidKey) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-      });
+      try {
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId,
+            clientEmail,
+            privateKey,
+          }),
+          storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+        });
+        db = admin.firestore();
+        auth = admin.auth();
+        messaging = admin.messaging();
+        console.log('Firebase initialized successfully');
+      } catch (initError) {
+        console.error('Error initializing Firebase Admin SDK:', initError);
+        // Do not throw, allow server to start without Firebase
+      }
     } else {
-      admin.initializeApp();
+      console.warn('Missing or invalid Firebase credentials. Skipping initialization.');
+      console.warn(`ProjectId: ${!!projectId}, ClientEmail: ${!!clientEmail}, ValidKey: ${hasValidKey}`);
     }
   }
-  
-  db = admin.firestore();
-  auth = admin.auth();
-  messaging = admin.messaging();
-
 } catch (error) {
-  console.error('Firebase Admin Initialization Error:', error.message);
-  throw error;
+  console.error('Firebase initialization error:', error);
 }
 
-module.exports = { admin, db, auth, messaging };
+module.exports = { db, auth, messaging };
