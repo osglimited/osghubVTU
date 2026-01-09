@@ -8,7 +8,7 @@ const TRANSACTION_COLLECTION = 'transactions';
 class TransactionService {
   
   async initiateTransaction(userId, type, amount, details, requestId) {
-    const providerName = 'DISABLED';
+    const providerName = 'IACafe';
     const idempotencyKey = requestId || `REQ-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
     // 1. Idempotency Check
     if (requestId) {

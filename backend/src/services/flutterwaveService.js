@@ -70,11 +70,26 @@ class FlutterwaveService {
 
   async creditIfValid(referenceOrId, expectedAmount, userId) {
     let verify;
-    if (String(referenceOrId).match(/^\d+$/)) {
-      verify = await this.verifyById(referenceOrId);
-    } else {
-      verify = await this.verifyByReference(referenceOrId);
+    try {
+      if (String(referenceOrId).match(/^\d+$/)) {
+        verify = await this.verifyById(referenceOrId);
+      } else {
+        verify = await this.verifyByReference(referenceOrId);
+      }
+    } catch (error) {
+      console.warn(`[Flutterwave Verify Error] Ref: ${referenceOrId} - ${error.message}`);
+      if (error.response && (error.response.status === 400 || error.response.status === 404)) {
+        // Invalid reference or not found. Mark as failed so we don't retry forever.
+         await db.collection('payments').doc(String(referenceOrId)).update({
+          status: 'failed',
+          verifiedAt: new Date(),
+          providerResponse: { error: error.message, status: error.response.status }
+        });
+        return { success: false, error: 'Payment not found or invalid reference' };
+      }
+      throw error; // Rethrow other errors (500s, network) to be handled by caller
     }
+
     const status = verify?.status;
     const vdata = verify?.data || {};
     const successful = status === 'success' && (vdata.status === 'successful' || vdata.processor_response === 'Approved');
@@ -90,6 +105,7 @@ class FlutterwaveService {
       });
       return { success: true, data: vdata };
     } else {
+      console.warn(`[Payment Verification Failed] Ref: ${referenceOrId}, User: ${userId}, Status: ${status}, AmountOk: ${amountOk} (Exp: ${expectedAmount}, Act: ${vdata.amount})`);
       await db.collection('payments').doc(vdata.tx_ref || referenceOrId).update({
         status: 'failed',
         verifiedAt: new Date(),

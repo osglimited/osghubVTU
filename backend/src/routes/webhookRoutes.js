@@ -17,20 +17,42 @@ router.post('/flutterwave', express.json({ type: '*/*' }), async (req, res) => {
     const tx_ref = event?.data?.tx_ref;
     const amount = event?.data?.amount;
     const meta = event?.data?.meta || {};
-    const userId = meta.userId;
+    let userId = meta.userId;
 
-    if (!userId || !amount) {
-      return res.status(400).json({ error: 'Missing userId/amount' });
+    if (!amount) {
+      return res.status(400).json({ error: 'Missing amount' });
     }
 
-    await db.collection('payments').doc(tx_ref || String(id)).set({
+    // If userId is missing from webhook metadata, try to find it in our records using tx_ref
+    if (!userId && tx_ref) {
+      try {
+        const paymentDoc = await db.collection('payments').doc(tx_ref).get();
+        if (paymentDoc.exists) {
+          userId = paymentDoc.data().userId;
+        }
+      } catch (err) {
+        console.error('Error fetching payment for webhook recovery:', err);
+      }
+    }
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    const updateData = {
       tx_ref: tx_ref || String(id),
       userId,
       amount,
       status: 'pending',
       provider: 'flutterwave',
-      createdAt: new Date(),
-    }, { merge: true });
+      updatedAt: new Date(),
+    };
+    
+    // Only set createdAt if it's a new document or we want to track webhook time
+    // But since we use merge: true, let's keep it simple but avoid overwriting if exists?
+    // Actually, simply using set with merge is fine, as long as userId is defined.
+    
+    await db.collection('payments').doc(tx_ref || String(id)).set(updateData, { merge: true });
 
     if (!process.env.FLW_SECRET_KEY) {
       await db.collection('payments').doc(tx_ref || String(id)).update({

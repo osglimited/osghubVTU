@@ -6,6 +6,7 @@ import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { purchaseData } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
+import { DATA_PLANS, DataPlan } from '@/data/dataPlans';
 
 const NETWORKS = [
   { label: 'MTN', value: 'MTN', id: 1 },
@@ -14,32 +15,15 @@ const NETWORKS = [
   { label: '9mobile', value: '9MOBILE', id: 4 },
 ];
 
-const PLAN_CATALOG: Record<string, Array<{ id: string; name: string; price: number }>> = {
-  MTN: [
-    { id: 'mtn_sme_500mb_30days', name: 'MTN SME 500MB (30 days)', price: 350 },
-    { id: 'mtn_sme_1gb_30days', name: 'MTN SME 1GB (30 days)', price: 1000 },
-    { id: 'mtn_sme_2gb_30days', name: 'MTN SME 2GB (30 days)', price: 1900 },
-  ],
-  GLO: [
-    { id: 'glo_1gb_30days', name: 'GLO 1GB (30 days)', price: 1000 },
-    { id: 'glo_2gb_30days', name: 'GLO 2GB (30 days)', price: 1900 },
-  ],
-  AIRTEL: [
-    { id: 'airtel_1gb_30days', name: 'Airtel 1GB (30 days)', price: 1000 },
-    { id: 'airtel_2gb_30days', name: 'Airtel 2GB (30 days)', price: 1900 },
-  ],
-  '9MOBILE': [
-    { id: '9mobile_1gb_30days', name: '9mobile 1GB (30 days)', price: 1000 },
-    { id: '9mobile_2gb_30days', name: '9mobile 2GB (30 days)', price: 1900 },
-  ],
-};
-
 export default function DataPage() {
   const { user } = useAuth();
   const { service, loading, error } = useService('data');
   const [network, setNetwork] = useState(NETWORKS[0]);
   const [phone, setPhone] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState(PLAN_CATALOG[NETWORKS[0].value][0]);
+  // Initialize with empty or first plan of first network
+  const [selectedPlan, setSelectedPlan] = useState<DataPlan | undefined>(
+    DATA_PLANS[NETWORKS[0].value]?.[0]
+  );
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
 
@@ -50,11 +34,12 @@ export default function DataPage() {
   };
 
   const onPinSuccess = async () => {
-    if (!user || !service) return;
+    if (!user || !service || !selectedPlan) return;
     
     setProcessing(true);
     try {
-      const planId = selectedPlan.id;
+      // Use variation_id as the planId for the backend provider
+      const planId = selectedPlan.variation_id;
       const result = await purchaseData(
         user.uid,
         selectedPlan.price,
@@ -102,7 +87,7 @@ export default function DataPage() {
                     onChange={(e) => {
                       const n = NETWORKS.find(nn => nn.value === e.target.value) || NETWORKS[0];
                       setNetwork(n);
-                      const plans = PLAN_CATALOG[n.value] || PLAN_CATALOG[NETWORKS[0].value];
+                      const plans = DATA_PLANS[n.value] || DATA_PLANS[NETWORKS[0].value];
                       setSelectedPlan(plans[0]);
                     }}
                   >
@@ -129,15 +114,15 @@ export default function DataPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Data Plan</label>
                   <select 
                     className="input-field"
-                    value={selectedPlan.id}
+                    value={selectedPlan?.variation_id || ''}
                     onChange={(e) => {
-                        const plans = PLAN_CATALOG[network.value] || [];
-                        const plan = plans.find(p => p.id === e.target.value) || plans[0];
+                        const plans = DATA_PLANS[network.value] || [];
+                        const plan = plans.find(p => p.variation_id === e.target.value) || plans[0];
                         setSelectedPlan(plan);
                     }}
                   >
-                    {(PLAN_CATALOG[network.value] || []).map(plan => (
-                      <option key={plan.id} value={plan.id}>
+                    {(DATA_PLANS[network.value] || []).map(plan => (
+                      <option key={plan.variation_id} value={plan.variation_id}>
                         {plan.name} - ₦{plan.price.toLocaleString()}
                       </option>
                     ))}
