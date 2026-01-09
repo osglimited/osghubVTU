@@ -3,12 +3,13 @@ const axios = require('axios');
 class ProviderService {
   constructor() {
     this.baseUrl = process.env.VTU_PROVIDER_URL || 'https://iacafe.com.ng/devapi/v1';
-    this.apiKey = process.env.VTU_PROVIDER_API_KEY; // "ak_live_..."
+    this.apiKey = process.env.VTU_PROVIDER_API_KEY ? process.env.VTU_PROVIDER_API_KEY.trim() : '';
   }
 
   _getHeaders() {
     return {
       'Authorization': `Bearer ${this.apiKey}`,
+      'X-API-Key': this.apiKey,
       'Content-Type': 'application/json',
       'User-Agent': 'OSGHUB-VTU/1.0'
     };
@@ -68,6 +69,7 @@ class ProviderService {
           status: txData.status // Return specific status for further handling if needed
         };
       } else {
+        console.error('[Provider] Airtime API Returned Failure:', data);
         return {
           success: false,
           message: data.message || data.error?.message || 'Transaction Failed',
@@ -128,6 +130,7 @@ class ProviderService {
           status: txData.status
         };
       } else {
+        console.error('[Provider] Data API Returned Failure:', data);
         return {
           success: false,
           message: data.message || data.error?.message || 'Transaction Failed',
