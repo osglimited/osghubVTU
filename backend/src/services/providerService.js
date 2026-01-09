@@ -17,13 +17,21 @@ class ProviderService {
 
   // Helper to map our internal network IDs/Names to Provider Service IDs
   _mapNetworkToServiceId(network) {
+    // Handle if network is an object (e.g. from frontend select component)
+    let netInput = network;
+    if (typeof network === 'object' && network !== null) {
+      netInput = network.value || network.id || network.name || network.label || JSON.stringify(network);
+    }
+
     // OSGHUB might send "MTN", "mtn", "01", etc.
     // IA Café expects: "mtn", "airtel", "glo", "9mobile"
-    const net = String(network).toLowerCase();
-    if (net.includes('mtn')) return 'mtn';
-    if (net.includes('airtel')) return 'airtel';
-    if (net.includes('glo')) return 'glo';
-    if (net.includes('9mobile') || net.includes('etisalat')) return '9mobile';
+    const net = String(netInput).toLowerCase();
+    
+    if (net.includes('mtn') || net === '1' || net === '01') return 'mtn';
+    if (net.includes('glo') || net === '2' || net === '02') return 'glo';
+    if (net.includes('9mobile') || net.includes('etisalat') || net === '3' || net === '03') return '9mobile';
+    if (net.includes('airtel') || net === '4' || net === '04') return 'airtel';
+    
     return net; // fallback
   }
 
