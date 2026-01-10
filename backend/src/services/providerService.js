@@ -10,7 +10,7 @@ class ProviderService {
     return {
       'Authorization': `Bearer ${this.apiKey}`,
       'X-API-Key': this.apiKey,
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
       'User-Agent': 'OSGHUB-VTU/1.0'
     };
   }
@@ -47,12 +47,12 @@ class ProviderService {
     const serviceId = this._mapNetworkToServiceId(network);
 
     try {
-      const payload = {
+      const payload = new URLSearchParams({
         request_id: requestId,
         phone: phone,
         service_id: serviceId,
-        amount: Number(amount)
-      };
+        amount: String(amount)
+      });
 
       console.log(`[Provider] Buying Airtime: ${serviceId} ${amount} for ${phone} (ReqID: ${requestId})`);
 
@@ -110,12 +110,12 @@ class ProviderService {
     const serviceId = this._mapNetworkToServiceId(network);
 
     try {
-      const payload = {
+      const payload = new URLSearchParams({
         request_id: requestId,
         phone: phone,
         service_id: serviceId,
-        variation_id: planId // The Plan ID from IA Café Variations
-      };
+        variation_id: String(planId) // The Plan ID from IA Café Variations
+      });
 
       console.log(`[Provider] Buying Data: ${serviceId} Plan:${planId} for ${phone} (ReqID: ${requestId})`);
 
@@ -163,14 +163,16 @@ class ProviderService {
    */
   async verifyCustomer(customerId, serviceId, variationId = null) {
     try {
-      const payload = {
+      const payloadObj = {
         customer_id: customerId,
         service_id: serviceId
       };
       // Electricity requires variation_id (prepaid/postpaid)
       if (variationId) {
-        payload.variation_id = variationId;
+        payloadObj.variation_id = variationId;
       }
+      
+      const payload = new URLSearchParams(payloadObj);
 
       const response = await axios.post(`${this.baseUrl}/verify-customer`, payload, {
         headers: this._getHeaders()
@@ -197,13 +199,13 @@ class ProviderService {
    */
   async purchaseElectricity(requestId, customerId, serviceId, variationId, amount) {
      try {
-      const payload = {
+      const payload = new URLSearchParams({
         request_id: requestId,
         customer_id: customerId,
         service_id: serviceId, // e.g. "ikeja-electric"
         variation_id: variationId, // "prepaid" or "postpaid"
-        amount: Number(amount)
-      };
+        amount: String(amount)
+      });
 
       const response = await axios.post(`${this.baseUrl}/electricity`, payload, {
         headers: this._getHeaders()
@@ -238,13 +240,15 @@ class ProviderService {
    */
   async purchaseCableTV(requestId, customerId, serviceId, variationId, amount = null) {
     try {
-      const payload = {
+      const payloadObj = {
         request_id: requestId,
         customer_id: customerId,
         service_id: serviceId, // e.g. "dstv"
         variation_id: variationId // Plan ID e.g. "2701"
       };
-      if (amount) payload.amount = amount; // Optional, auto-fetched if null
+      if (amount) payloadObj.amount = String(amount); // Optional, auto-fetched if null
+
+      const payload = new URLSearchParams(payloadObj);
 
       const response = await axios.post(`${this.baseUrl}/cable`, payload, {
         headers: this._getHeaders()
