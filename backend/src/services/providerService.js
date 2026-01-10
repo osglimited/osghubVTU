@@ -29,8 +29,8 @@ class ProviderService {
     
     if (net.includes('mtn') || net === '1' || net === '01') return 'mtn';
     if (net.includes('glo') || net === '2' || net === '02') return 'glo';
-    if (net.includes('9mobile') || net.includes('etisalat') || net === '3' || net === '03') return '9mobile';
-    if (net.includes('airtel') || net === '4' || net === '04') return 'airtel';
+    if (net.includes('airtel') || net === '3' || net === '03') return 'airtel';
+    if (net.includes('9mobile') || net.includes('etisalat') || net === '4' || net === '04') return '9mobile';
     
     return net; // fallback
   }
