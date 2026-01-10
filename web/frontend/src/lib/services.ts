@@ -125,23 +125,38 @@ export const purchaseAirtime = async (
   });
 
   if (res.status === 401 && auth.currentUser) {
-    try {
-      console.log('Token expired, refreshing...');
-      token = await auth.currentUser.getIdToken(true);
-      res = await fetch(`${backendUrl}/api/transactions/purchase`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body,
-      });
-    } catch (e) {
-      console.error('Token refresh failed:', e);
-    }
-  }
-
-  const data = await res.json().catch(() => null);
+     try {
+       console.log('Token expired, refreshing...');
+       token = await auth.currentUser.getIdToken(true);
+       res = await fetch(`${backendUrl}/api/transactions/purchase`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+           Authorization: `Bearer ${token}`,
+         },
+         body,
+       });
+     } catch (e) {
+       console.error('Token refresh failed, forcing logout:', e);
+       await auth.signOut();
+       if (typeof window !== 'undefined') {
+         window.location.href = '/login';
+       }
+       return { success: false, message: 'Session expired. Please log in again.' };
+     }
+   }
+   
+   // If the retry also failed with 401, force logout
+   if (res.status === 401) {
+     console.error('Request failed with 401 after refresh, forcing logout');
+     await auth.signOut();
+     if (typeof window !== 'undefined') {
+       window.location.href = '/login';
+     }
+     return { success: false, message: 'Session expired. Please log in again.' };
+   }
+ 
+   const data = await res.json().catch(() => null);
   if (!res.ok) {
     return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
   }
@@ -176,23 +191,38 @@ export const purchaseData = async (
   });
 
   if (res.status === 401 && auth.currentUser) {
-    try {
-      console.log('Token expired, refreshing...');
-      token = await auth.currentUser.getIdToken(true);
-      res = await fetch(`${backendUrl}/api/transactions/purchase`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body,
-      });
-    } catch (e) {
-      console.error('Token refresh failed:', e);
-    }
-  }
-
-  const data = await res.json().catch(() => null);
+     try {
+       console.log('Token expired, refreshing...');
+       token = await auth.currentUser.getIdToken(true);
+       res = await fetch(`${backendUrl}/api/transactions/purchase`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+           Authorization: `Bearer ${token}`,
+         },
+         body,
+       });
+     } catch (e) {
+       console.error('Token refresh failed, forcing logout:', e);
+       await auth.signOut();
+       if (typeof window !== 'undefined') {
+         window.location.href = '/login';
+       }
+       return { success: false, message: 'Session expired. Please log in again.' };
+     }
+   }
+   
+   // If the retry also failed with 401, force logout
+   if (res.status === 401) {
+     console.error('Request failed with 401 after refresh, forcing logout');
+     await auth.signOut();
+     if (typeof window !== 'undefined') {
+       window.location.href = '/login';
+     }
+     return { success: false, message: 'Session expired. Please log in again.' };
+   }
+ 
+   const data = await res.json().catch(() => null);
   if (!res.ok) {
     return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
   }
