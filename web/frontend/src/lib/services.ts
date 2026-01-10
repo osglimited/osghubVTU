@@ -104,23 +104,43 @@ export const purchaseAirtime = async (
   details: { network?: string; networkId?: number | string; phone: string }
 ): Promise<TransactionResult> => {
   const backendUrl = resolveBackendUrl();
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-  const res = await fetch(`${backendUrl}/api/transactions/purchase`, {
+  let token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  const body = JSON.stringify({
+    type: 'airtime',
+    amount,
+    details: {
+      phone: details.phone,
+      ...(details.networkId !== undefined ? { networkId: details.networkId } : {}),
+      ...(details.network ? { network: details.network } : {}),
+    },
+  });
+
+  let res = await fetch(`${backendUrl}/api/transactions/purchase`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({
-      type: 'airtime',
-      amount,
-      details: {
-        phone: details.phone,
-        ...(details.networkId !== undefined ? { networkId: details.networkId } : {}),
-        ...(details.network ? { network: details.network } : {}),
-      },
-    }),
+    body,
   });
+
+  if (res.status === 401 && auth.currentUser) {
+    try {
+      console.log('Token expired, refreshing...');
+      token = await auth.currentUser.getIdToken(true);
+      res = await fetch(`${backendUrl}/api/transactions/purchase`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body,
+      });
+    } catch (e) {
+      console.error('Token refresh failed:', e);
+    }
+  }
+
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
@@ -134,24 +154,44 @@ export const purchaseData = async (
   details: { planId: string; phone: string; network?: string; networkId?: number | string }
 ): Promise<TransactionResult> => {
   const backendUrl = resolveBackendUrl();
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-  const res = await fetch(`${backendUrl}/api/transactions/purchase`, {
+  let token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  const body = JSON.stringify({
+    type: 'data',
+    amount,
+    details: {
+      planId: details.planId,
+      phone: details.phone,
+      ...(details.networkId !== undefined ? { networkId: details.networkId } : {}),
+      ...(details.network ? { network: details.network } : {}),
+    },
+  });
+
+  let res = await fetch(`${backendUrl}/api/transactions/purchase`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({
-      type: 'data',
-      amount,
-      details: {
-        planId: details.planId,
-        phone: details.phone,
-        ...(details.networkId !== undefined ? { networkId: details.networkId } : {}),
-        ...(details.network ? { network: details.network } : {}),
-      },
-    }),
+    body,
   });
+
+  if (res.status === 401 && auth.currentUser) {
+    try {
+      console.log('Token expired, refreshing...');
+      token = await auth.currentUser.getIdToken(true);
+      res = await fetch(`${backendUrl}/api/transactions/purchase`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body,
+      });
+    } catch (e) {
+      console.error('Token refresh failed:', e);
+    }
+  }
+
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
