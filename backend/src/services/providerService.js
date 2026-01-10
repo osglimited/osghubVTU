@@ -35,6 +35,22 @@ class ProviderService {
     return net; // fallback
   }
 
+  // Helper to map network to ID for Budget Data (MTN=1, Glo=2, 9mobile=3, Airtel=4)
+  _mapNetworkToId(network) {
+    let netInput = network;
+    if (typeof network === 'object' && network !== null) {
+      netInput = network.value || network.id || network.name || network.label || JSON.stringify(network);
+    }
+    const net = String(netInput).toLowerCase();
+    
+    if (net.includes('mtn') || net === '1' || net === '01') return 1;
+    if (net.includes('glo') || net === '2' || net === '02') return 2;
+    if (net.includes('airtel') || net === '3' || net === '03') return 4;
+    if (net.includes('9mobile') || net.includes('etisalat') || net === '4' || net === '04') return 3;
+    
+    return 1; // Default to MTN
+  }
+
   /**
    * Purchase Airtime
    * Endpoint: POST /airtime
@@ -99,27 +115,28 @@ class ProviderService {
 
   /**
    * Purchase Data
-   * Endpoint: POST /data
-   * Note: Requires `variation_id` (Plan ID)
+   * Endpoint: POST /budget-data
+   * Note: Requires `data_plan` (Plan ID) and `network_id`
    */
   async purchaseData(requestId, phone, planId, network) {
     if (!this.apiKey) {
       return { success: false, message: 'Provider API Key missing', apiResponse: null };
     }
 
-    const serviceId = this._mapNetworkToServiceId(network);
+    // Use integer ID for budget-data
+    const networkId = this._mapNetworkToId(network);
 
     try {
       const payload = new URLSearchParams({
         request_id: requestId,
         phone: phone,
-        service_id: serviceId,
-        variation_id: String(planId) // The Plan ID from IA Café Variations
+        network_id: String(networkId),
+        data_plan: String(planId) // variation_id maps to data_plan
       });
 
-      console.log(`[Provider] Buying Data: ${serviceId} Plan:${planId} for ${phone} (ReqID: ${requestId})`);
+      console.log(`[Provider] Buying Data (Budget): Net:${networkId} Plan:${planId} for ${phone} (ReqID: ${requestId})`);
 
-      const response = await axios.post(`${this.baseUrl}/data`, payload, {
+      const response = await axios.post(`${this.baseUrl}/budget-data`, payload, {
         headers: this._getHeaders(),
         timeout: 30000
       });
