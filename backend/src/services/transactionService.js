@@ -83,11 +83,19 @@ class TransactionService {
           providerResponse: result.apiResponse,
           updatedAt: new Date()
         });
-        throw new Error(result.message || 'Provider transaction failed');
+        
+        // Ensure we don't return generic provider messages if they are confusing
+        const finalMessage = result.message && result.message.toLowerCase().includes('token') 
+          ? 'Service Provider Error (Try again later)' 
+          : (result.message || 'Provider transaction failed');
+
+        const err = new Error(finalMessage);
+        err.statusCode = 400; // Explicitly set status code for controller
+        throw err;
       }
     } catch (error) {
-      // If we haven't refunded yet (unexpected crash), we should technically refund here
-      // simplified for now:
+      // If the error was thrown above, it has the correct message.
+      // If it's an unexpected error, we log it and rethrow.
       console.error('Transaction Processing Error:', error);
       throw error;
     }
