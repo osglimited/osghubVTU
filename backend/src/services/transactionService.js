@@ -60,6 +60,9 @@ class TransactionService {
       if (type === 'airtime') {
         result = await providerService.purchaseAirtime(idempotencyKey, details.phone, amount, details.network || details.networkId);
       } else if (type === 'data') {
+        if (!details.planId) {
+          throw new Error('Data plan ID (variation_id) is required for data purchase');
+        }
         result = await providerService.purchaseData(idempotencyKey, details.phone, details.planId, details.network || details.networkId);
       } else {
         // Fallback for other types
@@ -84,17 +87,19 @@ class TransactionService {
           updatedAt: new Date()
         });
         
-        // Ensure we don't return generic provider messages if they are confusing
+        // Return the actual provider error message for better debugging
         const providerOrderId = result.apiResponse && result.apiResponse.order_id 
-    ? ` (Order ID: ${result.apiResponse.order_id})` 
-    : '';
-
-  const finalMessage = result.message && result.message.toLowerCase().includes('token') 
-    ? `Service Provider Error${providerOrderId} - Please contact support` 
-    : (result.message || 'Provider transaction failed');
+          ? ` (Order ID: ${result.apiResponse.order_id})` 
+          : '';
+        
+        const finalMessage = `${result.message || 'Provider transaction failed'}${providerOrderId}`;
 
         const err = new Error(finalMessage);
         err.statusCode = 400; // Explicitly set status code for controller
+        if (result.message && result.message.toLowerCase().includes('token')) {
+            // Keep the providerError flag for controller if needed, but allow message to pass through
+            err.providerError = true;
+        }
         throw err;
       }
     } catch (error) {
