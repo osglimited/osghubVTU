@@ -58,9 +58,9 @@ class TransactionService {
       let result;
       
       if (type === 'airtime') {
-        result = await providerService.purchaseAirtime(idempotencyKey, details.phone, amount, details.network);
+        result = await providerService.purchaseAirtime(idempotencyKey, details.phone, amount, details.network || details.networkId);
       } else if (type === 'data') {
-        result = await providerService.purchaseData(idempotencyKey, details.phone, details.planId, details.network);
+        result = await providerService.purchaseData(idempotencyKey, details.phone, details.planId, details.network || details.networkId);
       } else {
         // Fallback for other types
         result = { success: false, message: 'Service not implemented yet' };
