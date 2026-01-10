@@ -85,9 +85,13 @@ class TransactionService {
         });
         
         // Ensure we don't return generic provider messages if they are confusing
-        const finalMessage = result.message && result.message.toLowerCase().includes('token') 
-          ? 'Service Provider Error (Try again later)' 
-          : (result.message || 'Provider transaction failed');
+        const providerOrderId = result.apiResponse && result.apiResponse.order_id 
+    ? ` (Order ID: ${result.apiResponse.order_id})` 
+    : '';
+
+  const finalMessage = result.message && result.message.toLowerCase().includes('token') 
+    ? `Service Provider Error${providerOrderId} - Please contact support` 
+    : (result.message || 'Provider transaction failed');
 
         const err = new Error(finalMessage);
         err.statusCode = 400; // Explicitly set status code for controller
