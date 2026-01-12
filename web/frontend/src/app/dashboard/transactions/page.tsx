@@ -4,14 +4,13 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWalletHistory } from '@/lib/services';
 import { ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react';
-import TransactionReceiptModal from '@/components/dashboard/TransactionReceiptModal';
+import { useRouter } from 'next/navigation';
 
 export default function TransactionsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
-  const [showReceipt, setShowReceipt] = useState(false);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -56,13 +55,10 @@ export default function TransactionsPage() {
                 </tr>
               ) : (
                 transactions.map((tx) => (
-                  <tr 
-                    key={tx.id} 
+                  <tr
+                    key={tx.id}
                     className="hover:bg-gray-50/50 transition-colors cursor-pointer"
-                    onClick={() => {
-                      setSelectedTransaction(tx);
-                      setShowReceipt(true);
-                    }}
+                    onClick={() => router.push(`/dashboard/transactions/${tx.id}`)}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
@@ -114,12 +110,6 @@ export default function TransactionsPage() {
           </table>
         </div>
       </div>
-      
-      <TransactionReceiptModal 
-        isOpen={showReceipt} 
-        onClose={() => setShowReceipt(false)} 
-        transaction={selectedTransaction} 
-      />
     </div>
   );
 }
