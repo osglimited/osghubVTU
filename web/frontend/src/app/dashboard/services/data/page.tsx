@@ -6,6 +6,7 @@ import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import { purchaseData } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
+import TransactionResultModal from '@/components/dashboard/TransactionResultModal';
 import { DATA_PLANS, DataPlan } from '@/data/dataPlans';
 
 const NETWORKS = [
@@ -26,6 +27,19 @@ export default function DataPage() {
   );
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+  
+  const [resultModal, setResultModal] = useState<{
+    open: boolean;
+    status: 'success' | 'error';
+    title: string;
+    message: string;
+    transactionId?: string;
+  }>({
+    open: false,
+    status: 'success',
+    title: '',
+    message: ''
+  });
 
   const handlePurchase = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,13 +64,30 @@ export default function DataPage() {
         }
       );
       if (result.success) {
-        alert('Data purchase successful!');
+        setResultModal({
+          open: true,
+          status: 'success',
+          title: 'Purchase Successful',
+          message: `You have successfully purchased ${selectedPlan.name} for ${phone}.`,
+          transactionId: result.transactionId
+        });
         setPhone('');
       } else {
-        alert(`Transaction failed: ${result.message}`);
+        setResultModal({
+          open: true,
+          status: 'error',
+          title: 'Transaction Failed',
+          message: result.message || 'Unable to complete your purchase. Please try again.',
+          transactionId: result.transactionId
+        });
       }
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      setResultModal({
+        open: true,
+        status: 'error',
+        title: 'System Error',
+        message: err.message || 'An unexpected error occurred.',
+      });
     } finally {
       setProcessing(false);
     }
@@ -149,6 +180,16 @@ export default function DataPage() {
             isOpen={showPinModal} 
             onClose={() => setShowPinModal(false)} 
             onSuccess={onPinSuccess}
+          />
+          
+          <TransactionResultModal
+            isOpen={resultModal.open}
+            onClose={() => setResultModal(prev => ({ ...prev, open: false }))}
+            status={resultModal.status}
+            title={resultModal.title}
+            message={resultModal.message}
+            transactionId={resultModal.transactionId}
+            actionLabel="Done"
           />
         </div>
   );

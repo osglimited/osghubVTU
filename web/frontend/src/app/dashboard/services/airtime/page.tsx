@@ -5,6 +5,7 @@ import { Smartphone } from 'lucide-react';
 import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
+import TransactionResultModal from '@/components/dashboard/TransactionResultModal';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { purchaseAirtime } from '@/lib/services';
 
@@ -16,6 +17,20 @@ export default function AirtimePage() {
   const [amount, setAmount] = useState('100');
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+  
+  const [resultModal, setResultModal] = useState<{
+    open: boolean;
+    status: 'success' | 'error';
+    title: string;
+    message: string;
+    transactionId?: string;
+  }>({
+    open: false,
+    status: 'success',
+    title: '',
+    message: ''
+  });
+
   const { addNotification } = useNotifications();
 
   const handlePurchase = (e: React.FormEvent) => {
@@ -34,13 +49,33 @@ export default function AirtimePage() {
 
       if (result.success) {
         addNotification('success', 'Airtime purchase successful', `₦${Number(amount).toLocaleString()} on ${network}`);
+        setResultModal({
+          open: true,
+          status: 'success',
+          title: 'Purchase Successful',
+          message: `You have successfully purchased ₦${Number(amount).toLocaleString()} airtime on ${network} for ${phone}.`,
+          transactionId: result.transactionId
+        });
         setPhone('');
         setAmount('100');
       } else {
         addNotification('error', 'Transaction failed', result.message);
+        setResultModal({
+          open: true,
+          status: 'error',
+          title: 'Transaction Failed',
+          message: result.message || 'Unable to complete your purchase. Please try again.',
+          transactionId: result.transactionId
+        });
       }
     } catch (err: any) {
       addNotification('error', 'Error', err.message);
+      setResultModal({
+        open: true,
+        status: 'error',
+        title: 'System Error',
+        message: err.message || 'An unexpected error occurred.',
+      });
     } finally {
       setProcessing(false);
     }
@@ -122,6 +157,16 @@ export default function AirtimePage() {
             isOpen={showPinModal} 
             onClose={() => setShowPinModal(false)} 
             onSuccess={onPinSuccess}
+          />
+
+          <TransactionResultModal
+            isOpen={resultModal.open}
+            onClose={() => setResultModal(prev => ({ ...prev, open: false }))}
+            status={resultModal.status}
+            title={resultModal.title}
+            message={resultModal.message}
+            transactionId={resultModal.transactionId}
+            actionLabel="Done"
           />
         </div>
   );
