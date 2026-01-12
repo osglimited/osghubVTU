@@ -34,7 +34,19 @@ const verifyToken = async (req, res, next) => {
 
 const isAdmin = async (req, res, next) => {
   try {
-    if (req.user && (req.user.admin === true || (req.user.customClaims && req.user.customClaims.admin === true))) {
+    const allowed = (process.env.ADMIN_EMAILS || 'osglimited7@gmail.com')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    const email = (req.user && req.user.email || '').toLowerCase();
+    if (
+      req.user &&
+      (
+        req.user.admin === true ||
+        (req.user.customClaims && req.user.customClaims.admin === true) ||
+        (email && allowed.includes(email))
+      )
+    ) {
       return next();
     }
     const uid = req.user && req.user.uid;
