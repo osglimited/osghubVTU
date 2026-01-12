@@ -1,4 +1,4 @@
-const { db } = require('../config/firebase');
+const { db, auth } = require('../config/firebase');
 
 const SETTINGS_DOC = 'settings/global';
 
@@ -65,3 +65,50 @@ module.exports = {
   getAllTransactions,
   creditWallet
 };
+
+const listUsers = async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit || 100), 500);
+    const snap = await db.collection('users').orderBy('createdAt', 'desc').limit(limit).get();
+    const users = snap.docs.map((d) => ({ id: d.id, uid: d.id, ...(d.data() || {}) }));
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const promoteToAdmin = async (req, res) => {
+  try {
+    const { uid, email } = req.body || {};
+    let userRecord;
+    if (uid) {
+      userRecord = await auth.getUser(uid);
+    } else if (email) {
+      userRecord = await auth.getUserByEmail(email);
+    } else {
+      return res.status(400).json({ error: 'uid or email is required' });
+    }
+
+    const targetUid = userRecord.uid;
+
+    const existingClaims = userRecord.customClaims || {};
+    const newClaims = { ...existingClaims, admin: true };
+    await auth.setCustomUserClaims(targetUid, newClaims);
+
+    const userRef = db.collection('users').doc(targetUid);
+    await userRef.set(
+      {
+        role: 'admin',
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    );
+
+    res.json({ success: true, uid: targetUid, email: userRecord.email });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports.listUsers = listUsers;
+module.exports.promoteToAdmin = promoteToAdmin;

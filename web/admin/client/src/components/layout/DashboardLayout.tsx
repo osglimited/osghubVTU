@@ -2,7 +2,7 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
-import { auth } from "@/lib/firebase";
+import { auth, onAuthStateChanged } from "@/lib/firebase";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -14,7 +14,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user: any) => {
+    const unsubscribe = onAuthStateChanged((user: any) => {
       if (user) {
         setIsAuthenticated(true);
         // If user is already logged in and tries to access login page, redirect to dashboard

@@ -1,43 +1,35 @@
+import { initializeApp } from 'firebase/app';
+import { getAuth, onAuthStateChanged as firebaseOnAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
-// Placeholder admin client bindings (no mock data; connect to real backend)
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+};
 
-// Simple observer pattern for auth state
-let currentUser = localStorage.getItem('mockUser') ? JSON.parse(localStorage.getItem('mockUser')!) : null;
-const authListeners: Array<(user: any) => void> = [];
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
 
-export const auth = {
-  get currentUser() { return currentUser; },
-  onAuthStateChanged: (callback: any) => {
-    authListeners.push(callback);
-    callback(currentUser);
-    return () => {
-      const index = authListeners.indexOf(callback);
-      if (index > -1) authListeners.splice(index, 1);
-    };
-  },
-  signInWithEmailAndPassword: async (_email: string, _password: string) => {
-    throw new Error('Admin auth not configured. Connect to real auth.');
-  },
-  signOut: async () => {
-    localStorage.removeItem('mockUser');
-    currentUser = null;
-    authListeners.forEach(listener => listener(null));
+export const onAuthStateChanged = (callback: (user: any) => void) => {
+  return firebaseOnAuthStateChanged(auth, callback);
+};
+
+export const signInAdmin = async (email: string, password: string) => {
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  const token = await cred.user.getIdTokenResult();
+  const isAdmin = Boolean(token.claims && (token.claims.admin === true));
+  if (!isAdmin) {
+    await firebaseSignOut(auth);
+    throw new Error('Access denied: admin only');
   }
+  return cred.user;
 };
 
-export const db = {
-  collection: (_name: string) => ({
-    get: async () => ({ docs: [] })
-  })
-};
-
-export const mockUsers = [];
-export const mockTransactions = [];
-export const mockWalletRequests = [];
-export const mockStats = {
-  totalUsers: 0,
-  walletBalance: 0,
-  totalTransactions: 0,
-  todaySales: 0,
-  pendingRequests: 0,
+export const signOut = async () => {
+  await firebaseSignOut(auth);
 };

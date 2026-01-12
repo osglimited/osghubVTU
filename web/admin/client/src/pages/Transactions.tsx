@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Filter, Download, RotateCcw } from "lucide-react";
-import { fetchAdminTransactions } from "@/lib/backend";
+import { getAllTransactions } from "@/lib/backend";
 
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState("all");
@@ -32,7 +32,7 @@ export default function TransactionsPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const data = await fetchAdminTransactions();
+        const data = await getAllTransactions();
         if (!mounted) return;
         setTransactions(data);
       } finally {

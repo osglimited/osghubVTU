@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { auth } from "@/lib/firebase";
+import { auth, signOut } from "@/lib/firebase";
 
 export function Topbar() {
   const user = auth.currentUser || JSON.parse(localStorage.getItem('mockUser') || '{}');
@@ -54,7 +54,7 @@ export function Topbar() {
             <DropdownMenuItem>Profile</DropdownMenuItem>
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => auth.signOut()}>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => signOut()}>
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

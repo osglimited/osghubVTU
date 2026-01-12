@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { auth } from "@/lib/firebase";
+import { signInAdmin } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -45,7 +45,7 @@ export default function Login() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      await auth.signInWithEmailAndPassword(values.email, values.password);
+      await signInAdmin(values.email, values.password);
       toast({
         title: "Welcome back!",
         description: "Successfully logged in to OSGHUB Admin.",
@@ -55,7 +55,7 @@ export default function Login() {
       toast({
         variant: "destructive",
         title: "Access Denied",
-        description: "Invalid email or password. Please try again.",
+        description: "Invalid credentials or not an admin account.",
       });
     } finally {
       setIsLoading(false);

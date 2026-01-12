@@ -11,7 +11,7 @@ import {
   FileText,
   LogOut
 } from "lucide-react";
-import { auth } from "@/lib/firebase";
+import { signOut } from "@/lib/firebase";
 // Use the copied admin logo in public assets
 const logoUrl = "/assets/IMG-20251201-WA0053.jpg";
 
@@ -64,7 +64,7 @@ export function Sidebar() {
 
         <div className="mt-auto">
           <button
-            onClick={() => auth.signOut()}
+            onClick={() => signOut()}
             className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
           >
             <LogOut className="mr-3 h-5 w-5" />

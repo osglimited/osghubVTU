@@ -1,4 +1,3 @@
-import { mockWalletRequests } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,32 +94,11 @@ export default function WalletPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockWalletRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell className="font-mono text-xs">{request.id}</TableCell>
-                      <TableCell className="font-medium">{request.user}</TableCell>
-                      <TableCell>₦{request.amount.toLocaleString()}</TableCell>
-                      <TableCell>{request.method}</TableCell>
-                      <TableCell>{new Date(request.date).toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge variant={request.status === 'approved' ? 'default' : 'secondary'} className={request.status === 'approved' ? 'bg-emerald-500' : request.status === 'pending' ? 'bg-amber-500' : ''}>
-                          {request.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {request.status === 'pending' && (
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600">
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-200 hover:bg-red-50 hover:text-red-600">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                      No funding requests yet
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </CardContent>

@@ -1,4 +1,4 @@
-const { auth } = require('../config/firebase');
+const { auth, db } = require('../config/firebase');
 
 const verifyToken = async (req, res, next) => {
   try {
@@ -33,25 +33,22 @@ const verifyToken = async (req, res, next) => {
 };
 
 const isAdmin = async (req, res, next) => {
-    // Assuming we set a custom claim or check a specific email/uid for admin
-    // For now, let's assume we check a custom claim 'admin' or just pass for now if logic not defined
-    // Ideally, you'd set custom user claims for admins
-    if (req.user && req.user.admin === true) {
-        next();
-    } else {
-        // Fallback: Check if email is in a hardcoded list or DB (for simplicity, we skip complex RBAC for now)
-        // If not admin
-        // return res.status(403).json({ error: 'Forbidden: Admins only' });
-        // For development, we might want to allow this or check DB. 
-        // Let's implement a basic check.
-        // If the user document has role: 'admin'
-        
-        // We will need to fetch the user profile from Firestore if custom claims aren't used.
-        // For performance, custom claims are better.
-        // Let's assume custom claims for now, or we can fetch from DB.
-        // For now, let's keep it open or just check req.user
-        next(); 
+  try {
+    if (req.user && (req.user.admin === true || (req.user.customClaims && req.user.customClaims.admin === true))) {
+      return next();
     }
+    const uid = req.user && req.user.uid;
+    if (!uid) return res.status(403).json({ error: 'Forbidden: Admins only' });
+    const userDoc = await db.collection('users').doc(uid).get();
+    const role = userDoc.exists ? (userDoc.data().role || userDoc.data().roles) : null;
+    const isRoleAdmin = role === 'admin' || (Array.isArray(role) && role.includes('admin'));
+    if (isRoleAdmin) {
+      return next();
+    }
+    return res.status(403).json({ error: 'Forbidden: Admins only' });
+  } catch (e) {
+    return res.status(500).json({ error: 'Admin check failed', details: e.message });
+  }
 };
 
 module.exports = { verifyToken, isAdmin };

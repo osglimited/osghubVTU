@@ -11,5 +11,7 @@ router.post('/settings', adminController.updateSettings);
 router.get('/settings', adminController.getSettings);
 router.get('/transactions', adminController.getAllTransactions);
 router.post('/wallet/credit', adminController.creditWallet);
+router.get('/users', adminController.listUsers);
+router.post('/users/promote', adminController.promoteToAdmin);
 
 module.exports = router;

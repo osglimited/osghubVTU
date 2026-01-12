@@ -1,5 +1,4 @@
-import { mockUsers } from "@/lib/firebase";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,15 +19,42 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Search, UserPlus, Filter } from "lucide-react";
+import { listUsers, promoteAdmin } from "@/lib/backend";
+import { useToast } from "@/hooks/use-toast";
+import { listUsers, promoteAdmin } from "@/lib/backend";
+import { useToast } from "@/hooks/use-toast";
 
 export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredUsers = mockUsers.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.phone.includes(searchTerm)
-  );
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await listUsers(100);
+        if (!mounted) return;
+        setUsers(data);
+      } catch (e) {
+        // ignore
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    return users.filter(user =>
+      String(user.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(user.phone || '').includes(searchTerm)
+    );
+  }, [users, searchTerm]);
 
   return (
     <div className="space-y-6">
@@ -65,6 +91,9 @@ export default function UsersPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {loading ? (
+            <div className="p-6 text-sm text-muted-foreground">Loading users...</div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -81,16 +110,16 @@ export default function UsersPage() {
                 <TableRow key={user.id} className="group">
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="font-medium group-hover:text-primary transition-colors">{user.name}</span>
-                      <span className="text-xs text-muted-foreground">{user.email}</span>
+                      <span className="font-medium group-hover:text-primary transition-colors">{user.displayName || user.fullName || user.email || user.uid}</span>
+                      <span className="text-xs text-muted-foreground">{user.email || ''}</span>
                     </div>
                   </TableCell>
-                  <TableCell>{user.phone}</TableCell>
-                  <TableCell>{new Date(user.joinDate).toLocaleDateString()}</TableCell>
-                  <TableCell className="font-medium">₦{user.balance.toLocaleString()}</TableCell>
+                  <TableCell>{user.phone || '-'}</TableCell>
+                  <TableCell>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</TableCell>
+                  <TableCell className="font-medium">₦{Number(user.balance || 0).toLocaleString()}</TableCell>
                   <TableCell>
-                    <Badge variant={user.status === 'active' ? 'default' : 'destructive'} className={user.status === 'active' ? 'bg-emerald-500 hover:bg-emerald-600' : ''}>
-                      {user.status}
+                    <Badge variant={(user.role === 'admin') ? 'default' : 'secondary'} className={(user.role === 'admin') ? 'bg-emerald-500 hover:bg-emerald-600' : ''}>
+                      {user.role || 'user'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -106,8 +135,17 @@ export default function UsersPage() {
                         <DropdownMenuItem>View Profile</DropdownMenuItem>
                         <DropdownMenuItem>View Transactions</DropdownMenuItem>
                         <DropdownMenuItem>Fund Wallet</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
-                          {user.status === 'active' ? 'Suspend User' : 'Activate User'}
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            try {
+                              const res = await promoteAdmin(user.uid || user.id, undefined);
+                              toast({ title: 'Promoted to Admin', description: res.email || user.email });
+                            } catch (e: any) {
+                              toast({ title: 'Promotion Failed', description: e.message || 'Unable to promote', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          Make Admin
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -116,6 +154,7 @@ export default function UsersPage() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
     </div>
