@@ -1,88 +1,67 @@
-const resolveBackendUrl = (): string => {
-  const envUrl = import.meta.env.VITE_VTU_BACKEND_URL;
-  const envUrlLocal = import.meta.env.VITE_VTU_BACKEND_URL_LOCAL;
-  const isNonLocal = (url?: string) => !!url && !/localhost|127\.0\.0\.1/i.test(String(url));
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname.toLowerCase();
-    if (host.includes('localhost')) {
-      return envUrlLocal || 'http://localhost:5000';
-    }
-    if (host.includes('osghubvtu.onrender.com')) {
-      return 'https://osghubvtubackend.onrender.com';
-    }
-    if (isNonLocal(envUrl)) {
-      return String(envUrl);
-    }
+import { auth } from "./firebase";
+
+function getBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_BACKEND_URL as string | undefined;
+  if (envUrl && typeof envUrl === "string" && envUrl.trim()) return envUrl.trim();
+  return "";
+}
+
+async function getToken(): Promise<string> {
+  const user = auth.currentUser;
+  return user ? await user.getIdToken() : "";
+}
+
+async function request<T>(method: string, path: string, data?: unknown): Promise<T> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}${path}`;
+  const token = await getToken();
+
+  const res = await fetch(url, {
+    method,
+    headers: {
+      ...(data ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: data ? JSON.stringify(data) : undefined,
+    credentials: "include",
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(text || res.statusText);
   }
-  return isNonLocal(envUrl) ? String(envUrl) : 'https://osghubvtubackend.onrender.com';
-};
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return undefined as unknown as T;
+  }
+}
 
-const backendUrl = resolveBackendUrl();
+export async function getAdminSettings(): Promise<any> {
+  return await request<any>("GET", "/api/admin/settings");
+}
 
-const withAuth = async (headers: HeadersInit = {}): Promise<HeadersInit> => {
-  const { auth } = await import('./firebase');
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...headers,
-  };
-};
+export async function updateAdminSettings(payload: {
+  dailyReferralBudget?: number;
+  cashbackEnabled?: boolean;
+  pricing?: Record<string, unknown>;
+}): Promise<{ message: string }> {
+  return await request<{ message: string }>("POST", "/api/admin/settings", payload);
+}
 
-export const getAdminSettings = async (): Promise<any> => {
-  const res = await fetch(`${backendUrl}/api/admin/settings`, {
-    headers: await withAuth(),
-  });
-  if (!res.ok) throw new Error('Failed to fetch settings');
-  return res.json();
-};
+export async function getAllTransactions(): Promise<any[]> {
+  return await request<any[]>("GET", "/api/admin/transactions");
+}
 
-export const updateAdminSettings = async (payload: any): Promise<any> => {
-  const res = await fetch(`${backendUrl}/api/admin/settings`, {
-    method: 'POST',
-    headers: await withAuth(),
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error('Failed to update settings');
-  return res.json();
-};
+export async function listUsers(limit = 100): Promise<any[]> {
+  const qs = new URLSearchParams({ limit: String(limit) }).toString();
+  return await request<any[]>("GET", `/api/admin/users?${qs}`);
+}
 
-export const getAllTransactions = async (): Promise<any[]> => {
-  const res = await fetch(`${backendUrl}/api/admin/transactions`, {
-    headers: await withAuth(),
-  });
-  if (!res.ok) throw new Error('Failed to fetch transactions');
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-};
+export async function promoteAdmin(input: { uid?: string; email?: string }): Promise<{ success: boolean; uid: string; email: string }> {
+  return await request<{ success: boolean; uid: string; email: string }>("POST", "/api/admin/users/promote", input);
+}
 
-export const creditUserWallet = async (userId: string, amount: number, walletType: 'main'|'cashback'|'referral' = 'main', description?: string): Promise<any> => {
-  const res = await fetch(`${backendUrl}/api/admin/wallet/credit`, {
-    method: 'POST',
-    headers: await withAuth(),
-    body: JSON.stringify({ userId, amount, walletType, description }),
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error((data && (data.error || data.message)) || 'Failed to credit wallet');
-  return data;
-};
+export async function creditWallet(payload: { userId: string; amount: number; walletType?: "main" | "cashback" | "referral"; description?: string }): Promise<{ success: boolean; userId: string; newBalance: number; walletType: string }> {
+  return await request<{ success: boolean; userId: string; newBalance: number; walletType: string }>("POST", "/api/admin/wallet/credit", payload);
+}
 
-export const listUsers = async (limit = 100): Promise<any[]> => {
-  const res = await fetch(`${backendUrl}/api/admin/users?limit=${limit}`, {
-    headers: await withAuth(),
-  });
-  if (!res.ok) throw new Error('Failed to list users');
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-};
-
-export const promoteAdmin = async (uid?: string, email?: string): Promise<any> => {
-  const res = await fetch(`${backendUrl}/api/admin/users/promote`, {
-    method: 'POST',
-    headers: await withAuth(),
-    body: JSON.stringify({ uid, email }),
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error((data && (data.error || data.message)) || 'Failed to promote admin');
-  return data;
-};

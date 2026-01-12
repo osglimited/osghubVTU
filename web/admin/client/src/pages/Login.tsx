@@ -51,12 +51,21 @@ export default function Login() {
         description: "Successfully logged in to OSGHUB Admin.",
       });
       setLocation("/");
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Access Denied",
-        description: "Invalid credentials or not an admin account.",
-      });
+    } catch (error: any) {
+      const code = error?.code || "";
+      const msg = (error?.message || "").toLowerCase();
+      const isWrongPassword = code === "auth/wrong-password" || msg.includes("wrong password") || msg.includes("invalid password");
+      const isUserNotFound = code === "auth/user-not-found" || msg.includes("user-not-found");
+      const isAccessDenied = msg.includes("access denied") || msg.includes("admin only");
+      const title = isAccessDenied ? "Access Denied" : "Login Failed";
+      const description = isWrongPassword
+        ? "Invalid email or password. Please try again."
+        : isUserNotFound
+        ? "Account not found. Verify the email address."
+        : isAccessDenied
+        ? "You are not authorized to access the admin panel."
+        : "Unable to sign in at the moment.";
+      toast({ variant: "destructive", title, description });
     } finally {
       setIsLoading(false);
     }
