@@ -13,8 +13,16 @@ import {
 } from "@/components/ui/table";
 import { Check, X, Wallet as WalletIcon, RefreshCw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { creditUserWallet } from "@/lib/backend";
 
 export default function WalletPage() {
+  const { toast } = useToast();
+  const [creditForm, setCreditForm] = useState({ userId: '', amount: '', reason: '' });
+  const [debitForm, setDebitForm] = useState({ userId: '', amount: '', reason: '' });
+  const [processing, setProcessing] = useState<'credit'|'debit'|null>(null);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -129,17 +137,43 @@ export default function WalletPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">User Email / ID</label>
-                  <Input placeholder="Enter user email..." />
+                  <Input placeholder="Enter user email..." value={creditForm.userId} onChange={e => setCreditForm(prev => ({ ...prev, userId: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Amount (₦)</label>
-                  <Input type="number" placeholder="0.00" />
+                  <Input type="number" placeholder="0.00" value={creditForm.amount} onChange={e => setCreditForm(prev => ({ ...prev, amount: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Reason</label>
-                  <Input placeholder="Bonus / Refund / Correction" />
+                  <Input placeholder="Bonus / Refund / Correction" value={creditForm.reason} onChange={e => setCreditForm(prev => ({ ...prev, reason: e.target.value }))} />
                 </div>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Credit Wallet</Button>
+                <Button 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  disabled={processing === 'credit'}
+                  onClick={async () => {
+                    if (!creditForm.userId || !creditForm.amount) {
+                      toast({ title: 'Missing fields', description: 'Provide user and amount', variant: 'destructive' });
+                      return;
+                    }
+                    setProcessing('credit');
+                    try {
+                      const amt = Number(creditForm.amount);
+                      const res = await creditUserWallet(creditForm.userId, amt, 'main', creditForm.reason || 'Manual Credit');
+                      if (res && res.success) {
+                        toast({ title: 'Wallet Credited', description: `New balance: ₦${Number(res.newBalance || 0).toLocaleString()}` });
+                        setCreditForm({ userId: '', amount: '', reason: '' });
+                      } else {
+                        toast({ title: 'Credit Failed', description: res?.error || 'Unable to credit', variant: 'destructive' });
+                      }
+                    } catch (e: any) {
+                      toast({ title: 'Credit Failed', description: e.message || 'Unexpected error', variant: 'destructive' });
+                    } finally {
+                      setProcessing(null);
+                    }
+                  }}
+                >
+                  Credit Wallet
+                </Button>
               </CardContent>
             </Card>
 
@@ -151,17 +185,17 @@ export default function WalletPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">User Email / ID</label>
-                  <Input placeholder="Enter user email..." />
+                  <Input placeholder="Enter user email..." value={debitForm.userId} onChange={e => setDebitForm(prev => ({ ...prev, userId: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Amount (₦)</label>
-                  <Input type="number" placeholder="0.00" />
+                  <Input type="number" placeholder="0.00" value={debitForm.amount} onChange={e => setDebitForm(prev => ({ ...prev, amount: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Reason</label>
-                  <Input placeholder="Correction / Penalty" />
+                  <Input placeholder="Correction / Penalty" value={debitForm.reason} onChange={e => setDebitForm(prev => ({ ...prev, reason: e.target.value }))} />
                 </div>
-                <Button variant="destructive" className="w-full">Debit Wallet</Button>
+                <Button variant="destructive" className="w-full" disabled={processing === 'debit'} onClick={() => toast({ title: 'Not Implemented', description: 'Debit endpoint not ready', variant: 'destructive' })}>Debit Wallet</Button>
               </CardContent>
             </Card>
           </div>

@@ -4,10 +4,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Save, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getAdminSettings, updateAdminSettings } from "@/lib/backend";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ApiSettingsPage() {
   const [showKey, setShowKey] = useState(false);
+  const { toast } = useToast();
+  const [form, setForm] = useState<any>({ providerBaseUrl: '', apiKey: '', secretKey: '', cashbackEnabled: false, dailyReferralBudget: 0 });
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const s = await getAdminSettings();
+        if (!mounted) return;
+        setForm((prev: any) => ({
+          ...prev,
+          providerBaseUrl: s.providerBaseUrl || '',
+          apiKey: s.apiKey || '',
+          secretKey: s.secretKey || '',
+          cashbackEnabled: !!s.cashbackEnabled,
+          dailyReferralBudget: Number(s.dailyReferralBudget || 0)
+        }));
+      } catch {
+        // ignore
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -25,7 +51,7 @@ export default function ApiSettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Provider Base URL</Label>
-              <Input defaultValue="https://api.vtuprovider.com/v1" />
+              <Input value={form.providerBaseUrl} onChange={e => setForm((p: any) => ({ ...p, providerBaseUrl: e.target.value }))} />
             </div>
             
             <div className="space-y-2">
@@ -33,7 +59,8 @@ export default function ApiSettingsPage() {
               <div className="relative">
                 <Input 
                   type={showKey ? "text" : "password"} 
-                  defaultValue="sk_live_1234567890abcdef" 
+                  value={form.apiKey}
+                  onChange={e => setForm((p: any) => ({ ...p, apiKey: e.target.value }))}
                   className="pr-10"
                 />
                 <Button 
@@ -49,11 +76,22 @@ export default function ApiSettingsPage() {
 
             <div className="space-y-2">
               <Label>Secret Key</Label>
-              <Input type="password" defaultValue="**********************" />
+              <Input type="password" value={form.secretKey} onChange={e => setForm((p: any) => ({ ...p, secretKey: e.target.value }))} />
             </div>
           </CardContent>
           <CardFooter className="bg-muted/30 border-t py-4">
-            <Button className="ml-auto">
+            <Button className="ml-auto" onClick={async () => {
+              const payload = {
+                cashbackEnabled: !!form.cashbackEnabled,
+                dailyReferralBudget: Number(form.dailyReferralBudget || 0),
+                pricing: {}, // extend later
+                providerBaseUrl: form.providerBaseUrl,
+                apiKey: form.apiKey,
+                secretKey: form.secretKey
+              };
+              const res = await updateAdminSettings(payload);
+              toast({ title: 'Settings Saved', description: res.message || 'Updated' });
+            }}>
               <Save className="mr-2 h-4 w-4" /> Save Changes
             </Button>
           </CardFooter>

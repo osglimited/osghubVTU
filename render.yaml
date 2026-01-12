@@ -6,3 +6,10 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm run start
     autoDeploy: true
+  - type: web
+    name: osghub-admin
+    env: node
+    rootDirectory: web/admin
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    autoDeploy: true

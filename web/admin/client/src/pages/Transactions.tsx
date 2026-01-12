@@ -1,5 +1,4 @@
-import { mockTransactions } from "@/lib/firebase";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,16 +19,37 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Filter, Download, RotateCcw } from "lucide-react";
+import { fetchAdminTransactions } from "@/lib/backend";
 
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredTransactions = mockTransactions.filter(t => {
-    if (filterType !== "all" && t.type.toLowerCase() !== filterType) return false;
-    if (filterStatus !== "all" && t.status !== filterStatus) return false;
-    return true;
-  });
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchAdminTransactions();
+        if (!mounted) return;
+        setTransactions(data);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((t) => {
+      const typeOk = filterType === "all" ? true : String(t.type || '').toLowerCase() === filterType;
+      const statusOk = filterStatus === "all" ? true : String(t.status || '').toLowerCase() === filterStatus;
+      return typeOk && statusOk;
+    });
+  }, [transactions, filterType, filterStatus]);
 
   return (
     <div className="space-y-6">
@@ -84,6 +104,9 @@ export default function TransactionsPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {loading ? (
+            <div className="p-6 text-sm text-muted-foreground">Loading transactions...</div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -101,11 +124,17 @@ export default function TransactionsPage() {
               {filteredTransactions.map((t) => (
                 <TableRow key={t.id}>
                   <TableCell className="font-mono text-xs">{t.id}</TableCell>
-                  <TableCell className="font-medium">{t.user}</TableCell>
+                  <TableCell className="font-medium">{t.userId || t.user || '-'}</TableCell>
                   <TableCell>{t.type}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{t.details}</TableCell>
-                  <TableCell>₦{t.amount.toLocaleString()}</TableCell>
-                  <TableCell>{new Date(t.date).toLocaleString()}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {t.details ? JSON.stringify(t.details) : t.description || '-'}
+                  </TableCell>
+                  <TableCell>₦{Number(t.amount || 0).toLocaleString()}</TableCell>
+                  <TableCell>
+                    {t.createdAt 
+                      ? new Date(t.createdAt._seconds ? t.createdAt._seconds * 1000 : t.createdAt).toLocaleString()
+                      : '-'}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={t.status === 'success' ? 'default' : t.status === 'pending' ? 'secondary' : 'destructive'} 
                            className={t.status === 'success' ? 'bg-emerald-500' : t.status === 'pending' ? 'bg-amber-500' : ''}>
@@ -123,6 +152,7 @@ export default function TransactionsPage() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
     </div>
