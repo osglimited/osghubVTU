@@ -20,14 +20,14 @@ export default function ProfilePage() {
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 relative">
               <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
-                <AvatarImage src="/avatar-placeholder.png" />
+                <AvatarImage src={(user as any).photoURL || ""} />
                 <AvatarFallback className="text-2xl bg-primary text-primary-foreground font-bold">
-                  {user.displayName ? user.displayName.charAt(0) : 'A'}
+                  {String((user as any).displayName || (user as any).email || "A").charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </div>
-            <CardTitle>{user.displayName || 'Admin User'}</CardTitle>
-            <CardDescription>{user.email || 'admin@osghub.com'}</CardDescription>
+            <CardTitle>{(user as any).displayName || 'Admin User'}</CardTitle>
+            <CardDescription>{(user as any).email || ''}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex justify-between py-2 border-b text-sm">
