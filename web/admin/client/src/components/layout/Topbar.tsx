@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth, signOut } from "@/lib/firebase";
 
 export function Topbar() {
-  const user = auth.currentUser || JSON.parse(localStorage.getItem('mockUser') || '{}');
+  const user = auth.currentUser || undefined;
 
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-primary px-6 shadow-sm">
@@ -41,9 +41,9 @@ export function Topbar() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full ring-2 ring-white/20 hover:ring-white">
               <Avatar className="h-9 w-9">
-                <AvatarImage src="/avatar-placeholder.png" alt="Admin" />
+                <AvatarImage src={user?.photoURL || ""} alt={user?.email || "Admin"} />
                 <AvatarFallback className="bg-primary-foreground text-primary font-bold">
-                  {user.displayName ? user.displayName.charAt(0) : 'A'}
+                  {(user?.displayName || user?.email || "A").charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </Button>

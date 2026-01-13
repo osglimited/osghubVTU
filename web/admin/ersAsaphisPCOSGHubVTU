@@ -1,0 +1,4 @@
+[33me3a3108[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/admin-web[m[33m)[m Remove mock fallbacks and placeholder avatars; production-safe UI
+[33m42a837a[m Admin auth + Firebase Firestore fallback; load env; prefer local backend in dev; ignore env local
+[33m4450bed[m Admin: user controls (suspend/delete/password), wallet debit, provider status/error visibility, DB-backed balances and transactions
+[33mb5d8e86[m Admin panel: real auth, backend verification, DB-backed settings/transactions, remove mocks

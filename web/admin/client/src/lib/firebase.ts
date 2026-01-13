@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged as firebaseOnAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, onAuthStateChanged as firebaseOnAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -20,21 +20,13 @@ export const onAuthStateChanged = (callback: (user: any) => void) => {
 };
 
 export const signInAdmin = async (email: string, password: string) => {
-  let cred: any;
-  try {
-    cred = await signInWithEmailAndPassword(auth, email, password);
-  } catch (e: any) {
-    if (e && e.code === 'auth/user-not-found') {
-      cred = await createUserWithEmailAndPassword(auth, email, password);
-    } else {
-      throw e;
-    }
-  }
-  const token = await cred.user.getIdTokenResult();
   const allowed = (import.meta.env.VITE_ADMIN_EMAILS || 'osglimited7@gmail.com')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
+  let cred: any;
+  cred = await signInWithEmailAndPassword(auth, email, password);
+  const token = await cred.user.getIdTokenResult();
   const userEmail = (cred.user.email || '').toLowerCase();
   const isAdmin = Boolean(token.claims && (token.claims.admin === true)) || (userEmail && allowed.includes(userEmail));
   if (!isAdmin) {

@@ -54,7 +54,7 @@ try {
         db = admin.firestore();
         auth = admin.auth();
         messaging = admin.messaging();
-        console.log('Firebase initialized successfully');
+        console.log(`Firebase initialized successfully (projectId=${projectId})`);
       } catch (initError) {
         console.error('Error initializing Firebase Admin SDK:', initError);
         // Do not throw, allow server to start without Firebase

@@ -12,6 +12,7 @@ import Login from "@/pages/Login";
 import UsersPage from "@/pages/Users";
 import WalletPage from "@/pages/Wallet";
 import TransactionsPage from "@/pages/Transactions";
+import TransactionDetailsPage from "@/pages/TransactionDetails";
 import ServicesPage from "@/pages/Services";
 import ApiSettingsPage from "@/pages/Settings";
 import ProfilePage from "@/pages/Profile";
@@ -26,6 +27,7 @@ function Router() {
         <Route path="/users" component={UsersPage} />
         <Route path="/wallet" component={WalletPage} />
         <Route path="/transactions" component={TransactionsPage} />
+        <Route path="/transactions/:id" component={TransactionDetailsPage} />
         <Route path="/services" component={ServicesPage} />
         <Route path="/settings/api" component={ApiSettingsPage} />
         <Route path="/profile" component={ProfilePage} />

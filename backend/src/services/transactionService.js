@@ -2,6 +2,7 @@ const { db } = require('../config/firebase');
 const walletService = require('./walletService');
 const cashbackService = require('./cashbackService');
 const referralService = require('./referralService');
+const notificationService = require('./notificationService');
 
 const TRANSACTION_COLLECTION = 'transactions';
 
@@ -76,6 +77,13 @@ class TransactionService {
           providerResponse: result.apiResponse,
           updatedAt: new Date()
         });
+        try {
+          const maskedPhone = String(details.phone || '').replace(/^(\d{0,7})/, '*******');
+          const title = `${type.charAt(0).toUpperCase() + type.slice(1)} Purchase Successful`;
+          const body = `You purchased ${type} for ${maskedPhone}. Amount: ₦${amount}. Ref: ${result.transactionId}.`;
+          await notificationService.sendNotification(userId, title, body);
+          await notificationService.sendSms(details.phone, body);
+        } catch (notifyErr) {}
         return { ...transactionData, status: 'success' };
       } else {
         // Refund if provider fails

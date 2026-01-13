@@ -1,4 +1,5 @@
 const { messaging } = require('../config/firebase');
+const axios = require('axios');
 
 class NotificationService {
   async sendNotification(userId, title, body, data = {}) {
@@ -31,6 +32,35 @@ class NotificationService {
       */
     } catch (error) {
       console.error('Error sending notification:', error);
+    }
+  }
+
+  async sendSms(phone, message) {
+    try {
+      if ((process.env.SEND_PURCHASE_SMS || '').toLowerCase() !== 'true') {
+        return;
+      }
+      const apiKey = process.env.SMS_TERMII_API_KEY || '';
+      const senderId = process.env.SMS_SENDER_ID || 'OSGHUB';
+      const channel = process.env.SMS_CHANNEL || 'dnd';
+      if (!apiKey) {
+        console.warn('SMS provider API key missing');
+        return;
+      }
+      const payload = {
+        api_key: apiKey,
+        to: String(phone),
+        from: senderId,
+        sms: String(message),
+        type: 'plain',
+        channel
+      };
+      await axios.post('https://api.ng.termii.com/api/sms/send', payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 15000
+      });
+    } catch (error) {
+      console.error('Error sending SMS:', error?.response?.data || error?.message || String(error));
     }
   }
 }

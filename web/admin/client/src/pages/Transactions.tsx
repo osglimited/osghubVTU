@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Search, Filter, Download, RotateCcw } from "lucide-react";
 import { getAllTransactions } from "@/lib/backend";
+import { Link } from "wouter";
 
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState("all");
@@ -117,6 +118,8 @@ export default function TransactionsPage() {
                 <TableHead>Amount</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Provider Status</TableHead>
+                <TableHead>Provider Error</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -141,12 +144,24 @@ export default function TransactionsPage() {
                       {t.status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <Badge variant={t.providerStatus === 'success' ? 'default' : t.providerStatus === 'processing' ? 'secondary' : 'destructive'} 
+                           className={t.providerStatus === 'success' ? 'bg-emerald-500' : t.providerStatus === 'processing' ? 'bg-amber-500' : ''}>
+                      {t.providerStatus || '-'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs font-mono text-red-600 max-w-[200px] truncate" title={t.providerErrorMessage || ''}>
+                    {t.providerErrorMessage || '-'}
+                  </TableCell>
                   <TableCell className="text-right">
                     {t.status === 'failed' && (
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Retry Transaction">
                         <RotateCcw className="h-4 w-4 text-primary" />
                       </Button>
                     )}
+                    <Link href={`/transactions/${encodeURIComponent(t.id)}`}>
+                      <Button size="sm" variant="outline">View</Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}

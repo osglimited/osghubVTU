@@ -16,7 +16,6 @@ export const DATA_PLANS: Record<string, DataPlan[]> = {
     { id: 'glo_1gig_3days_corporate', name: '1GB (Corporate) (3 Days)', price: 376, networkId: 2, variation_id: '45' }
   ],
   AIRTEL: [
-    { id: 'airtel_sme_2days', name: '600MB (SME) (2 Days)', price: 350, networkId: 3, variation_id: '412' },
     { id: 'airtel_gifting_1day_1gbb', name: '1GB (Gifting) (1 Day)', price: 592, networkId: 3, variation_id: '349' },
     { id: 'airtel_sme_2days_1_5gbb', name: '1.5GB (SME) (2 Days)', price: 749, networkId: 3, variation_id: '413' },
     { id: 'airtel_sme_3days_500mb', name: '500MB (SME) (3 Days)', price: 450, networkId: 3, variation_id: '420' }
