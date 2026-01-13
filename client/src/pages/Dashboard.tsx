@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { getAllTransactions, listUsers } from "@/lib/backend";
+import { useMemo } from "react";
+import { getAdminStats } from "@/lib/backend";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Wallet, Activity, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import {
@@ -10,51 +10,33 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useQuery } from "@tanstack/react-query";
 
-const chartData = [
-  { name: "Mon", total: 1200 },
-  { name: "Tue", total: 2100 },
-  { name: "Wed", total: 1800 },
-  { name: "Thu", total: 2400 },
-  { name: "Fri", total: 3200 },
-  { name: "Sat", total: 3800 },
-  { name: "Sun", total: 4200 },
+const defaultChartData = [
+  { name: "Mon", total: 0 },
+  { name: "Tue", total: 0 },
+  { name: "Wed", total: 0 },
+  { name: "Thu", total: 0 },
+  { name: "Fri", total: 0 },
+  { name: "Sat", total: 0 },
+  { name: "Sun", total: 0 },
 ];
 
 export default function Dashboard() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const stats = useMemo(() => {
-    const totalUsers = users.length;
-    const walletBalance = users.reduce((sum, u) => sum + Number(u.walletBalance || 0), 0);
-    const totalTransactions = transactions.length;
-    const todaySales = transactions
-      .filter(t => {
-        const d = new Date(t.createdAt || t.date || Date.now());
-        const now = new Date();
-        return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      })
-      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    return { totalUsers, walletBalance, totalTransactions, todaySales };
-  }, [users, transactions]);
+  const { data: stats } = useQuery({
+    queryKey: ["admin-stats"],
+    queryFn: async () => await getAdminStats(),
+    refetchInterval: 5000,
+    staleTime: 4000,
+    initialData: { totalUsers: 0, walletBalance: 0, totalTransactions: 0, todaySales: 0, recentTransactions: [], dailyTotals: [] },
+  });
+  const chartData = useMemo(() => {
+    const days = stats.dailyTotals || [];
+    if (!days.length) return defaultChartData;
+    return days.map(d => ({ name: d.day, total: d.total }));
+  }, [stats]);
 
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      try {
-        const [u, tx] = await Promise.all([listUsers(100), getAllTransactions()]);
-        if (!mounted) return;
-        setUsers(u || []);
-        setTransactions(tx || []);
-      } catch {
-        if (!mounted) return;
-        setUsers([]);
-        setTransactions([]);
-      }
-    };
-    load();
-    return () => { mounted = false; };
-  }, []);
+  const recent = (stats.recentTransactions || []).slice(0, 5);
   return (
     <div className="space-y-8">
       <div>
@@ -179,15 +161,15 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
               <div className="space-y-6">
-              {transactions.slice(0, 5).map((transaction) => (
+              {recent.map((transaction) => (
                 <div key={transaction.id} className="flex items-center justify-between group">
                   <div className="flex items-center space-x-4">
                     <div className={`p-2 rounded-full ${transaction.status === 'success' ? 'bg-emerald-100 text-emerald-600' : transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'}`}>
                       {transaction.status === 'success' ? <ArrowUpRight className="h-4 w-4" /> : transaction.status === 'pending' ? <Activity className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
                     </div>
                     <div>
-                      <p className="text-sm font-medium leading-none group-hover:text-primary transition-colors">{transaction.user}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{transaction.type} • {new Date(transaction.date).toLocaleDateString()}</p>
+                      <p className="text-sm font-medium leading-none group-hover:text-primary transition-colors">{transaction.user || transaction.userId}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{transaction.type} • {new Date(transaction.createdAt ? (transaction.createdAt._seconds ? transaction.createdAt._seconds * 1000 : transaction.createdAt) : Date.now()).toLocaleDateString()}</p>
                     </div>
                   </div>
                   <div className="font-medium text-sm">

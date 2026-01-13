@@ -12,15 +12,35 @@ import {
 } from "@/components/ui/table";
 import { Check, X, Wallet as WalletIcon, RefreshCw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { creditWallet } from "@/lib/backend";
+import { creditWallet, debitWallet, getWalletLogs, getWalletDeposits } from "@/lib/backend";
 
 export default function WalletPage() {
   const { toast } = useToast();
   const [creditForm, setCreditForm] = useState({ userId: '', amount: '', reason: '' });
   const [debitForm, setDebitForm] = useState({ userId: '', amount: '', reason: '' });
   const [processing, setProcessing] = useState<'credit'|'debit'|null>(null);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [deposits, setDeposits] = useState<any[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const [wl, dp] = await Promise.all([getWalletLogs(), getWalletDeposits()]);
+        if (!mounted) return;
+        setLogs(wl || []);
+        setDeposits(dp || []);
+      } catch {
+        if (!mounted) return;
+        setLogs([]);
+        setDeposits([]);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -41,8 +61,8 @@ export default function WalletPage() {
             <CardTitle className="text-sm font-medium opacity-80">Pending Requests</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">5</div>
-            <p className="text-xs opacity-70 mt-1">Total value: ₦25,000</p>
+            <div className="text-3xl font-bold">{deposits.filter(d => d.status === 'pending').length}</div>
+            <p className="text-xs opacity-70 mt-1">Total value: ₦{deposits.filter(d => d.status === 'pending').reduce((s, d) => s + Number(d.amount || 0), 0).toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card className="border-none shadow-sm">
@@ -50,8 +70,16 @@ export default function WalletPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Processed Today</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground mt-1">Total value: ₦150,000</p>
+            <div className="text-3xl font-bold">{deposits.filter(d => {
+              const dd = new Date(d.createdAt ? (d.createdAt._seconds ? d.createdAt._seconds * 1000 : d.createdAt) : Date.now());
+              const now = new Date();
+              return d.status === 'success' && dd.getDate() === now.getDate() && dd.getMonth() === now.getMonth() && dd.getFullYear() === now.getFullYear();
+            }).length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Total value: ₦{deposits.filter(d => {
+              const dd = new Date(d.createdAt ? (d.createdAt._seconds ? d.createdAt._seconds * 1000 : d.createdAt) : Date.now());
+              const now = new Date();
+              return d.status === 'success' && dd.getDate() === now.getDate() && dd.getMonth() === now.getMonth() && dd.getFullYear() === now.getFullYear();
+            }).reduce((s, d) => s + Number(d.amount || 0), 0).toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card className="border-none shadow-sm">
@@ -59,8 +87,12 @@ export default function WalletPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Funded (Month)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">₦4.5M</div>
-            <p className="text-xs text-muted-foreground mt-1">+12% from last month</p>
+            <div className="text-3xl font-bold">₦{deposits.filter(d => {
+              const dd = new Date(d.createdAt ? (d.createdAt._seconds ? d.createdAt._seconds * 1000 : d.createdAt) : Date.now());
+              const now = new Date();
+              return d.status === 'success' && dd.getMonth() === now.getMonth() && dd.getFullYear() === now.getFullYear();
+            }).reduce((s, d) => s + Number(d.amount || 0), 0).toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">+ recent</p>
           </CardContent>
         </Card>
       </div>
@@ -173,10 +205,74 @@ export default function WalletPage() {
                   <label className="text-sm font-medium">Reason</label>
                   <Input placeholder="Correction / Penalty" value={debitForm.reason} onChange={e => setDebitForm(prev => ({ ...prev, reason: e.target.value }))} />
                 </div>
-                <Button variant="destructive" className="w-full" disabled={processing === 'debit'} onClick={() => toast({ title: 'Not Implemented', description: 'Debit endpoint not ready', variant: 'destructive' })}>Debit Wallet</Button>
+                <Button 
+                  variant="destructive" 
+                  className="w-full" 
+                  disabled={processing === 'debit'} 
+                  onClick={async () => {
+                    if (!debitForm.userId || !debitForm.amount) {
+                      toast({ title: 'Missing fields', description: 'Provide user and amount', variant: 'destructive' });
+                      return;
+                    }
+                    setProcessing('debit');
+                    try {
+                      const amt = Number(debitForm.amount);
+                      const res = await debitWallet({ userId: debitForm.userId, amount: amt, walletType: "main", description: debitForm.reason || "Manual Debit" });
+                      if (res && res.success) {
+                        toast({ title: 'Wallet Debited', description: `New balance: ₦${Number(res.newBalance || 0).toLocaleString()}` });
+                        setDebitForm({ userId: '', amount: '', reason: '' });
+                      } else {
+                        toast({ title: 'Debit Failed', description: res?.error || 'Unable to debit', variant: 'destructive' });
+                      }
+                    } catch (e: any) {
+                      toast({ title: 'Debit Failed', description: e.message || 'Unexpected error', variant: 'destructive' });
+                    } finally {
+                      setProcessing(null);
+                    }
+                  }}
+                >
+                  Debit Wallet
+                </Button>
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <Card className="border-none shadow-sm">
+            <CardHeader>
+              <CardTitle>Wallet Logs</CardTitle>
+              <CardDescription>Recent wallet credits and debits.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {logs.map((l) => (
+                    <TableRow key={l.id}>
+                      <TableCell className="font-mono text-xs">{l.id}</TableCell>
+                      <TableCell>{l.user}</TableCell>
+                      <TableCell>
+                        <Badge variant={l.type === 'credit' ? 'default' : 'secondary'} className={l.type === 'credit' ? 'bg-emerald-500' : ''}>
+                          {l.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>₦{Number(l.amount || 0).toLocaleString()}</TableCell>
+                      <TableCell>{new Date(l.createdAt ? (l.createdAt._seconds ? l.createdAt._seconds * 1000 : l.createdAt) : Date.now()).toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

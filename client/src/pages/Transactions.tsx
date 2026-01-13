@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Search, Filter, Download, RotateCcw } from "lucide-react";
 import { getAllTransactions } from "@/lib/backend";
+import { Link } from "wouter";
 
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState("all");
@@ -158,6 +159,9 @@ export default function TransactionsPage() {
                         <RotateCcw className="h-4 w-4 text-primary" />
                       </Button>
                     )}
+                    <Link href={`/transactions/${encodeURIComponent(t.id)}`}>
+                      <Button size="sm" variant="outline">View</Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}

@@ -17,7 +17,7 @@ export default function LogsPage() {
           action: t.type || "transaction",
           user: t.user || t.user_email || "",
           status: t.status || "success",
-          timestamp: t.createdAt || t.created_at || new Date().toISOString(),
+          timestamp: t.createdAt || t.created_at || Date.now(),
           ip: "",
           amount: t.amount || 0,
         }));
@@ -57,7 +57,15 @@ export default function LogsPage() {
             <TableBody>
               {logs.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell className="font-mono text-xs">{new Date(log.timestamp).toLocaleString()}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {new Date(
+                      (typeof log.timestamp === 'number')
+                        ? log.timestamp
+                        : (log.timestamp?._seconds
+                          ? log.timestamp._seconds * 1000
+                          : log.timestamp || Date.now())
+                    ).toLocaleString()}
+                  </TableCell>
                   <TableCell className="font-medium">{log.action}</TableCell>
                   <TableCell>{log.user}</TableCell>
                   <TableCell>

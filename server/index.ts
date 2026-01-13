@@ -2,6 +2,47 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import fs from "fs";
+import path from "path";
+
+function loadEnvFiles() {
+  const files = [".env", ".env.local"];
+  // search both process cwd and project subdir for robustness
+  const here = (() => {
+    try {
+      const url = new URL(import.meta.url);
+      const p = url.pathname;
+      return path.dirname(p);
+    } catch {
+      return process.cwd();
+    }
+  })();
+  const searchDirs = [
+    process.cwd(),
+    here,
+    path.resolve(here, ".."), // server/
+    path.resolve(here, "../.."), // web/admin/
+  ];
+  for (const dir of searchDirs) {
+    for (const name of files) {
+      const p = path.resolve(dir, name);
+      if (!fs.existsSync(p)) continue;
+      const text = fs.readFileSync(p, "utf8");
+      const lines = text.split(/\r?\n/);
+      for (const line of lines) {
+        const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)\s*$/);
+        if (!m) continue;
+        const key = m[1];
+        let val = m[2];
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        process.env[key] = val;
+      }
+    }
+  }
+}
+loadEnvFiles();
 
 const app = express();
 const httpServer = createServer(app);
