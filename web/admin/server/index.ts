@@ -63,6 +63,32 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Basic CORS for admin panel → backend communication
+const allowedOrigins = new Set<string>(
+  [
+    process.env.ADMIN_ORIGIN,
+    process.env.ADMIN_FRONTEND_ORIGIN,
+    process.env.VITE_ADMIN_ORIGIN,
+    process.env.ADMIN_PANEL_ORIGIN,
+  ]
+    .filter((x) => typeof x === "string" && x.trim().length > 0)
+    .map((x) => x!.trim().replace(/^`|`$/g, "")),
+);
+app.use((req, res, next) => {
+  const origin = String(req.headers.origin || "");
+  if (origin && (allowedOrigins.size === 0 || allowedOrigins.has(origin))) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Vary", "Origin");
+    res.header("Access-Control-Allow-Credentials", "true");
+  }
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Email");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",

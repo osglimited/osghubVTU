@@ -18,7 +18,14 @@ export async function registerRoutes(
         const json = JSON.parse(sa);
         initializeApp({ credential: cert(json), projectId: json.project_id || projectId } as any);
       } else {
-        initializeApp({ credential: applicationDefault(), projectId } as any);
+        const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+        const rawKey = process.env.FIREBASE_PRIVATE_KEY;
+        if (clientEmail && rawKey) {
+          const privateKey = String(rawKey).replace(/\\n/g, "\n");
+          initializeApp({ credential: cert({ project_id: projectId, client_email: clientEmail, private_key: privateKey }), projectId } as any);
+        } else {
+          initializeApp({ credential: applicationDefault(), projectId } as any);
+        }
       }
     } catch {
       // ignore
@@ -167,6 +174,11 @@ export async function registerRoutes(
   app.get("/api/admin/settings", adminAuth, async (_req: Request, res: Response) => {
     const url = process.env.DATABASE_URL;
     if (!url) {
+      try {
+        const db = getFirestore();
+        const doc = await db.collection("admin_settings").doc("settings").get();
+        if (doc.exists) return res.json(doc.data() || settingsStore);
+      } catch {}
       return res.json(settingsStore);
     }
     await ensureTables();
@@ -187,6 +199,10 @@ export async function registerRoutes(
     Object.assign(settingsStore, body);
     const url = process.env.DATABASE_URL;
     if (!url) {
+      try {
+        const db = getFirestore();
+        await db.collection("admin_settings").doc("settings").set(settingsStore, { merge: true });
+      } catch {}
       return res.json({ message: "Settings updated" });
     }
     await ensureTables();
@@ -321,7 +337,34 @@ export async function registerRoutes(
     const newBalance = amount;
     const url = process.env.DATABASE_URL;
     const doInsert = async () => {
-      if (!url) return;
+      if (!url) {
+        try {
+          const db = getFirestore();
+          const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          await db.collection("admin_transactions").doc(id).set({
+            id,
+            user_email: userId,
+            amount,
+            status: "success",
+            type: "credit",
+            createdAt: Date.now(),
+          });
+          const uw = db.collection("user_wallets").doc(userId.toLowerCase());
+          const snap = await uw.get();
+          const start = snap.exists ? Number((snap.data() as any).main_balance || 0) : 0;
+          await uw.set({ main_balance: start + amount, updated_at: Date.now() }, { merge: true });
+          const logId = `wl_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          await db.collection("wallet_logs").doc(logId).set({
+            id: logId,
+            user_email: userId,
+            type: "credit",
+            amount,
+            description: String(req.body?.description || "Admin credit"),
+            createdAt: Date.now(),
+          });
+        } catch {}
+        return;
+      }
       await ensureTables();
       const pool = new Pool({ connectionString: url, max: 1 });
       try {
@@ -354,7 +397,34 @@ export async function registerRoutes(
     const walletType = String((req.body?.walletType as string) || "main");
     const url = process.env.DATABASE_URL;
     const doInsert = async () => {
-      if (!url) return;
+      if (!url) {
+        try {
+          const db = getFirestore();
+          const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          await db.collection("admin_transactions").doc(id).set({
+            id,
+            user_email: userId,
+            amount,
+            status: "success",
+            type: "debit",
+            createdAt: Date.now(),
+          });
+          const uw = db.collection("user_wallets").doc(userId.toLowerCase());
+          const snap = await uw.get();
+          const start = snap.exists ? Number((snap.data() as any).main_balance || 0) : 0;
+          await uw.set({ main_balance: start - amount, updated_at: Date.now() }, { merge: true });
+          const logId = `wl_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          await db.collection("wallet_logs").doc(logId).set({
+            id: logId,
+            user_email: userId,
+            type: "debit",
+            amount,
+            description: String(req.body?.description || "Admin debit"),
+            createdAt: Date.now(),
+          });
+        } catch {}
+        return;
+      }
       await ensureTables();
       const pool = new Pool({ connectionString: url, max: 1 });
       try {
@@ -463,7 +533,28 @@ export async function registerRoutes(
 
   app.get("/api/admin/plans", adminAuth, async (_req: Request, res: Response) => {
     const url = process.env.DATABASE_URL;
-    if (!url) return res.json([]);
+    if (!url) {
+      try {
+        const db = getFirestore();
+        const snap = await db.collection("service_plans").orderBy("createdAt", "desc").get();
+        const rows = snap.docs.map(d => {
+          const x: any = d.data() || {};
+          return {
+            id: d.id,
+            network: x.network || "",
+            name: x.name || "",
+            priceUser: Number(x.priceUser || x.price_user || 0),
+            priceApi: Number(x.priceApi || x.price_api || 0),
+            active: Boolean(x.active !== false),
+            metadata: x.metadata || null,
+            createdAt: x.createdAt || Date.now(),
+          };
+        });
+        return res.json(rows);
+      } catch {
+        return res.json([]);
+      }
+    }
     await ensureTables();
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
@@ -491,7 +582,21 @@ export async function registerRoutes(
       return res.status(400).json({ message: "network, name, priceUser, priceApi required" });
     }
     const url = process.env.DATABASE_URL;
-    if (!url) return res.json({ id, network, name, priceUser, priceApi, active, metadata: body.metadata || null });
+    if (!url) {
+      try {
+        const db = getFirestore();
+        await db.collection("service_plans").doc(id).set({
+          network,
+          name,
+          priceUser,
+          priceApi,
+          active,
+          metadata: body.metadata || null,
+          createdAt: Date.now(),
+        });
+      } catch {}
+      return res.json({ id, network, name, priceUser, priceApi, active, metadata: body.metadata || null });
+    }
     await ensureTables();
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
@@ -527,7 +632,20 @@ export async function registerRoutes(
     if (body.metadata !== undefined) { fields.push(`metadata = $${idx++}`); values.push(body.metadata ? JSON.stringify(body.metadata) : null); }
     if (!id || !fields.length) return res.status(400).json({ message: "id and at least one field required" });
     const url = process.env.DATABASE_URL;
-    if (!url) return res.json({ id, ...body });
+    if (!url) {
+      try {
+        const db = getFirestore();
+        const patch: any = {};
+        if (body.network !== undefined) patch.network = String(body.network || "");
+        if (body.name !== undefined) patch.name = String(body.name || "");
+        if (body.priceUser !== undefined) patch.priceUser = Number(body.priceUser || 0);
+        if (body.priceApi !== undefined) patch.priceApi = Number(body.priceApi || 0);
+        if (body.active !== undefined) patch.active = Boolean(body.active);
+        if (body.metadata !== undefined) patch.metadata = body.metadata ? body.metadata : null;
+        await db.collection("service_plans").doc(id).set(patch, { merge: true });
+      } catch {}
+      return res.json({ id, ...body });
+    }
     await ensureTables();
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
@@ -552,7 +670,13 @@ export async function registerRoutes(
     const id = String(req.params.id || "");
     if (!id) return res.status(400).json({ message: "id required" });
     const url = process.env.DATABASE_URL;
-    if (!url) return res.json({ success: true, id });
+    if (!url) {
+      try {
+        const db = getFirestore();
+        await db.collection("service_plans").doc(id).delete();
+      } catch {}
+      return res.json({ success: true, id });
+    }
     await ensureTables();
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
@@ -705,7 +829,19 @@ export async function registerRoutes(
 
   app.get("/api/admin/wallet/logs", adminAuth, async (_req: Request, res: Response) => {
     const url = process.env.DATABASE_URL;
-    if (!url) return res.json([]);
+    if (!url) {
+      try {
+        const db = getFirestore();
+        const snap = await db.collection("wallet_logs").orderBy("createdAt", "desc").limit(200).get();
+        const rows = snap.docs.map(d => {
+          const x: any = d.data() || {};
+          return { id: d.id, user: x.user || x.user_email || "", type: x.type || "", amount: Number(x.amount || 0), description: x.description || "", createdAt: x.createdAt || Date.now() };
+        });
+        return res.json(rows);
+      } catch {
+        return res.json([]);
+      }
+    }
     await ensureTables();
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
@@ -720,7 +856,19 @@ export async function registerRoutes(
 
   app.get("/api/admin/wallet/deposits", adminAuth, async (_req: Request, res: Response) => {
     const url = process.env.DATABASE_URL;
-    if (!url) return res.json([]);
+    if (!url) {
+      try {
+        const db = getFirestore();
+        const snap = await db.collection("wallet_deposits").orderBy("createdAt", "desc").limit(200).get();
+        const rows = snap.docs.map(d => {
+          const x: any = d.data() || {};
+          return { id: d.id, user: x.user || x.user_email || "", amount: Number(x.amount || 0), method: x.method || "", status: x.status || "", createdAt: x.createdAt || Date.now() };
+        });
+        return res.json(rows);
+      } catch {
+        return res.json([]);
+      }
+    }
     await ensureTables();
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
@@ -766,7 +914,19 @@ export async function registerRoutes(
   });
   app.get("/api/admin/admins", adminAuth, async (_req: Request, res: Response) => {
     const url = process.env.DATABASE_URL;
-    if (!url) return res.json([]);
+    if (!url) {
+      try {
+        const db = getFirestore();
+        const snap = await db.collection("admin_accounts").orderBy("createdAt", "desc").get();
+        const rows = snap.docs.map(d => {
+          const x: any = d.data() || {};
+          return { email: x.email || d.id, uid: x.uid || "", createdAt: x.createdAt || Date.now() };
+        });
+        return res.json(rows);
+      } catch {
+        return res.json([]);
+      }
+    }
     await ensureTables();
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
@@ -793,6 +953,11 @@ export async function registerRoutes(
         } finally {
           await pool.end();
         }
+      } else {
+        try {
+          const db = getFirestore();
+          await db.collection("admin_accounts").doc(email.toLowerCase()).set({ email: email.toLowerCase(), uid: user.uid, createdAt: Date.now() }, { merge: true });
+        } catch {}
       }
       res.json({ success: true, uid: user.uid, email: user.email });
     } catch (e: any) {

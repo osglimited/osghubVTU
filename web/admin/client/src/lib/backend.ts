@@ -37,7 +37,7 @@ async function request<T>(method: string, path: string, data?: unknown): Promise
       ...(currentEmail ? { "X-Admin-Email": currentEmail } : {}),
     },
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    credentials: "omit",
   });
   const text = await res.text();
   if (!res.ok) {
