@@ -73,3 +73,24 @@ export async function promoteAdmin(input: { uid?: string; email?: string }): Pro
 export async function creditWallet(payload: { userId: string; amount: number; walletType?: "main" | "cashback" | "referral"; description?: string }): Promise<{ success: boolean; userId: string; newBalance: number; walletType: string }> {
   return await request<{ success: boolean; userId: string; newBalance: number; walletType: string }>("POST", "/api/admin/wallet/credit", payload);
 }
+
+export async function debitWallet(payload: { userId: string; amount: number; walletType?: "main" | "cashback" | "referral"; description?: string }): Promise<{ success: boolean; userId: string; newBalance: number; walletType: string }> {
+  return await request<{ success: boolean; userId: string; newBalance: number; walletType: string }>("POST", "/api/admin/wallet/debit", payload);
+}
+
+export async function suspendUser(input: { uid?: string; email?: string; suspend: boolean }): Promise<{ success: boolean; uid: string; email: string; disabled: boolean }> {
+  return await request<{ success: boolean; uid: string; email: string; disabled: boolean }>("POST", "/api/admin/users/suspend", input);
+}
+
+export async function deleteUser(input: { uid?: string; email?: string }): Promise<{ success: boolean; uid?: string; email?: string }> {
+  return await request<{ success: boolean; uid?: string; email?: string }>("POST", "/api/admin/users/delete", input);
+}
+
+export async function updateUserPassword(input: { uid?: string; email?: string; password: string }): Promise<{ success: boolean; uid: string; email: string }> {
+  return await request<{ success: boolean; uid: string; email: string }>("POST", "/api/admin/users/password", input);
+}
+
+export async function getUserTransactions(input: { uid?: string; email?: string }): Promise<any[]> {
+  const qs = new URLSearchParams({ uid: String(input.uid || ""), email: String(input.email || "") }).toString();
+  return await request<any[]>("GET", `/api/admin/users/transactions?${qs}`);
+}

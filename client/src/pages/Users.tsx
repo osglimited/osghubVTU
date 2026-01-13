@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Search, UserPlus, Filter } from "lucide-react";
-import { listUsers, promoteAdmin } from "@/lib/backend";
+import { listUsers, promoteAdmin, suspendUser, deleteUser, updateUserPassword, debitWallet } from "@/lib/backend";
 import { useToast } from "@/hooks/use-toast";
 
 export default function UsersPage() {
@@ -144,6 +144,61 @@ export default function UsersPage() {
                           }}
                         >
                           Make Admin
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            try {
+                              const res = await suspendUser({ uid: user.uid || user.id, email: user.email, suspend: !(user.status === 'inactive') });
+                              toast({ title: res.disabled ? 'User Suspended' : 'User Reinstated', description: res.email || user.email });
+                            } catch (e: any) {
+                              toast({ title: 'Suspend Failed', description: e.message || 'Unable to suspend', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          {user.status === 'inactive' ? 'Reinstate User' : 'Suspend User'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            const pwd = prompt('Enter new password for user');
+                            if (!pwd) return;
+                            try {
+                              const res = await updateUserPassword({ uid: user.uid || user.id, email: user.email, password: pwd });
+                              toast({ title: 'Password Updated', description: res.email || user.email });
+                            } catch (e: any) {
+                              toast({ title: 'Update Failed', description: e.message || 'Unable to update', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          Change Password
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            const amtStr = prompt('Enter amount to debit (₦)');
+                            const amt = Number(amtStr || '0');
+                            if (!amt || amt <= 0) return;
+                            try {
+                              const res = await debitWallet({ userId: user.email || user.uid || user.id, amount: amt, walletType: "main", description: "Admin debit" });
+                              toast({ title: 'Wallet Debited', description: `New balance: ₦${Number(res.newBalance || 0).toLocaleString()}` });
+                            } catch (e: any) {
+                              toast({ title: 'Debit Failed', description: e.message || 'Unable to debit', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          Debit Wallet
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            const confirmDelete = confirm(`Delete user ${user.email}? This cannot be undone.`);
+                            if (!confirmDelete) return;
+                            try {
+                              const res = await deleteUser({ uid: user.uid || user.id, email: user.email });
+                              toast({ title: 'User Deleted', description: res.email || user.email });
+                            } catch (e: any) {
+                              toast({ title: 'Delete Failed', description: e.message || 'Unable to delete', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          Remove User
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

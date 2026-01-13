@@ -56,7 +56,20 @@ export async function registerRoutes(
           amount NUMERIC,
           status TEXT,
           type TEXT,
+          provider_status TEXT,
+          provider_error_code TEXT,
+          provider_error_message TEXT,
+          provider_raw JSONB,
           created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_wallets (
+          user_email TEXT PRIMARY KEY,
+          main_balance NUMERIC DEFAULT 0,
+          cashback_balance NUMERIC DEFAULT 0,
+          referral_balance NUMERIC DEFAULT 0,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
         );
       `);
     } finally {
@@ -141,7 +154,7 @@ export async function registerRoutes(
     await ensureTables();
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
-      const r = await pool.query(`SELECT id, user_email as "user", amount, status, type, created_at as "createdAt" FROM admin_transactions ORDER BY created_at DESC LIMIT 200`);
+      const r = await pool.query(`SELECT id, user_email as "user", amount, status, type, provider_status as "providerStatus", provider_error_code as "providerErrorCode", provider_error_message as "providerErrorMessage", provider_raw as "providerRaw", created_at as "createdAt" FROM admin_transactions ORDER BY created_at DESC LIMIT 200`);
       res.json(r.rows);
     } finally {
       await pool.end();
@@ -151,15 +164,34 @@ export async function registerRoutes(
   app.get("/api/admin/users", adminAuth, async (req: Request, res: Response) => {
     const limit = Math.max(1, Math.min(1000, Number((req.query.limit as string) || "100")));
     const list = await getAuth().listUsers(limit);
-    const users = list.users.map(u => ({
+    const url = process.env.DATABASE_URL;
+    let balances: Record<string, any> = {};
+    if (url) {
+      await ensureTables();
+      const pool = new Pool({ connectionString: url, max: 1 });
+      try {
+        const r = await pool.query(`SELECT user_email, main_balance, cashback_balance, referral_balance FROM user_wallets`);
+        for (const row of r.rows) {
+          balances[String(row.user_email).toLowerCase()] = row;
+        }
+      } finally {
+        await pool.end();
+      }
+    }
+    const users = list.users.map(u => {
+      const email = (u.email || "").toLowerCase();
+      const bal = balances[email];
+      return {
       id: u.uid,
       displayName: u.displayName || "",
       email: u.email || "",
       phone: u.phoneNumber || "",
       joinedAt: u.metadata.creationTime,
-      walletBalance: 0,
+      walletBalance: bal ? Number(bal.main_balance || 0) : 0,
+      cashbackBalance: bal ? Number(bal.cashback_balance || 0) : 0,
+      referralBalance: bal ? Number(bal.referral_balance || 0) : 0,
       status: u.disabled ? "inactive" : "active",
-    }));
+    }});
     res.json(users);
   });
 
@@ -204,12 +236,125 @@ export async function registerRoutes(
           `INSERT INTO admin_transactions (id, user_email, amount, status, type) VALUES ($1, $2, $3, $4, $5)`,
           [id, userId, amount, "success", "credit"]
         );
+        await pool.query(
+          `INSERT INTO user_wallets (user_email, main_balance) VALUES ($1, $2)
+           ON CONFLICT (user_email) DO UPDATE SET main_balance = user_wallets.main_balance + EXCLUDED.main_balance, updated_at = NOW()`,
+          [userId, amount]
+        );
       } finally {
         await pool.end();
       }
     };
     doInsert().catch(() => {});
     res.json({ success: true, userId, newBalance, walletType });
+  });
+
+  app.post("/api/admin/wallet/debit", adminAuth, (req: Request, res: Response) => {
+    const userId = String((req.body?.userId as string) || "");
+    const amount = Number((req.body?.amount as number) || 0);
+    const walletType = String((req.body?.walletType as string) || "main");
+    const url = process.env.DATABASE_URL;
+    const doInsert = async () => {
+      if (!url) return;
+      await ensureTables();
+      const pool = new Pool({ connectionString: url, max: 1 });
+      try {
+        const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        await pool.query(
+          `INSERT INTO admin_transactions (id, user_email, amount, status, type) VALUES ($1, $2, $3, $4, $5)`,
+          [id, userId, amount, "success", "debit"]
+        );
+        await pool.query(
+          `INSERT INTO user_wallets (user_email, main_balance) VALUES ($1, $2)
+           ON CONFLICT (user_email) DO UPDATE SET main_balance = user_wallets.main_balance - EXCLUDED.main_balance, updated_at = NOW()`,
+          [userId, amount]
+        );
+      } finally {
+        await pool.end();
+      }
+    };
+    doInsert().catch(() => {});
+    res.json({ success: true, userId, newBalance: 0, walletType });
+  });
+
+  app.post("/api/admin/users/suspend", adminAuth, async (req: Request, res: Response) => {
+    const uid = String((req.body?.uid as string) || "");
+    const email = String((req.body?.email as string) || "");
+    const suspend = Boolean(req.body?.suspend);
+    const auth = getAuth();
+    try {
+      let targetUid = uid;
+      if (!targetUid && email) {
+        const u = await auth.getUserByEmail(email);
+        targetUid = u.uid;
+      }
+      if (!targetUid) return res.status(400).json({ success: false, message: "uid or email required" });
+      await auth.updateUser(targetUid, { disabled: suspend });
+      const user = await auth.getUser(targetUid);
+      res.json({ success: true, uid: targetUid, email: String(user.email || ""), disabled: Boolean(user.disabled) });
+    } catch (e: any) {
+      res.status(400).json({ success: false, message: String(e?.message || "error") });
+    }
+  });
+
+  app.post("/api/admin/users/delete", adminAuth, async (req: Request, res: Response) => {
+    const uid = String((req.body?.uid as string) || "");
+    const email = String((req.body?.email as string) || "");
+    const auth = getAuth();
+    try {
+      let targetUid = uid;
+      if (!targetUid && email) {
+        const u = await auth.getUserByEmail(email);
+        targetUid = u.uid;
+      }
+      if (!targetUid) return res.status(400).json({ success: false, message: "uid or email required" });
+      await auth.deleteUser(targetUid);
+      res.json({ success: true, uid: targetUid, email });
+    } catch (e: any) {
+      res.status(400).json({ success: false, message: String(e?.message || "error") });
+    }
+  });
+
+  app.post("/api/admin/users/password", adminAuth, async (req: Request, res: Response) => {
+    const uid = String((req.body?.uid as string) || "");
+    const email = String((req.body?.email as string) || "");
+    const password = String((req.body?.password as string) || "");
+    const auth = getAuth();
+    try {
+      let targetUid = uid;
+      if (!targetUid && email) {
+        const u = await auth.getUserByEmail(email);
+        targetUid = u.uid;
+      }
+      if (!targetUid || !password) return res.status(400).json({ success: false, message: "uid/email and password required" });
+      await auth.updateUser(targetUid, { password });
+      const user = await auth.getUser(targetUid);
+      res.json({ success: true, uid: targetUid, email: String(user.email || "") });
+    } catch (e: any) {
+      res.status(400).json({ success: false, message: String(e?.message || "error") });
+    }
+  });
+
+  app.get("/api/admin/users/transactions", adminAuth, async (req: Request, res: Response) => {
+    const uid = String((req.query?.uid as string) || "");
+    const email = String((req.query?.email as string) || "");
+    const targetEmail = email.toLowerCase();
+    const url = process.env.DATABASE_URL;
+    if (!url) return res.json([]);
+    await ensureTables();
+    const pool = new Pool({ connectionString: url, max: 1 });
+    try {
+      const r = await pool.query(
+        `SELECT id, user_email as "user", amount, status, type, provider_status as "providerStatus", provider_error_code as "providerErrorCode", provider_error_message as "providerErrorMessage", provider_raw as "providerRaw", created_at as "createdAt" 
+         FROM admin_transactions 
+         WHERE user_email = $1 
+         ORDER BY created_at DESC LIMIT 200`,
+        [targetEmail]
+      );
+      res.json(r.rows);
+    } finally {
+      await pool.end();
+    }
   });
 
   app.get("/api/ping", (_req: Request, res: Response) => {

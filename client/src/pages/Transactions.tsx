@@ -117,6 +117,8 @@ export default function TransactionsPage() {
                 <TableHead>Amount</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Provider Status</TableHead>
+                <TableHead>Provider Error</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -140,6 +142,15 @@ export default function TransactionsPage() {
                            className={t.status === 'success' ? 'bg-emerald-500' : t.status === 'pending' ? 'bg-amber-500' : ''}>
                       {t.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={t.providerStatus === 'success' ? 'default' : t.providerStatus === 'processing' ? 'secondary' : 'destructive'} 
+                           className={t.providerStatus === 'success' ? 'bg-emerald-500' : t.providerStatus === 'processing' ? 'bg-amber-500' : ''}>
+                      {t.providerStatus || '-'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs font-mono text-red-600 max-w-[200px] truncate" title={t.providerErrorMessage || ''}>
+                    {t.providerErrorMessage || '-'}
                   </TableCell>
                   <TableCell className="text-right">
                     {t.status === 'failed' && (
