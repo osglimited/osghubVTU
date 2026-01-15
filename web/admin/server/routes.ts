@@ -118,40 +118,74 @@ export async function registerRoutes(
 
   app.get("/api/admin/users", adminAuth, async (req: Request, res: Response) => {
     const limit = Math.max(1, Math.min(1000, Number((req.query.limit as string) || "100")));
-    let list: any = { users: [] as any[] };
+    const db = getFirestore();
+    let baseUsers: Array<{
+      id: string;
+      uid: string;
+      displayName: string;
+      email: string;
+      phone: string;
+      joinedAt: any;
+      status: string;
+    }> = [];
     try {
-      list = await getAuth().listUsers(limit);
-    } catch {
-      list = { users: [] };
-    }
-    let balances: Record<string, any> = {};
-    try {
-      const db = getFirestore();
-      const snap = await db.collection("user_wallets").limit(1000).get();
-      for (const d of snap.docs) {
-        const x: any = d.data() || {};
-        const email = String(d.id || x.user_email || "").toLowerCase();
-        balances[email] = {
-          user_email: email,
-          main_balance: Number(x.main_balance || x.balance || 0),
-          cashback_balance: Number(x.cashback_balance || 0),
-          referral_balance: Number(x.referral_balance || 0),
-        };
-      }
-    } catch {}
-    const users = list.users.map(u => {
-      const email = (u.email || "").toLowerCase();
-      const bal = balances[email];
-      return {
+      const list = await getAuth().listUsers(limit);
+      baseUsers = list.users.map((u) => ({
         id: u.uid,
+        uid: u.uid,
         displayName: u.displayName || "",
         email: u.email || "",
         phone: u.phoneNumber || "",
-        joinedAt: u.metadata.creationTime,
+        joinedAt: u.metadata?.creationTime || "",
+        status: u.disabled ? "inactive" : "active",
+      }));
+    } catch {
+      try {
+        const snap = await db.collection("users").orderBy("createdAt", "desc").limit(limit).get();
+        baseUsers = snap.docs.map((d) => {
+          const x: any = d.data() || {};
+          return {
+            id: d.id,
+            uid: d.id,
+            displayName: x.displayName || x.name || "",
+            email: x.email || "",
+            phone: x.phone || x.phoneNumber || "",
+            joinedAt: x.createdAt || "",
+            status: x.disabled ? "inactive" : "active",
+          };
+        });
+      } catch {
+        baseUsers = [];
+      }
+    }
+    const balances: Record<string, { main_balance: number; cashback_balance: number; referral_balance: number }> = {};
+    try {
+      const names = ["wallets", "user_wallets"];
+      for (const n of names) {
+        const snap = await db.collection(n).limit(1000).get();
+        for (const d of snap.docs) {
+          const x: any = d.data() || {};
+          const email = String(d.id || x.user_email || x.userEmail || "").toLowerCase();
+          const mb = Number(x.mainBalance || x.main_balance || x.balance || 0);
+          const cb = Number(x.cashbackBalance || x.cashback_balance || 0);
+          const rb = Number(x.referralBalance || x.referral_balance || 0);
+          balances[email] = { main_balance: mb, cashback_balance: cb, referral_balance: rb };
+        }
+      }
+    } catch {}
+    const users = baseUsers.map((u) => {
+      const emailKey = String(u.email || "").toLowerCase();
+      const bal = balances[emailKey];
+      return {
+        id: u.id,
+        displayName: u.displayName,
+        email: u.email,
+        phone: u.phone,
+        joinedAt: u.joinedAt,
         walletBalance: bal ? Number(bal.main_balance || 0) : 0,
         cashbackBalance: bal ? Number(bal.cashback_balance || 0) : 0,
         referralBalance: bal ? Number(bal.referral_balance || 0) : 0,
-        status: u.disabled ? "inactive" : "active",
+        status: u.status,
       };
     });
     res.json(users);
@@ -316,15 +350,15 @@ export async function registerRoutes(
     if (!email) return res.json([]);
     try {
       const db = getFirestore();
-      const names = ["admin_transactions", "transactions"];
+      const names = ["admin_transactions", "transactions", "wallet_transactions"];
       for (const n of names) {
         const snap = await db.collection(n).where("user_email", "==", email).orderBy("createdAt", "desc").limit(200).get();
         if (!snap.empty) {
-          const rows = snap.docs.map(d => {
+          const rows = snap.docs.map((d) => {
             const x: any = d.data() || {};
             return {
               id: d.id,
-              user: x.user || x.user_email || x.userEmail || "",
+              user: x.user || x.user_email || x.userEmail || x.userId || "",
               amount: Number(x.amount || 0),
               status: x.status || "success",
               type: x.type || "transaction",
@@ -444,8 +478,8 @@ export async function registerRoutes(
     }
     try {
       const db = getFirestore();
-      const txNames = ["admin_transactions", "transactions"];
-      const walletNames = ["user_wallets", "wallets"];
+      const txNames = ["transactions", "admin_transactions", "wallet_transactions"];
+      const walletNames = ["wallets", "user_wallets"];
       let txs: any[] = [];
       for (const n of txNames) {
         const snap = await db.collection(n).orderBy("createdAt", "desc").limit(500).get();
@@ -485,7 +519,7 @@ export async function registerRoutes(
         if (!snap.empty) {
           walletSum = snap.docs.reduce((sum, d) => {
             const x: any = d.data() || {};
-            const mb = Number(x.main_balance || x.balance || 0);
+            const mb = Number(x.mainBalance || x.main_balance || x.balance || 0);
             return sum + mb;
           }, 0);
           break;
@@ -514,12 +548,25 @@ export async function registerRoutes(
   app.get("/api/admin/wallet/logs", adminAuth, async (_req: Request, res: Response) => {
     try {
       const db = getFirestore();
-      const snap = await db.collection("wallet_logs").orderBy("createdAt", "desc").limit(200).get();
-      const rows = snap.docs.map(d => {
-        const x: any = d.data() || {};
-        return { id: d.id, user: x.user || x.user_email || "", type: x.type || "", amount: Number(x.amount || 0), description: x.description || "", createdAt: x.createdAt || Date.now() };
-      });
-      return res.json(rows);
+      const names = ["wallet_logs", "wallet_transactions"];
+      for (const n of names) {
+        const snap = await db.collection(n).orderBy("createdAt", "desc").limit(200).get();
+        if (!snap.empty) {
+          const rows = snap.docs.map((d) => {
+            const x: any = d.data() || {};
+            return {
+              id: d.id,
+              user: x.user || x.user_email || x.userId || "",
+              type: x.type || "",
+              amount: Number(x.amount || 0),
+              description: x.description || "",
+              createdAt: x.createdAt || Date.now(),
+            };
+          });
+          return res.json(rows);
+        }
+      }
+      return res.json([]);
     } catch {
       return res.json([]);
     }
@@ -529,9 +576,16 @@ export async function registerRoutes(
     try {
       const db = getFirestore();
       const snap = await db.collection("wallet_deposits").orderBy("createdAt", "desc").limit(200).get();
-      const rows = snap.docs.map(d => {
+      const rows = snap.docs.map((d) => {
         const x: any = d.data() || {};
-        return { id: d.id, user: x.user || x.user_email || "", amount: Number(x.amount || 0), method: x.method || "", status: x.status || "", createdAt: x.createdAt || Date.now() };
+        return {
+          id: d.id,
+          user: x.user || x.user_email || x.userId || "",
+          amount: Number(x.amount || 0),
+          method: x.method || "",
+          status: x.status || "",
+          createdAt: x.createdAt || Date.now(),
+        };
       });
       return res.json(rows);
     } catch {
