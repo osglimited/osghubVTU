@@ -8,23 +8,18 @@ import { auth } from '@/lib/firebase';
 const resolveBackendUrl = (): string => {
   const envUrl = process.env.NEXT_PUBLIC_VTU_BACKEND_URL;
   const envUrlLocal = process.env.NEXT_PUBLIC_VTU_BACKEND_URL_LOCAL;
-  const isNonLocal = (url?: string) => !!url && !/localhost|127\.0\.0\.1/i.test(url);
   if (typeof window !== 'undefined') {
     const host = window.location.hostname.toLowerCase();
-    if (host.includes('localhost')) {
-      return envUrlLocal || 'http://localhost:5000';
+    if (host.includes('localhost') || host.includes('127.0.0.1')) {
+      return envUrlLocal || envUrl || 'http://localhost:5000';
     }
-    if (host.includes('osghub.com')) {
-      return '';
-    }
-    if (host.includes('osghubvtu.onrender.com')) {
-      return 'https://osghubvtubackend.onrender.com';
-    }
-    if (isNonLocal(envUrl)) {
+    if (envUrl) {
       return envUrl as string;
     }
   }
-  return isNonLocal(envUrl) ? (envUrl as string) : 'https://osghubvtubackend.onrender.com';
+  if (envUrlLocal) return envUrlLocal as string;
+  if (envUrl) return envUrl as string;
+  return 'https://osghubvtubackend.onrender.com';
 };
 
 export interface ServiceDoc {

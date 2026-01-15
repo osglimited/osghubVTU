@@ -1,7 +1,13 @@
-export async function POST(req: Request) {
+function resolveBackend() {
   const envUrl = process.env.NEXT_PUBLIC_VTU_BACKEND_URL;
-  const useEnv = !!envUrl && !/localhost|127\.0\.0\.1/i.test(envUrl);
-  const backend = useEnv ? (envUrl as string) : 'https://osghubvtubackend.onrender.com';
+  const envUrlLocal = process.env.NEXT_PUBLIC_VTU_BACKEND_URL_LOCAL;
+  if (envUrlLocal) return envUrlLocal as string;
+  if (envUrl) return envUrl as string;
+  return 'https://osghubvtubackend.onrender.com';
+}
+
+export async function POST(req: Request) {
+  const backend = resolveBackend();
   const headers = new Headers();
   headers.set('Content-Type', 'application/json');
   const auth = req.headers.get('authorization');
