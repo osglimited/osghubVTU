@@ -201,7 +201,7 @@ export default function DataPage() {
                     className="btn-accent w-full" 
                     disabled={!service.enabled || processing}
                 >
-                  {processing ? 'Processing...' : service.enabled ? `Buy ${selectedPlan.name.split('(')[0]}` : 'Coming soon'}
+                  {processing ? 'Processing...' : service.enabled ? `Buy ${selectedPlan?.name?.split('(')[0] || 'Data Plan'}` : 'Coming soon'}
                 </button>
               </form>
             </>
