@@ -233,10 +233,30 @@ export async function registerRoutes(
           type: "credit",
           createdAt: Date.now(),
         });
+        const keyA = walletType === "cashback" ? "cashback_balance" : walletType === "referral" ? "referral_balance" : "main_balance";
+        const keyB = walletType === "cashback" ? "cashbackBalance" : walletType === "referral" ? "referralBalance" : "mainBalance";
         const uw = db.collection("user_wallets").doc(userId.toLowerCase());
         const snap = await uw.get();
-        const start = snap.exists ? Number((snap.data() as any).main_balance || 0) : 0;
-        await uw.set({ main_balance: start + amount, updated_at: Date.now() }, { merge: true });
+        const dataUW: any = snap.exists ? (snap.data() as any) : {};
+        const startUW = walletType === "cashback"
+          ? Number(dataUW.cashback_balance || dataUW.cashbackBalance || 0)
+          : walletType === "referral"
+          ? Number(dataUW.referral_balance || dataUW.referralBalance || 0)
+          : Number(dataUW.main_balance || dataUW.mainBalance || dataUW.balance || 0);
+        const updatedUW: any = { [keyA]: startUW + amount, [keyB]: startUW + amount, updated_at: Date.now() };
+        if (walletType === "main") updatedUW.balance = startUW + amount;
+        await uw.set(updatedUW, { merge: true });
+        const w = db.collection("wallets").doc(userId.toLowerCase());
+        const wsnap = await w.get();
+        const dataW: any = wsnap.exists ? (wsnap.data() as any) : {};
+        const startW = walletType === "cashback"
+          ? Number(dataW.cashback_balance || dataW.cashbackBalance || 0)
+          : walletType === "referral"
+          ? Number(dataW.referral_balance || dataW.referralBalance || 0)
+          : Number(dataW.main_balance || dataW.mainBalance || dataW.balance || 0);
+        const updatedW: any = { [keyA]: startW + amount, [keyB]: startW + amount, updated_at: Date.now() };
+        if (walletType === "main") updatedW.balance = startW + amount;
+        await w.set(updatedW, { merge: true });
         const logId = `wl_${Date.now()}_${Math.random().toString(36).slice(2)}`;
         await db.collection("wallet_logs").doc(logId).set({
           id: logId,
@@ -268,10 +288,30 @@ export async function registerRoutes(
           type: "debit",
           createdAt: Date.now(),
         });
+        const keyA = walletType === "cashback" ? "cashback_balance" : walletType === "referral" ? "referral_balance" : "main_balance";
+        const keyB = walletType === "cashback" ? "cashbackBalance" : walletType === "referral" ? "referralBalance" : "mainBalance";
         const uw = db.collection("user_wallets").doc(userId.toLowerCase());
         const snap = await uw.get();
-        const start = snap.exists ? Number((snap.data() as any).main_balance || 0) : 0;
-        await uw.set({ main_balance: start - amount, updated_at: Date.now() }, { merge: true });
+        const dataUW: any = snap.exists ? (snap.data() as any) : {};
+        const startUW = walletType === "cashback"
+          ? Number(dataUW.cashback_balance || dataUW.cashbackBalance || 0)
+          : walletType === "referral"
+          ? Number(dataUW.referral_balance || dataUW.referralBalance || 0)
+          : Number(dataUW.main_balance || dataUW.mainBalance || dataUW.balance || 0);
+        const updatedUW: any = { [keyA]: startUW - amount, [keyB]: startUW - amount, updated_at: Date.now() };
+        if (walletType === "main") updatedUW.balance = startUW - amount;
+        await uw.set(updatedUW, { merge: true });
+        const w = db.collection("wallets").doc(userId.toLowerCase());
+        const wsnap = await w.get();
+        const dataW: any = wsnap.exists ? (wsnap.data() as any) : {};
+        const startW = walletType === "cashback"
+          ? Number(dataW.cashback_balance || dataW.cashbackBalance || 0)
+          : walletType === "referral"
+          ? Number(dataW.referral_balance || dataW.referralBalance || 0)
+          : Number(dataW.main_balance || dataW.mainBalance || dataW.balance || 0);
+        const updatedW: any = { [keyA]: startW - amount, [keyB]: startW - amount, updated_at: Date.now() };
+        if (walletType === "main") updatedW.balance = startW - amount;
+        await w.set(updatedW, { merge: true });
         const logId = `wl_${Date.now()}_${Math.random().toString(36).slice(2)}`;
         await db.collection("wallet_logs").doc(logId).set({
           id: logId,

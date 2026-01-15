@@ -20,29 +20,25 @@ const origins = originsEnv ? originsEnv.split(',').map(s => s.trim()).filter(Boo
   'http://localhost:5000',
   'http://localhost:5001'
 ];
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests without origin (e.g., mobile apps, curl) and from known origins
     const isAllowed = !origin || origins.includes(origin);
-    
     if (!isAllowed) {
       console.log(`[CORS] Blocked origin: ${origin}`);
       console.log(`[CORS] Allowed origins: ${origins.join(', ')}`);
     }
-
-    if (isAllowed) {
-      return callback(null, true);
-    }
-    return callback(new Error('Not allowed by CORS'));
+    return isAllowed ? callback(null, true) : callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Email'],
+  // Do not pin allowed headers; let cors echo Access-Control-Request-Headers
   exposedHeaders: ['Content-Length', 'Content-Type'],
-  maxAge: 86400
-}));
-// Ensure preflight requests are handled early
-app.options('*', cors());
+  maxAge: 86400,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+// Ensure preflight requests are handled early with the same options
+app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(morgan('dev'));
 
