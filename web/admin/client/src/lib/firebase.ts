@@ -39,3 +39,21 @@ export const signInAdmin = async (email: string, password: string) => {
 export const signOut = async () => {
   await firebaseSignOut(auth);
 };
+
+export const mockStats = {
+  totalUsers: 0,
+  walletBalance: 0,
+  totalTransactions: 0,
+  todaySales: 0,
+  dailyTotals: [
+    { day: "Mon", total: 0 },
+    { day: "Tue", total: 0 },
+    { day: "Wed", total: 0 },
+    { day: "Thu", total: 0 },
+    { day: "Fri", total: 0 },
+    { day: "Sat", total: 0 },
+    { day: "Sun", total: 0 },
+  ],
+};
+
+export const mockTransactions = [];
