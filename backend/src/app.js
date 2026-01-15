@@ -11,7 +11,7 @@ const app = express();
 // Middleware
 app.use(helmet());
 const originsEnv = process.env.CORS_ALLOWED_ORIGINS;
-const origins = originsEnv ? originsEnv.split(',').map(s => s.trim()).filter(Boolean) : [
+const defaultOrigins = [
   'https://osghub.com',
   'https://www.osghub.com',
   'https://osghubvtu.onrender.com',
@@ -20,9 +20,20 @@ const origins = originsEnv ? originsEnv.split(',').map(s => s.trim()).filter(Boo
   'http://localhost:5000',
   'http://localhost:5001'
 ];
+const envOrigins = originsEnv ? originsEnv.split(',').map(s => s.trim()).filter(Boolean) : [];
+const origins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 const corsOptions = {
   origin: (origin, callback) => {
-    const isAllowed = !origin || origins.includes(origin);
+    let isAllowed = !origin || origins.includes(origin);
+    if (!isAllowed && origin) {
+      try {
+        const host = new URL(origin).hostname.toLowerCase();
+        // Allow any subdomain of osghub.com
+        if (host === 'osghub.com' || host.endsWith('.osghub.com')) {
+          isAllowed = true;
+        }
+      } catch {}
+    }
     if (!isAllowed) {
       console.log(`[CORS] Blocked origin: ${origin}`);
       console.log(`[CORS] Allowed origins: ${origins.join(', ')}`);
