@@ -12,37 +12,39 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 
-const defaultChartData = [
-  { name: "Mon", total: 0 },
-  { name: "Tue", total: 0 },
-  { name: "Wed", total: 0 },
-  { name: "Thu", total: 0 },
-  { name: "Fri", total: 0 },
-  { name: "Sat", total: 0 },
-  { name: "Sun", total: 0 },
-];
+const defaultChartData: Array<{ name: string; total: number }> = [];
 
 export default function Dashboard() {
-  const { data: stats } = useQuery({
+  const { data: stats, isLoading, isError } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => await getAdminStats(),
     refetchInterval: 5000,
     staleTime: 4000,
-    initialData: { totalUsers: 0, walletBalance: 0, totalTransactions: 0, todaySales: 0, recentTransactions: [], dailyTotals: [] },
   });
   const chartData = useMemo(() => {
-    const days = stats.dailyTotals || [];
-    if (!days.length) return defaultChartData;
+    const days = (stats && stats.dailyTotals) || [];
     return days.map(d => ({ name: d.day, total: d.total }));
   }, [stats]);
 
-  const recent = (stats.recentTransactions || []).slice(0, 5);
+  const recent = ((stats && stats.recentTransactions) || []).slice(0, 5);
   return (
     <div className="space-y-8">
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-foreground">Dashboard Overview</h2>
         <p className="text-muted-foreground">Welcome back, here's what's happening today.</p>
       </div>
+
+      {isLoading && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="h-28 rounded-md bg-muted animate-pulse" />
+          <div className="h-28 rounded-md bg-muted animate-pulse" />
+          <div className="h-28 rounded-md bg-muted animate-pulse" />
+          <div className="h-28 rounded-md bg-muted animate-pulse" />
+        </div>
+      )}
+      {isError && (
+        <div className="text-sm text-destructive">Failed to load stats</div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
@@ -51,7 +53,7 @@ export default function Dashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{Number((stats && stats.totalUsers) || 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <span className="text-emerald-500 flex items-center mr-1">
                 <ArrowUpRight className="h-3 w-3 mr-0.5" /> +12%
@@ -67,7 +69,7 @@ export default function Dashboard() {
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₦{stats.walletBalance.toLocaleString()}</div>
+            <div className="text-2xl font-bold">₦{Number((stats && stats.walletBalance) || 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <span className="text-emerald-500 flex items-center mr-1">
                 <ArrowUpRight className="h-3 w-3 mr-0.5" /> +5.2%
@@ -83,7 +85,7 @@ export default function Dashboard() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalTransactions.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{Number((stats && stats.totalTransactions) || 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <span className="text-emerald-500 flex items-center mr-1">
                 <ArrowUpRight className="h-3 w-3 mr-0.5" /> +18%
@@ -99,7 +101,7 @@ export default function Dashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₦{stats.todaySales.toLocaleString()}</div>
+            <div className="text-2xl font-bold">₦{Number((stats && stats.todaySales) || 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <span className="text-emerald-500 flex items-center mr-1">
                 <ArrowUpRight className="h-3 w-3 mr-0.5" /> +8%
@@ -116,6 +118,9 @@ export default function Dashboard() {
             <CardTitle>Transaction Overview</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
+            {chartData.length === 0 ? (
+              <div className="p-6 text-sm text-muted-foreground">No transactions in the last 7 days</div>
+            ) : (
             <ResponsiveContainer width="100%" height={350}>
               <AreaChart data={chartData}>
                 <defs>
@@ -152,6 +157,7 @@ export default function Dashboard() {
                 />
               </AreaChart>
             </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
