@@ -8,7 +8,7 @@ function getBaseUrl(): string {
   const localUrl = strip(localUrlRaw);
   let origin = "";
   try { origin = window.location.origin; } catch {}
-p  const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
+ const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
   if (isLocal) return localUrl || "http://localhost:5000";
   return prodUrl || "https://osghubvtubackend.onrender.com";
 }
