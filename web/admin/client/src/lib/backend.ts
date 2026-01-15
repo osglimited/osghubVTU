@@ -8,9 +8,9 @@ function getBaseUrl(): string {
   const localUrl = strip(localUrlRaw);
   let origin = "";
   try { origin = window.location.origin; } catch {}
-  const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
-  if (isLocal) return localUrl || origin || "http://localhost:5000";
-  return prodUrl || origin || "";
+p  const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
+  if (isLocal) return localUrl || "http://localhost:5000";
+  return prodUrl || "https://osghubvtubackend.onrender.com";
 }
 
 async function getToken(): Promise<string> {

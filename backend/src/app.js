@@ -15,6 +15,7 @@ const origins = originsEnv ? originsEnv.split(',').map(s => s.trim()).filter(Boo
   'https://osghub.com',
   'https://www.osghub.com',
   'https://osghubvtu.onrender.com',
+  'https://osghubadminpanel.onrender.com',
   'http://localhost:3000',
   'http://localhost:5000',
   'http://localhost:5001'
@@ -36,7 +37,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Email'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
   maxAge: 86400
 }));
