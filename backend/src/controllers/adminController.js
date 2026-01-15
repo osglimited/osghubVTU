@@ -69,8 +69,58 @@ module.exports = {
 const listUsers = async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit || 100), 500);
-    const snap = await db.collection('users').orderBy('createdAt', 'desc').limit(limit).get();
-    const users = snap.docs.map((d) => ({ id: d.id, uid: d.id, ...(d.data() || {}) }));
+    let baseUsers = [];
+    try {
+      const authList = await auth.listUsers(limit);
+      baseUsers = authList.users.map(u => ({
+        id: u.uid,
+        uid: u.uid,
+        displayName: u.displayName || '',
+        email: u.email || '',
+        phone: u.phoneNumber || '',
+        joinedAt: u.metadata?.creationTime || '',
+        status: u.disabled ? 'inactive' : 'active',
+      }));
+    } catch {
+      const snap = await db.collection('users').orderBy('createdAt', 'desc').limit(limit).get();
+      baseUsers = snap.docs.map((d) => {
+        const x = d.data() || {};
+        return {
+          id: d.id,
+          uid: d.id,
+          displayName: x.displayName || x.name || '',
+          email: x.email || '',
+          phone: x.phone || x.phoneNumber || '',
+          joinedAt: x.createdAt || '',
+          status: x.disabled ? 'inactive' : 'active',
+        };
+      });
+    }
+    const balances = {};
+    try {
+      const names = ['wallets', 'user_wallets'];
+      for (const n of names) {
+        const snap = await db.collection(n).limit(1000).get();
+        for (const d of snap.docs) {
+          const x = d.data() || {};
+          const email = String(d.id || x.user_email || x.userEmail || '').toLowerCase();
+          const mb = Number(x.mainBalance || x.main_balance || x.balance || 0);
+          const cb = Number(x.cashbackBalance || x.cashback_balance || 0);
+          const rb = Number(x.referralBalance || x.referral_balance || 0);
+          balances[email] = { main_balance: mb, cashback_balance: cb, referral_balance: rb };
+        }
+      }
+    } catch {}
+    const users = baseUsers.map(u => {
+      const emailKey = String(u.email || '').toLowerCase();
+      const bal = balances[emailKey];
+      return {
+        ...u,
+        walletBalance: bal ? Number(bal.main_balance || 0) : 0,
+        cashbackBalance: bal ? Number(bal.cashback_balance || 0) : 0,
+        referralBalance: bal ? Number(bal.referral_balance || 0) : 0,
+      };
+    });
     res.json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
