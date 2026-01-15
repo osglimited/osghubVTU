@@ -6,8 +6,8 @@
   "scripts": {
     "dev:client": "vite dev --port 5000",
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
-    "build": "esbuild server/index.ts --bundle --platform=node --format=esm --outfile=dist/index.mjs && vite build",
-    "start": "cross-env NODE_ENV=production node dist/index.mjs",
+    "build": "vite build",
+    "start": "cross-env NODE_ENV=production tsx server/index.ts",
     "check": "tsc"
   },
   "dependencies": {
