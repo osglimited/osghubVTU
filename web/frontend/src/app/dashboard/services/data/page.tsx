@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Wifi } from 'lucide-react';
 import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +8,7 @@ import { purchaseData } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 import TransactionResultModal from '@/components/dashboard/TransactionResultModal';
 import { DATA_PLANS, DataPlan } from '@/data/dataPlans';
+import { getServicePlans, ServicePlan } from '@/lib/services';
 
 const NETWORKS = [
   { label: 'MTN', value: 'MTN', id: 1 },
@@ -25,6 +26,7 @@ export default function DataPage() {
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | undefined>(
     DATA_PLANS[NETWORKS[0].value]?.[0]
   );
+  const [dynamicPlans, setDynamicPlans] = useState<Record<string, DataPlan[]>>({});
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
   
@@ -40,6 +42,35 @@ export default function DataPage() {
     title: '',
     message: ''
   });
+
+  useEffect(() => {
+    let mounted = true;
+    const loadPlans = async () => {
+      const rows = await getServicePlans();
+      if (!mounted || rows.length === 0) return;
+      // Group by network and map to DataPlan shape
+      const byNet: Record<string, DataPlan[]> = {};
+      for (const r of rows) {
+        const netKey = (r.network || '').toUpperCase();
+        const varId = r.metadata?.variation_id ? String(r.metadata.variation_id) : '';
+        const netId = r.metadata?.networkId ? Number(r.metadata.networkId) : undefined;
+        if (!varId || !netId) continue; // require provider mapping
+        const dp: DataPlan = {
+          id: `${netKey}_${varId}`,
+          name: r.name || 'Plan',
+          price: Number(r.priceUser || 0),
+          networkId: netId,
+          variation_id: varId
+        };
+        byNet[netKey] = byNet[netKey] ? [...byNet[netKey], dp] : [dp];
+      }
+      setDynamicPlans(byNet);
+      const initial = byNet[NETWORKS[0].value] || DATA_PLANS[NETWORKS[0].value] || [];
+      setSelectedPlan(initial[0]);
+    };
+    loadPlans();
+    return () => { mounted = false; };
+  }, []);
 
   const handlePurchase = (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,7 +149,7 @@ export default function DataPage() {
                     onChange={(e) => {
                       const n = NETWORKS.find(nn => nn.value === e.target.value) || NETWORKS[0];
                       setNetwork(n);
-                      const plans = DATA_PLANS[n.value] || DATA_PLANS[NETWORKS[0].value];
+                      const plans = (dynamicPlans[n.value] || DATA_PLANS[n.value] || dynamicPlans[NETWORKS[0].value] || DATA_PLANS[NETWORKS[0].value] || []);
                       setSelectedPlan(plans[0]);
                     }}
                   >
@@ -152,7 +183,7 @@ export default function DataPage() {
                         setSelectedPlan(plan);
                     }}
                   >
-                    {(DATA_PLANS[network.value] || []).map(plan => (
+                    {((dynamicPlans[network.value] || DATA_PLANS[network.value] || [])).map(plan => (
                       <option key={plan.variation_id} value={plan.variation_id}>
                         {plan.name} - ₦{plan.price.toLocaleString()}
                       </option>

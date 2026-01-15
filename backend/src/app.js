@@ -7,6 +7,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const app = express();
+const { db } = require('./config/firebase');
 
 // Middleware
 app.use(helmet());
@@ -56,6 +57,29 @@ app.use(morgan('dev'));
 // Routes
 app.get('/', (req, res) => {
   res.status(200).json({ message: 'OSGHUB VTU Backend is running' });
+});
+// Public Plans endpoint for user frontend
+app.get('/api/plans', async (_req, res) => {
+  try {
+    if (!db) return res.json([]);
+    const snap = await db.collection('service_plans').orderBy('createdAt', 'desc').get();
+    const rows = snap.docs.map(d => {
+      const x = d.data() || {};
+      return {
+        id: d.id,
+        network: x.network || '',
+        name: x.name || '',
+        priceUser: Number(x.priceUser || x.price_user || 0),
+        priceApi: Number(x.priceApi || x.price_api || 0),
+        active: x.active !== false,
+        metadata: x.metadata || null,
+        createdAt: x.createdAt || new Date(),
+      };
+    }).filter(r => r.active);
+    res.json(rows);
+  } catch (e) {
+    res.json([]);
+  }
 });
 
 // Import Routes

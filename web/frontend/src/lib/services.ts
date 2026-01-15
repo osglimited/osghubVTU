@@ -93,6 +93,27 @@ export const getWalletHistory = async (): Promise<any[]> => {
   }
 };
 
+export interface ServicePlan {
+  id: string;
+  network: string;
+  name: string;
+  priceUser: number;
+  priceApi?: number;
+  metadata?: { variation_id?: string; networkId?: number };
+}
+
+export const getServicePlans = async (): Promise<ServicePlan[]> => {
+  const backendUrl = resolveBackendUrl();
+  try {
+    const res = await fetch(`${backendUrl}/api/plans`, { method: 'GET' });
+    if (!res.ok) throw new Error('Failed to fetch plans');
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+};
+
 export const purchaseAirtime = async (
   userId: string,
   amount: number,

@@ -230,6 +230,8 @@ function NewPlanForm({ onCreated }: { onCreated: (plan: any) => void }) {
   const [priceUser, setPriceUser] = useState("");
   const [priceApi, setPriceApi] = useState("");
   const [active, setActive] = useState(true);
+  const [variationId, setVariationId] = useState("");
+  const [networkId, setNetworkId] = useState("");
   const [saving, setSaving] = useState(false);
   return (
     <div className="space-y-4">
@@ -247,6 +249,16 @@ function NewPlanForm({ onCreated }: { onCreated: (plan: any) => void }) {
           <Input type="number" placeholder="0" value={priceApi} onChange={e => setPriceApi(e.target.value)} />
         </div>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>Provider Variation ID</Label>
+          <Input placeholder="e.g. 349" value={variationId} onChange={e => setVariationId(e.target.value)} />
+        </div>
+        <div>
+          <Label>Network ID</Label>
+          <Input type="number" placeholder="1=MTN,2=Glo,4=Airtel,3=9mobile" value={networkId} onChange={e => setNetworkId(e.target.value)} />
+        </div>
+      </div>
       <div className="flex items-center gap-2">
         <Switch checked={active} onCheckedChange={setActive} />
         <Label>Active</Label>
@@ -255,13 +267,13 @@ function NewPlanForm({ onCreated }: { onCreated: (plan: any) => void }) {
         <Button
           disabled={saving}
           onClick={async () => {
-            if (!network || !name || !priceUser || !priceApi) {
-              toast({ title: "Missing fields", description: "Provide all fields", variant: "destructive" });
+            if (!network || !name || !priceUser || !priceApi || !variationId || !networkId) {
+              toast({ title: "Missing fields", description: "Provide all fields including provider mapping", variant: "destructive" });
               return;
             }
             setSaving(true);
             try {
-              const plan = await createPlan({ network, name, priceUser: Number(priceUser), priceApi: Number(priceApi), active });
+              const plan = await createPlan({ network, name, priceUser: Number(priceUser), priceApi: Number(priceApi), active, metadata: { variation_id: variationId, networkId: Number(networkId) } });
               toast({ title: "Plan created", description: `${plan.network} ${plan.name}` });
               onCreated(plan);
             } catch (e: any) {
