@@ -347,29 +347,81 @@ export async function registerRoutes(
 
   app.get("/api/admin/users/transactions", adminAuth, async (req: Request, res: Response) => {
     const email = String((req.query?.email as string) || "").toLowerCase();
-    if (!email) return res.json([]);
+    const uid = String((req.query as any)?.uid || "").toLowerCase();
+    if (!email && !uid) return res.json([]);
     try {
       const db = getFirestore();
       const names = ["admin_transactions", "transactions", "wallet_transactions"];
       for (const n of names) {
-        const snap = await db.collection(n).where("user_email", "==", email).orderBy("createdAt", "desc").limit(200).get();
-        if (!snap.empty) {
-          const rows = snap.docs.map((d) => {
-            const x: any = d.data() || {};
-            return {
-              id: d.id,
-              user: x.user || x.user_email || x.userEmail || x.userId || "",
-              amount: Number(x.amount || 0),
-              status: x.status || "success",
-              type: x.type || "transaction",
-              providerStatus: x.providerStatus || x.provider_status || "",
-              providerErrorCode: x.providerErrorCode || x.provider_error_code || "",
-              providerErrorMessage: x.providerErrorMessage || x.provider_error_message || "",
-              providerRaw: x.providerRaw || x.provider_raw || null,
-              createdAt: x.createdAt || x.timestamp || Date.now(),
-            };
-          });
-          return res.json(rows);
+        let rows: any[] = [];
+        if (email) {
+          const snapEmail = await db.collection(n).where("user_email", "==", email).orderBy("createdAt", "desc").limit(200).get();
+          if (!snapEmail.empty) {
+            rows = rows.concat(
+              snapEmail.docs.map((d) => {
+                const x: any = d.data() || {};
+                return {
+                  id: d.id,
+                  user: x.user || x.user_email || x.userEmail || x.userId || "",
+                  amount: Number(x.amount || 0),
+                  status: x.status || "success",
+                  type: x.type || "transaction",
+                  providerStatus: x.providerStatus || x.provider_status || "",
+                  providerErrorCode: x.providerErrorCode || x.provider_error_code || "",
+                  providerErrorMessage: x.providerErrorMessage || x.provider_error_message || "",
+                  providerRaw: x.providerRaw || x.provider_raw || null,
+                  createdAt: x.createdAt || x.timestamp || Date.now(),
+                };
+              }),
+            );
+          }
+          const snapUser = await db.collection(n).where("user", "==", email).orderBy("createdAt", "desc").limit(200).get();
+          if (!snapUser.empty) {
+            rows = rows.concat(
+              snapUser.docs.map((d) => {
+                const x: any = d.data() || {};
+                return {
+                  id: d.id,
+                  user: x.user || x.user_email || x.userEmail || x.userId || "",
+                  amount: Number(x.amount || 0),
+                  status: x.status || "success",
+                  type: x.type || "transaction",
+                  providerStatus: x.providerStatus || x.provider_status || "",
+                  providerErrorCode: x.providerErrorCode || x.provider_error_code || "",
+                  providerErrorMessage: x.providerErrorMessage || x.provider_error_message || "",
+                  providerRaw: x.providerRaw || x.provider_raw || null,
+                  createdAt: x.createdAt || x.timestamp || Date.now(),
+                };
+              }),
+            );
+          }
+        }
+        if (uid) {
+          const snapUid = await db.collection(n).where("userId", "==", uid).orderBy("createdAt", "desc").limit(200).get();
+          if (!snapUid.empty) {
+            rows = rows.concat(
+              snapUid.docs.map((d) => {
+                const x: any = d.data() || {};
+                return {
+                  id: d.id,
+                  user: x.user || x.user_email || x.userEmail || x.userId || "",
+                  amount: Number(x.amount || 0),
+                  status: x.status || "success",
+                  type: x.type || "transaction",
+                  providerStatus: x.providerStatus || x.provider_status || "",
+                  providerErrorCode: x.providerErrorCode || x.provider_error_code || "",
+                  providerErrorMessage: x.providerErrorMessage || x.provider_error_message || "",
+                  providerRaw: x.providerRaw || x.provider_raw || null,
+                  createdAt: x.createdAt || x.timestamp || Date.now(),
+                };
+              }),
+            );
+          }
+        }
+        if (rows.length > 0) {
+          const map: Record<string, any> = {};
+          for (const r of rows) map[r.id] = r;
+          return res.json(Object.values(map));
         }
       }
       return res.json([]);
