@@ -216,7 +216,8 @@ const createUser = async (req, res) => {
       email,
       password,
       displayName: displayName || undefined,
-      phoneNumber: phoneNumber || undefined
+      phoneNumber: phoneNumber || undefined,
+      emailVerified: true
     });
     const profileRef = db.collection('users').doc(user.uid);
     await profileRef.set(
