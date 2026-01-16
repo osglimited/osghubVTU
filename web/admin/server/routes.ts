@@ -467,67 +467,67 @@ export async function registerRoutes(
       for (const n of names) {
         let rows: any[] = [];
         if (email) {
-          const snapEmail = await db.collection(n).where("user_email", "==", email).orderBy("createdAt", "desc").limit(200).get();
-          if (!snapEmail.empty) {
-            rows = rows.concat(
-              snapEmail.docs.map((d) => {
-                const x: any = d.data() || {};
-                return {
-                  id: d.id,
-                  user: x.user || x.user_email || x.userEmail || x.userId || "",
-                  amount: Number(x.amount || 0),
-                  status: x.status || "success",
-                  type: x.type || "transaction",
-                  providerStatus: x.providerStatus || x.provider_status || "",
-                  providerErrorCode: x.providerErrorCode || x.provider_error_code || "",
-                  providerErrorMessage: x.providerErrorMessage || x.provider_error_message || "",
-                  providerRaw: x.providerRaw || x.provider_raw || null,
-                  createdAt: x.createdAt || x.timestamp || Date.now(),
-                };
-              }),
-            );
-          }
-          const snapUser = await db.collection(n).where("user", "==", email).orderBy("createdAt", "desc").limit(200).get();
-          if (!snapUser.empty) {
-            rows = rows.concat(
-              snapUser.docs.map((d) => {
-                const x: any = d.data() || {};
-                return {
-                  id: d.id,
-                  user: x.user || x.user_email || x.userEmail || x.userId || "",
-                  amount: Number(x.amount || 0),
-                  status: x.status || "success",
-                  type: x.type || "transaction",
-                  providerStatus: x.providerStatus || x.provider_status || "",
-                  providerErrorCode: x.providerErrorCode || x.provider_error_code || "",
-                  providerErrorMessage: x.providerErrorMessage || x.provider_error_message || "",
-                  providerRaw: x.providerRaw || x.provider_raw || null,
-                  createdAt: x.createdAt || x.timestamp || Date.now(),
-                };
-              }),
-            );
+          const queries = [
+            db.collection(n).where("user_email", "==", email).orderBy("createdAt", "desc").limit(200).get(),
+            db.collection(n).where("user", "==", email).orderBy("createdAt", "desc").limit(200).get(),
+            db.collection(n).where("userEmail", "==", email).orderBy("createdAt", "desc").limit(200).get(),
+            db.collection(n).where("email", "==", email).orderBy("createdAt", "desc").limit(200).get(),
+          ];
+          const snaps = await Promise.allSettled(queries);
+          for (const s of snaps) {
+            if (s.status === "fulfilled") {
+              const snap = s.value;
+              if (!snap.empty) {
+                rows = rows.concat(
+                  snap.docs.map((d) => {
+                    const x: any = d.data() || {};
+                    return {
+                      id: d.id,
+                      user: x.user || x.user_email || x.userEmail || x.email || x.userId || "",
+                      amount: Number(x.amount || 0),
+                      status: x.status || "success",
+                      type: x.type || "transaction",
+                      providerStatus: x.providerStatus || x.provider_status || "",
+                      providerErrorCode: x.providerErrorCode || x.provider_error_code || "",
+                      providerErrorMessage: x.providerErrorMessage || x.provider_error_message || "",
+                      providerRaw: x.providerRaw || x.provider_raw || null,
+                      createdAt: x.createdAt || x.timestamp || Date.now(),
+                    };
+                  }),
+                );
+              }
+            }
           }
         }
         if (uid) {
-          const snapUid = await db.collection(n).where("userId", "==", uid).orderBy("createdAt", "desc").limit(200).get();
-          if (!snapUid.empty) {
-            rows = rows.concat(
-              snapUid.docs.map((d) => {
-                const x: any = d.data() || {};
-                return {
-                  id: d.id,
-                  user: x.user || x.user_email || x.userEmail || x.userId || "",
-                  amount: Number(x.amount || 0),
-                  status: x.status || "success",
-                  type: x.type || "transaction",
-                  providerStatus: x.providerStatus || x.provider_status || "",
-                  providerErrorCode: x.providerErrorCode || x.provider_error_code || "",
-                  providerErrorMessage: x.providerErrorMessage || x.provider_error_message || "",
-                  providerRaw: x.providerRaw || x.provider_raw || null,
-                  createdAt: x.createdAt || x.timestamp || Date.now(),
-                };
-              }),
-            );
+          const queries = [
+            db.collection(n).where("userId", "==", uid).orderBy("createdAt", "desc").limit(200).get(),
+            db.collection(n).where("uid", "==", uid).orderBy("createdAt", "desc").limit(200).get(),
+          ];
+          const snaps = await Promise.allSettled(queries);
+          for (const s of snaps) {
+            if (s.status === "fulfilled") {
+              const snap = s.value;
+              if (!snap.empty) {
+                rows = rows.concat(
+                  snap.docs.map((d) => {
+                    const x: any = d.data() || {};
+                    return {
+                      id: d.id,
+                      user: x.user || x.user_email || x.userEmail || x.email || x.userId || "",
+                      amount: Number(x.amount || 0),
+                      status: x.status || "success",
+                      type: x.type || "transaction",
+                      providerStatus: x.providerStatus || x.provider_status || "",
+                      providerErrorCode: x.providerErrorCode || x.provider_error_code || "",
+                      providerErrorMessage: x.providerErrorMessage || x.provider_error_message || "",
+                      providerRaw: x.providerRaw || x.provider_raw || null,
+                      createdAt: x.createdAt || x.timestamp || Date.now(),
+                    };
+                  }),
+                );
+              }
+            }
           }
         }
         if (rows.length > 0) {
@@ -652,7 +652,7 @@ export async function registerRoutes(
             const x: any = d.data() || {};
             return {
               id: d.id,
-              user: x.user || x.user_email || x.userEmail || "",
+              user: x.user || x.user_email || x.userEmail || x.email || x.userId || "",
               amount: Number(x.amount || 0),
               status: x.status || "success",
               type: x.type || "transaction",
@@ -720,7 +720,7 @@ export async function registerRoutes(
             const x: any = d.data() || {};
             return {
               id: d.id,
-              user: x.user || x.user_email || x.userId || "",
+              user: x.user || x.user_email || x.userEmail || x.email || x.userId || "",
               type: x.type || "",
               amount: Number(x.amount || 0),
               description: x.description || "",
@@ -744,7 +744,7 @@ export async function registerRoutes(
         const x: any = d.data() || {};
         return {
           id: d.id,
-          user: x.user || x.user_email || x.userId || "",
+          user: x.user || x.user_email || x.userEmail || x.email || x.userId || "",
           amount: Number(x.amount || 0),
           method: x.method || "",
           status: x.status || "",
