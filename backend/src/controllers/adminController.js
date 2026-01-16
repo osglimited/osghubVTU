@@ -4,14 +4,31 @@ const SETTINGS_DOC = 'settings/global';
 
 const updateSettings = async (req, res) => {
   try {
-    const { dailyReferralBudget, cashbackEnabled, pricing } = req.body;
-    
-    await db.doc(SETTINGS_DOC).set({
-      dailyReferralBudget,
-      cashbackEnabled,
-      pricing,
-      updatedAt: new Date()
-    }, { merge: true });
+    const { dailyReferralBudget, cashbackEnabled, pricing } = req.body || {};
+
+    const data = {};
+
+    if (dailyReferralBudget !== undefined && dailyReferralBudget !== null) {
+      data.dailyReferralBudget = dailyReferralBudget;
+    }
+
+    if (cashbackEnabled !== undefined) {
+      data.cashbackEnabled = cashbackEnabled;
+    }
+
+    if (pricing && typeof pricing === 'object') {
+      const sanitizedPricing = {};
+      for (const [key, value] of Object.entries(pricing)) {
+        if (value !== undefined) {
+          sanitizedPricing[key] = value;
+        }
+      }
+      data.pricing = sanitizedPricing;
+    }
+
+    data.updatedAt = new Date();
+
+    await db.doc(SETTINGS_DOC).set(data, { merge: true });
 
     res.json({ message: 'Settings updated' });
   } catch (error) {

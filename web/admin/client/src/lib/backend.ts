@@ -6,11 +6,23 @@ function getBaseUrl(): string {
   const strip = (s?: string) => (s && typeof s === "string" ? s.trim().replace(/^`|`$/g, "") : "");
   const prodUrl = strip(prodUrlRaw);
   const localUrl = strip(localUrlRaw);
+
   let origin = "";
-  try { origin = window.location.origin; } catch {}
- const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
-  if (isLocal) return localUrl || "http://localhost:5000";
-  return prodUrl || "https://osghubvtubackend.onrender.com";
+  try {
+    origin = window.location.origin;
+  } catch {}
+
+  const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
+
+  if (isLocal) {
+    if (localUrl) return localUrl;
+    if (origin) return origin;
+    return "http://localhost:5000";
+  }
+
+  if (origin) return origin;
+  if (prodUrl) return prodUrl;
+  return "https://osghubvtubackend.onrender.com";
 }
 
 async function getToken(): Promise<string> {
