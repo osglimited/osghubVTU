@@ -16,6 +16,30 @@ router.post('/wallet/debit', adminController.debitWallet);
 router.get('/users', adminController.listUsers);
 router.post('/users/promote', adminController.promoteToAdmin);
 router.post('/users/create', adminController.createUser);
+router.post('/users/suspend', async (req, res) => {
+  try {
+    const { uid, email, suspend } = req.body || {};
+    let userRecord;
+    if (uid) {
+      userRecord = await auth.getUser(String(uid));
+    } else if (email) {
+      userRecord = await auth.getUserByEmail(String(email));
+    } else {
+      return res.status(400).json({ success: false, message: 'uid or email required' });
+    }
+    const targetUid = userRecord.uid;
+    await auth.updateUser(targetUid, { disabled: !!suspend });
+    const updated = await auth.getUser(targetUid);
+    return res.json({
+      success: true,
+      uid: targetUid,
+      email: updated.email || userRecord.email || '',
+      disabled: !!updated.disabled,
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error && error.message ? error.message : String(error) });
+  }
+});
 router.post('/admins', adminController.createAdmin);
 router.post('/users/verification-link', adminController.generateVerificationLink);
 

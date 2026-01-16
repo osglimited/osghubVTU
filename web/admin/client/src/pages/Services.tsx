@@ -96,7 +96,6 @@ export default function ServicesPage() {
                             const updated = { ...airtimeNetworks, [network]: { ...(airtimeNetworks[network] || { discount: 2 }), enabled: Boolean(val) } };
                             setAirtimeNetworks(updated);
                             try {
-                              await updateAdminSettings({ pricing: undefined, cashbackEnabled: undefined, dailyReferralBudget: undefined, });
                               await updateAdminSettings({ airtimeNetworks: updated as any });
                             } catch (e: any) {
                               toast({ title: "Update failed", description: e.message || "Unable to save settings", variant: "destructive" });
