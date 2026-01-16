@@ -9,6 +9,7 @@ import {
   Settings,
   User,
   FileText,
+  TrendingUp,
   LogOut
 } from "lucide-react";
 import { signOut } from "@/lib/firebase";
@@ -23,6 +24,7 @@ export function Sidebar() {
     { icon: Users, label: "User Management", href: "/users" },
     { icon: Wallet, label: "Wallet Funding", href: "/wallet" },
     { icon: ArrowRightLeft, label: "Transactions", href: "/transactions" },
+    { icon: TrendingUp, label: "Financial Intelligence", href: "/finance" },
     { icon: Server, label: "VTU Services", href: "/services" },
     { icon: Settings, label: "API Settings", href: "/settings/api" },
     { icon: FileText, label: "System Logs", href: "/logs" },

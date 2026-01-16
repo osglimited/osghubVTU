@@ -156,3 +156,26 @@ export async function createAdmin(input: { email: string; password: string; disp
 export async function generateVerificationLink(input: { email?: string; uid?: string; redirectUrl?: string }): Promise<{ success: boolean; email: string; verificationLink: string }> {
   return await request<{ success: boolean; email: string; verificationLink: string }>("POST", "/api/admin/users/verification-link", input);
 }
+
+export async function getFinanceSystem(): Promise<{
+  daily: { deposits: number; providerCost: number; smsCost: number; netProfit: number };
+  weekly: { deposits: number; providerCost: number; smsCost: number; netProfit: number };
+  monthly: { deposits: number; providerCost: number; smsCost: number; netProfit: number };
+  requiredProviderBalance: number;
+}> {
+  return await request("GET", "/api/admin/finance/system");
+}
+
+export async function getFinanceUser(input: { uid?: string; email?: string }): Promise<{
+  walletBalance: number;
+  totalDeposited: number;
+  totalSpent: number;
+  totalProviderCost: number;
+  totalSmsCost: number;
+  netProfit: number;
+  transactions: any[];
+  risk: { providerBalanceRequired: number; smsCost: number; expectedProfit: number };
+}> {
+  const qs = new URLSearchParams({ uid: String(input.uid || ""), email: String(input.email || "") }).toString();
+  return await request("GET", `/api/admin/finance/user?${qs}`);
+}

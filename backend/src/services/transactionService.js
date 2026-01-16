@@ -32,6 +32,29 @@ class TransactionService {
 
     // 3. Create Transaction Record (Pending)
     const transactionRef = db.collection(TRANSACTION_COLLECTION).doc();
+    let userPrice = Number(amount || 0);
+    let providerCost = Number(amount || 0);
+    let smsCost = 0;
+    try {
+      if (type === 'data' && details && details.planId) {
+        const planSnap = await db.collection('service_plans').where('metadata.variation_id', '==', String(details.planId)).limit(1).get();
+        if (!planSnap.empty) {
+          const p = planSnap.docs[0].data();
+          userPrice = Number(p.priceUser || userPrice);
+          providerCost = Number(p.priceApi || providerCost);
+        }
+      } else if (type === 'airtime' && details && (details.network || details.networkId)) {
+        try {
+          const settingsDoc = await db.collection('admin_settings').doc('settings').get();
+          const st = settingsDoc.exists ? settingsDoc.data() || {} : {};
+          const airtimeNetworks = st.airtimeNetworks || {};
+          const netKey = String(details.network || details.networkId || '').toString().toUpperCase();
+          const discount = Number((airtimeNetworks[netKey] && airtimeNetworks[netKey].discount) || 0);
+          const rate = (100 - discount) / 100;
+          providerCost = Math.round(Number(amount || 0) * rate);
+        } catch {}
+      }
+    } catch {}
     const transactionData = {
       id: transactionRef.id,
       userId,
@@ -41,7 +64,11 @@ class TransactionService {
       requestId: idempotencyKey,
       status: 'pending',
       createdAt: new Date(),
-      provider: providerName
+      provider: providerName,
+      userPrice,
+      providerCost,
+      smsCost,
+      serviceType: type
     };
     await transactionRef.set(transactionData);
 
@@ -83,8 +110,13 @@ class TransactionService {
           const body = `You purchased ${type} for ${maskedPhone}. Amount: ₦${amount}. Ref: ${result.transactionId}.`;
           await notificationService.sendNotification(userId, title, body);
           await notificationService.sendSms(details.phone, body);
+          const unit = Number(process.env.SMS_UNIT_COST || 0);
+          if (unit > 0) {
+            smsCost = unit;
+            await transactionRef.update({ smsCost });
+          }
         } catch (notifyErr) {}
-        return { ...transactionData, status: 'success' };
+        return { ...transactionData, status: 'success', smsCost }
       } else {
         // Refund if provider fails
         await walletService.creditWallet(userId, amount, 'main', `Refund: ${type} failed`);

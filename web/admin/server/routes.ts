@@ -759,6 +759,151 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/finance/system", adminAuth, async (_req: Request, res: Response) => {
+    const makePeriod = (days: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - days);
+      return d.getTime();
+    };
+    try {
+      const db = getFirestore();
+      const txNames = ["transactions", "admin_transactions", "wallet_transactions"];
+      const depositsSnap = await db.collection("wallet_deposits").orderBy("createdAt", "desc").limit(2000).get();
+      const deposits = depositsSnap.docs.map(d => d.data() || {});
+      const collectTx = async () => {
+        let rows: any[] = [];
+        for (const n of txNames) {
+          const snap = await db.collection(n).orderBy("createdAt", "desc").limit(3000).get();
+          if (!snap.empty) {
+            rows = rows.concat(
+              snap.docs.map(d => {
+                const x: any = d.data() || {};
+                return {
+                  id: d.id,
+                  userId: x.userId || "",
+                  user: x.user || x.user_email || x.userEmail || x.email || "",
+                  userPrice: Number(x.userPrice || x.amount || 0),
+                  providerCost: Number(x.providerCost || 0),
+                  smsCost: Number(x.smsCost || 0),
+                  serviceType: String(x.serviceType || x.type || ""),
+                  status: String(x.status || ""),
+                  createdAt: Number(x.createdAt || 0),
+                };
+              }),
+            );
+          }
+        }
+        return rows;
+      };
+      const transactions = await collectTx();
+      const allWallets: Array<{ main: number }> = [];
+      for (const n of ["wallets", "user_wallets"]) {
+        const snap = await db.collection(n).limit(2000).get();
+        if (!snap.empty) {
+          allWallets.push(
+            ...snap.docs.map(d => {
+              const x: any = d.data() || {};
+              return { main: Number(x.mainBalance || x.main_balance || x.balance || 0) };
+            }),
+          );
+        }
+      }
+      const requiredProviderBalance = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
+      const computeBucket = (startTs: number) => {
+        const dep = deposits.filter(d => Number(d.createdAt || 0) >= startTs).reduce((s, d) => s + Number(d.amount || 0), 0);
+        const tx = transactions.filter(t => Number(t.createdAt || 0) >= startTs);
+        const provider = tx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+        const sms = tx.reduce((s, t) => s + Number(t.smsCost || 0), 0);
+        const revenue = tx.filter(t => String(t.status || "") === "success").reduce((s, t) => s + Number(t.userPrice || 0), 0);
+        const net = revenue - provider - sms;
+        return { deposits: dep, providerCost: provider, smsCost: sms, netProfit: net };
+      };
+      const daily = computeBucket(makePeriod(1));
+      const weekly = computeBucket(makePeriod(7));
+      const monthly = computeBucket(makePeriod(30));
+      res.json({ daily, weekly, monthly, requiredProviderBalance });
+    } catch {
+      res.json({ daily: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, weekly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, monthly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, requiredProviderBalance: 0 });
+    }
+  });
+
+  app.get("/api/admin/finance/user", adminAuth, async (req: Request, res: Response) => {
+    const email = String((req.query?.email as string) || "").toLowerCase();
+    const uid = String((req.query as any)?.uid || "").toLowerCase();
+    if (!email && !uid) return res.status(400).json({ message: "uid or email required" });
+    try {
+      const db = getFirestore();
+      const txNames = ["transactions", "admin_transactions", "wallet_transactions"];
+      const depositsSnap = await db.collection("wallet_deposits").orderBy("createdAt", "desc").limit(2000).get();
+      const depositsAll = depositsSnap.docs.map(d => d.data() || {});
+      const deposits = depositsAll.filter(d => {
+        const u = String((d.user as string) || (d.user_email as string) || (d.userId as string) || "").toLowerCase();
+        return (email && u === email) || (uid && u === uid);
+      });
+      let transactions: any[] = [];
+      for (const n of txNames) {
+        const snap = await db.collection(n).orderBy("createdAt", "desc").limit(2000).get();
+        if (!snap.empty) {
+          const rows = snap.docs.map(d => {
+            const x: any = d.data() || {};
+            return {
+              id: d.id,
+              userId: x.userId || "",
+              user: x.user || x.user_email || x.userEmail || x.email || "",
+              userPrice: Number(x.userPrice || x.amount || 0),
+              providerCost: Number(x.providerCost || 0),
+              smsCost: Number(x.smsCost || 0),
+              serviceType: String(x.serviceType || x.type || ""),
+              status: String(x.status || ""),
+              createdAt: Number(x.createdAt || 0),
+            };
+          });
+          const filtered = rows.filter(r => {
+            const uId = String(r.userId || "").toLowerCase();
+            const uEmail = String(r.user || "").toLowerCase();
+            return (email && (uEmail === email)) || (uid && (uId === uid));
+          });
+          transactions = transactions.concat(filtered);
+        }
+      }
+      transactions.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+      let walletBalance = 0;
+      for (const n of ["wallets", "user_wallets"]) {
+        const doc = await db.collection(n).doc(uid || email).get();
+        if (doc.exists) {
+          const x: any = doc.data() || {};
+          walletBalance = Number(x.mainBalance || x.main_balance || x.balance || 0);
+          break;
+        }
+      }
+      const totalDeposited = deposits.reduce((s, d) => s + Number(d.amount || 0), 0);
+      const totalSpent = transactions.filter(t => String(t.status || "") === "success").reduce((s, t) => s + Number(t.userPrice || 0), 0);
+      const totalProviderCost = transactions.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+      const totalSmsCost = transactions.reduce((s, t) => s + Number(t.smsCost || 0), 0);
+      const netProfit = totalSpent - totalProviderCost - totalSmsCost;
+      const recent = transactions.slice(0, 50);
+      const rateDen = recent.reduce((s, t) => s + Number(t.userPrice || 0), 0);
+      const rateNum = recent.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+      const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
+      const avgSms = recent.length > 0 ? recent.reduce((s, t) => s + Number(t.smsCost || 0), 0) / recent.length : 0;
+      const riskProviderBalance = walletBalance * providerRate;
+      const riskSmsCost = avgSms;
+      const riskExpectedProfit = walletBalance - riskProviderBalance - riskSmsCost;
+      res.json({
+        walletBalance,
+        totalDeposited,
+        totalSpent,
+        totalProviderCost,
+        totalSmsCost,
+        netProfit,
+        transactions,
+        risk: { providerBalanceRequired: riskProviderBalance, smsCost: riskSmsCost, expectedProfit: riskExpectedProfit },
+      });
+    } catch {
+      res.json({ walletBalance: 0, totalDeposited: 0, totalSpent: 0, totalProviderCost: 0, totalSmsCost: 0, netProfit: 0, transactions: [], risk: { providerBalanceRequired: 0, smsCost: 0, expectedProfit: 0 } });
+    }
+  });
+
   app.get("/api/admin/transactions/:id", adminAuth, async (req: Request, res: Response) => {
     const id = String(req.params.id || "");
     if (!id) return res.status(400).json({ message: "id required" });

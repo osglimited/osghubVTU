@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRoute, Link } from "wouter";
-import { listUsers, getUserTransactions } from "@/lib/backend";
+import { listUsers, getUserTransactions, getFinanceUser } from "@/lib/backend";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,6 +13,7 @@ export default function UserProfilePage() {
   const { toast } = useToast();
   const [user, setUser] = useState<any | null>(null);
   const [txs, setTxs] = useState<any[]>([]);
+  const [finance, setFinance] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,6 +27,8 @@ export default function UserProfilePage() {
         setUser(found || null);
         const res = await getUserTransactions({ uid: uidParam, email: String(found?.email || "") });
         setTxs(res || []);
+        const fin = await getFinanceUser({ uid: uidParam, email: String(found?.email || "") });
+        setFinance(fin || null);
       } catch (e: any) {
         toast({ title: "Failed to load user", description: e.message || "Unable to fetch", variant: "destructive" });
       } finally {
@@ -97,7 +100,7 @@ export default function UserProfilePage() {
           <CardContent className="grid gap-4 md:grid-cols-3">
             <div className="rounded-lg border p-4">
               <div className="text-sm text-muted-foreground">Main Balance</div>
-              <div className="text-2xl font-bold">₦{Number(user.walletBalance || 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold">₦{Number(finance?.walletBalance || 0).toLocaleString()}</div>
             </div>
             <div className="rounded-lg border p-4">
               <div className="text-sm text-muted-foreground">Cashback</div>
@@ -106,6 +109,57 @@ export default function UserProfilePage() {
             <div className="rounded-lg border p-4">
               <div className="text-sm text-muted-foreground">Referral</div>
               <div className="text-2xl font-bold">₦{Number(user.referralBalance || 0).toLocaleString()}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="border-none shadow-sm">
+          <CardHeader>
+            <CardTitle>Totals</CardTitle>
+            <CardDescription>User activity</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border p-4">
+              <div className="text-sm text-muted-foreground">Total Deposited</div>
+              <div className="text-2xl font-bold">₦{Number(finance?.totalDeposited || 0).toLocaleString()}</div>
+            </div>
+            <div className="rounded-lg border p-4">
+              <div className="text-sm text-muted-foreground">Total Spent</div>
+              <div className="text-2xl font-bold">₦{Number(finance?.totalSpent || 0).toLocaleString()}</div>
+            </div>
+            <div className="rounded-lg border p-4">
+              <div className="text-sm text-muted-foreground">Provider Cost</div>
+              <div className="text-2xl font-bold">₦{Number(finance?.totalProviderCost || 0).toLocaleString()}</div>
+            </div>
+            <div className="rounded-lg border p-4">
+              <div className="text-sm text-muted-foreground">SMS Cost</div>
+              <div className="text-2xl font-bold">₦{Number(finance?.totalSmsCost || 0).toLocaleString()}</div>
+            </div>
+            <div className="rounded-lg border p-4 md:col-span-2">
+              <div className="text-sm text-muted-foreground">Net Profit</div>
+              <div className="text-2xl font-bold">₦{Number(finance?.netProfit || 0).toLocaleString()}</div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-none shadow-sm md:col-span-2">
+          <CardHeader>
+            <CardTitle>Risk Intelligence</CardTitle>
+            <CardDescription>Projected provider balance and profit</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border p-4">
+              <div className="text-sm text-muted-foreground">Provider Balance Required</div>
+              <div className="text-2xl font-bold">₦{Number(finance?.risk?.providerBalanceRequired || 0).toLocaleString()}</div>
+            </div>
+            <div className="rounded-lg border p-4">
+              <div className="text-sm text-muted-foreground">SMS Cost</div>
+              <div className="text-2xl font-bold">₦{Number(finance?.risk?.smsCost || 0).toLocaleString()}</div>
+            </div>
+            <div className="rounded-lg border p-4">
+              <div className="text-sm text-muted-foreground">Expected Profit</div>
+              <div className="text-2xl font-bold">₦{Number(finance?.risk?.expectedProfit || 0).toLocaleString()}</div>
             </div>
           </CardContent>
         </Card>

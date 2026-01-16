@@ -18,6 +18,7 @@ import ApiSettingsPage from "@/pages/Settings";
 import ProfilePage from "@/pages/Profile";
 import LogsPage from "@/pages/Logs";
 import UserProfilePage from "@/pages/UserProfile";
+import FinancePage from "@/pages/Finance";
 
 function Router() {
   return (
@@ -31,6 +32,7 @@ function Router() {
         <Route path="/transactions" component={TransactionsPage} />
         <Route path="/transactions/:id" component={TransactionDetailsPage} />
         <Route path="/services" component={ServicesPage} />
+        <Route path="/finance" component={FinancePage} />
         <Route path="/settings/api" component={ApiSettingsPage} />
         <Route path="/profile" component={ProfilePage} />
         <Route path="/logs" component={LogsPage} />
