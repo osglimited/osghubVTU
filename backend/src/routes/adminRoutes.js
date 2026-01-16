@@ -171,6 +171,110 @@ router.get('/wallet/deposits', async (_req, res) => {
   }
 });
 
+// Unified Financial Intelligence: system or user scope
+router.get('/finance/analytics', async (req, res) => {
+  const email = String(req.query.email || '').toLowerCase();
+  const uid = String(req.query.uid || '').toLowerCase();
+  const scope = (email || uid) ? 'user' : 'system';
+  const makePeriod = (days) => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.getTime();
+  };
+  try {
+    // Deposits
+    const depSnap = await db.collection('wallet_deposits').orderBy('createdAt', 'desc').limit(5000).get();
+    const depositsAll = depSnap.docs.map(d => d.data() || {});
+    const deposits = scope === 'user'
+      ? depositsAll.filter(d => {
+          const u = String((d.user || d.user_email || d.userId || '')).toLowerCase();
+          return (email && u === email) || (uid && u === uid);
+        })
+      : depositsAll;
+
+    // Transactions
+    const txNames = ['transactions', 'admin_transactions', 'wallet_transactions'];
+    let transactions = [];
+    for (const n of txNames) {
+      const snap = await db.collection(n).orderBy('createdAt', 'desc').limit(5000).get();
+      if (!snap.empty) {
+        const rows = snap.docs.map(d => {
+          const x = d.data() || {};
+          const status = String(x.status || '');
+          const sms = status === 'success' ? 5 : 0; // ₦5 per successful transaction
+          return {
+            id: d.id,
+            userId: x.userId || '',
+            user: x.user || x.user_email || x.userEmail || x.email || x.userId || '',
+            userPrice: Number(x.userPrice || x.amount || 0),
+            providerCost: Number(x.providerCost || 0),
+            smsCost: sms,
+            serviceType: String(x.serviceType || x.type || ''),
+            status,
+            createdAt: Number(x.createdAt || 0),
+          };
+        });
+        const filtered = scope === 'user'
+          ? rows.filter(r => {
+              const uId = String(r.userId || '').toLowerCase();
+              const uEmail = String(r.user || '').toLowerCase();
+              return (email && (uEmail === email)) || (uid && (uId === uid));
+            })
+          : rows;
+        transactions = transactions.concat(filtered);
+      }
+    }
+    transactions.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+
+    // Provider balance required
+    let providerBalanceRequired = 0;
+    if (scope === 'user') {
+      let walletBalance = 0;
+      for (const n of ['wallets', 'user_wallets']) {
+        const doc = await db.collection(n).doc(uid || email).get();
+        if (doc.exists) {
+          const x = doc.data() || {};
+          walletBalance = Number(x.mainBalance || x.main_balance || x.balance || 0);
+          break;
+        }
+      }
+      providerBalanceRequired = walletBalance;
+    } else {
+      const allWallets = [];
+      for (const n of ['wallets', 'user_wallets']) {
+        const snap = await db.collection(n).limit(5000).get();
+        if (!snap.empty) {
+          allWallets.push(
+            ...snap.docs.map(d => {
+              const x = d.data() || {};
+              return { main: Number(x.mainBalance || x.main_balance || x.balance || 0) };
+            })
+          );
+        }
+      }
+      providerBalanceRequired = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
+    }
+
+    const computeBucket = (startTs) => {
+      const dep = deposits.filter(d => Number(d.createdAt || 0) >= startTs).reduce((s, d) => s + Number(d.amount || 0), 0);
+      const tx = transactions.filter(t => Number(t.createdAt || 0) >= startTs);
+      const provider = tx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+      const sms = tx.reduce((s, t) => s + Number(t.smsCost || 0), 0);
+      const revenue = tx.filter(t => String(t.status || '') === 'success').reduce((s, t) => s + Number(t.userPrice || 0), 0);
+      const net = revenue - provider - sms;
+      return { deposits: dep, providerCost: provider, smsCost: sms, netProfit: net };
+    };
+
+    const daily = computeBucket(makePeriod(1));
+    const weekly = computeBucket(makePeriod(7));
+    const monthly = computeBucket(makePeriod(30));
+
+    return res.json({ scope, providerBalanceRequired, daily, weekly, monthly, transactions });
+  } catch (e) {
+    return res.json({ scope: (email || uid) ? 'user' : 'system', providerBalanceRequired: 0, daily: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, weekly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, monthly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, transactions: [] });
+  }
+});
+
 router.get('/users/transactions', async (req, res) => {
   const email = String(req.query.email || '').toLowerCase();
   const uid = String(req.query.uid || '').toLowerCase();
