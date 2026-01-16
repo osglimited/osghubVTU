@@ -210,14 +210,14 @@ const debitWallet = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { email, password, displayName, phoneNumber } = req.body || {};
+    const { email, password, displayName, phoneNumber, requireVerification, redirectUrl } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
     const user = await auth.createUser({
       email,
       password,
       displayName: displayName || undefined,
       phoneNumber: phoneNumber || undefined,
-      emailVerified: true
+      emailVerified: !requireVerification
     });
     const profileRef = db.collection('users').doc(user.uid);
     await profileRef.set(
@@ -231,7 +231,14 @@ const createUser = async (req, res) => {
       { merge: true }
     );
     await walletService.createWallet(user.uid);
-    res.json({ success: true, uid: user.uid, email: user.email });
+    let verificationLink;
+    if (requireVerification) {
+      try {
+        const url = redirectUrl || 'https://osghub.com/login';
+        verificationLink = await auth.generateEmailVerificationLink(email, { url });
+      } catch (e) {}
+    }
+    res.json({ success: true, uid: user.uid, email: user.email, verificationLink });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -262,3 +269,22 @@ const createAdmin = async (req, res) => {
 module.exports.debitWallet = debitWallet;
 module.exports.createUser = createUser;
 module.exports.createAdmin = createAdmin;
+
+const generateVerificationLink = async (req, res) => {
+  try {
+    const { email, uid, redirectUrl } = req.body || {};
+    let targetEmail = email;
+    if (!targetEmail && uid) {
+      const u = await auth.getUser(uid);
+      targetEmail = u.email;
+    }
+    if (!targetEmail) return res.status(400).json({ error: 'email or uid required' });
+    const url = redirectUrl || 'https://osghub.com/login';
+    const link = await auth.generateEmailVerificationLink(targetEmail, { url });
+    res.json({ success: true, email: targetEmail, verificationLink: link });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports.generateVerificationLink = generateVerificationLink;

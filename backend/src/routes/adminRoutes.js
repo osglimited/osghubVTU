@@ -17,6 +17,7 @@ router.get('/users', adminController.listUsers);
 router.post('/users/promote', adminController.promoteToAdmin);
 router.post('/users/create', adminController.createUser);
 router.post('/admins', adminController.createAdmin);
+router.post('/users/verification-link', adminController.generateVerificationLink);
 
 router.get('/stats', async (_req, res) => {
   const result = {

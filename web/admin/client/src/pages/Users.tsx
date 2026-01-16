@@ -26,6 +26,8 @@ import { InputGroup } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { createUser } from "@/lib/backend";
 import { createAdmin } from "@/lib/backend";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input as RawInput } from "@/components/ui/input";
 
 export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -269,6 +271,9 @@ function AddUserForm({ onDone }: { onDone: () => void }) {
   const [displayName, setDisplayName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [saving, setSaving] = useState(false);
+  const [requireVerification, setRequireVerification] = useState(false);
+  const [verificationLink, setVerificationLink] = useState<string | undefined>(undefined);
+  const [redirectUrl, setRedirectUrl] = useState("https://osghub.com/login");
   return (
     <div className="space-y-4">
       <InputGroup>
@@ -287,6 +292,33 @@ function AddUserForm({ onDone }: { onDone: () => void }) {
         <Label>Phone Number</Label>
         <Input placeholder="+234..." value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
       </InputGroup>
+      <div className="flex items-center gap-3">
+        <Checkbox id="requireVerification" checked={requireVerification} onCheckedChange={(v) => setRequireVerification(Boolean(v))} />
+        <Label htmlFor="requireVerification">Require email verification</Label>
+      </div>
+      {requireVerification && (
+        <InputGroup>
+          <Label>Redirect URL</Label>
+          <RawInput placeholder="https://osghub.com/login" value={redirectUrl} onChange={e => setRedirectUrl(e.target.value)} />
+        </InputGroup>
+      )}
+      {verificationLink ? (
+        <div className="space-y-2">
+          <Label>Verification Link</Label>
+          <div className="flex items-center gap-2">
+            <RawInput readOnly value={verificationLink} />
+            <Button
+              variant="outline"
+              onClick={() => {
+                navigator.clipboard.writeText(verificationLink || "");
+                toast({ title: "Link copied", description: "Verification link copied to clipboard" });
+              }}
+            >
+              Copy
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <div className="flex justify-end">
         <Button
           disabled={saving}
@@ -297,8 +329,14 @@ function AddUserForm({ onDone }: { onDone: () => void }) {
             }
             setSaving(true);
             try {
-              const res = await createUser({ email, password, displayName, phoneNumber });
+              const res = await createUser({ email, password, displayName, phoneNumber, requireVerification, redirectUrl });
               toast({ title: "User Created", description: res.email || email });
+              if (res.verificationLink) {
+                setVerificationLink(res.verificationLink);
+                toast({ title: "Verification Required", description: "Copy and send the verification link to the user" });
+              } else {
+                setVerificationLink(undefined);
+              }
               onDone();
             } catch (e: any) {
               toast({ title: "Create Failed", description: e.message || "Unable to create", variant: "destructive" });

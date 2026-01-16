@@ -139,8 +139,8 @@ export async function getTransactionById(id: string): Promise<any> {
   return await request<any>("GET", `/api/admin/transactions/${encodeURIComponent(id)}`);
 }
 
-export async function createUser(input: { email: string; password: string; displayName?: string; phoneNumber?: string }): Promise<{ success: boolean; uid: string; email: string }> {
-  return await request<{ success: boolean; uid: string; email: string }>("POST", "/api/admin/users/create", input);
+export async function createUser(input: { email: string; password: string; displayName?: string; phoneNumber?: string; requireVerification?: boolean; redirectUrl?: string }): Promise<{ success: boolean; uid: string; email: string; verificationLink?: string }> {
+  return await request<{ success: boolean; uid: string; email: string; verificationLink?: string }>("POST", "/api/admin/users/create", input);
 }
 
 export async function listAdmins(): Promise<any[]> {
@@ -149,4 +149,8 @@ export async function listAdmins(): Promise<any[]> {
 
 export async function createAdmin(input: { email: string; password: string; displayName?: string }): Promise<{ success: boolean; uid: string; email: string }> {
   return await request<{ success: boolean; uid: string; email: string }>("POST", "/api/admin/admins", input);
+}
+
+export async function generateVerificationLink(input: { email?: string; uid?: string; redirectUrl?: string }): Promise<{ success: boolean; email: string; verificationLink: string }> {
+  return await request<{ success: boolean; email: string; verificationLink: string }>("POST", "/api/admin/users/verification-link", input);
 }
