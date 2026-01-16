@@ -3,7 +3,72 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
+import {app.post("/api/admin/wallet/credit", adminAuth, (req, res) => {
+  const userId = String((req.body?.userId as string) || "");
+  const amount = Number((req.body?.amount as number) || 0);
+  const walletType = String((req.body?.walletType as string) || "main");
+
+  const doInsert = async () => {
+    const db = getFirestore();
+    let resolvedUid = "";
+    let resolvedEmail = "";
+
+    // Resolve userId as email or uid
+    if (userId.includes("@")) {
+      const u = await getAuth().getUserByEmail(userId);
+      resolvedUid = String(u.uid || "").toLowerCase();
+      resolvedEmail = String(u.email || userId || "").toLowerCase();
+    } else {
+      const u = await getAuth().getUser(userId);
+      resolvedUid = String(u.uid || userId || "").toLowerCase();
+      resolvedEmail = String(u.email || "").toLowerCase();
+    }
+
+    const targetIds = Array.from(new Set([resolvedUid, resolvedEmail].filter(Boolean)));
+
+    // Write admin_transactions row for this user only
+    await db.collection("admin_transactions").doc(id).set({
+      id,
+      user_email: userId,
+      amount,
+      status: "success",
+      type: "credit",
+      createdAt: Date.now(),
+    });
+
+    // Update only that user's wallet/user_wallet documents
+    for (const tid of targetIds) {
+      // update user_wallets/<tid> and wallets/<tid> ...
+    }
+
+    // Wallet log per user
+    await db.collection("wallet_logs").doc(logId).set({
+      id: logId,
+      user_email: userId,
+      type: "credit",
+      amount,
+      description: String(req.body?.description || "Admin credit"),
+      createdAt: Date.now(),
+    });
+  };
+
+  res.json({ success: true<DropdownMenuItem
+  onClick={() => {
+    const targetUid = String(user.uid || user.id || "");
+    if (!targetUid) return;
+    setLocation(`/users/${encodeURIComponent(targetUid)}`);
+  }}
+>
+  View Profile
+</DropdownMenuItem><DropdownMenuItem
+  onClick={() => {
+    const targetUid = String(user.uid || user.id || "");
+    if (!targetUid) return;
+    setLocation(`/users/${encodeURIComponent(targetUid)}`);
+  }}
+>
+  View Profile
+</DropdownMenuItem><Route path="/users/:uid" component={UserProfilePage} />
   Table,
   TableBody,
   TableCell,
@@ -19,21 +84,36 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Filter, Download, RotateCcw } from "lucide-react";
-import { getAllTransactions } from "@/lib/backend";
+import { getAllTransactions, getUserTransactions } from "@/lib/backend";
 import { Link } from "wouter";
+import { useEffectOnce } from "@/lib/useEffectOnce";
 
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [context, setContext] = useState<{ uid?: string; email?: string } | null>(null);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       setLoading(true);
       try {
-        const data = await getAllTransactions();
+        let data: any[] = [];
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const uid = params.get("uid") || undefined;
+          const email = params.get("email") || undefined;
+          if (uid || email) {
+            setContext({ uid, email });
+            data = await getUserTransactions({ uid, email });
+          } else {
+            data = await getAllTransactions();
+          }
+        } catch {
+          data = await getAllTransactions();
+        }
         if (!mounted) return;
         setTransactions(data);
       } finally {
@@ -57,7 +137,9 @@ export default function TransactionsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-foreground">Transactions</h2>
-          <p className="text-muted-foreground">View and manage all system transactions.</p>
+          <p className="text-muted-foreground">
+            {context?.uid || context?.email ? "Viewing transactions for selected user" : "View and manage all system transactions."}
+          </p>
         </div>
         <Button variant="outline">
           <Download className="mr-2 h-4 w-4" />

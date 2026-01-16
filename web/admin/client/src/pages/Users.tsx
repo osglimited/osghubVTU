@@ -179,7 +179,9 @@ export default function UsersPage() {
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuItem
                           onClick={() => {
-                            setLocation("/profile");
+                            const targetUid = String(user.uid || user.id || "");
+                            if (!targetUid) return;
+                            setLocation(`/users/${encodeURIComponent(targetUid)}`);
                           }}
                         >
                           View Profile
