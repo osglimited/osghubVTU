@@ -158,29 +158,57 @@ export async function registerRoutes(
         baseUsers = [];
       }
     }
+    const profiles: Record<string, { phone: string; displayName: string }> = {};
+    try {
+      const snap = await db.collection("users").limit(1000).get();
+      for (const d of snap.docs) {
+        const x: any = d.data() || {};
+        const uidKey = String(x.uid || d.id || "").toLowerCase();
+        const emailKey = String(x.email || "").toLowerCase();
+        const phone = String(x.phone || x.phoneNumber || "");
+        const displayName = String(x.displayName || x.name || "");
+        if (uidKey) {
+          profiles[uidKey] = { phone, displayName };
+        }
+        if (emailKey && !profiles[emailKey]) {
+          profiles[emailKey] = { phone, displayName };
+        }
+      }
+    } catch {}
     const balances: Record<string, { main_balance: number; cashback_balance: number; referral_balance: number }> = {};
     try {
-      const names = ["wallets", "user_wallets"];
+      const names = ["user_wallets", "wallets"];
       for (const n of names) {
         const snap = await db.collection(n).limit(1000).get();
         for (const d of snap.docs) {
           const x: any = d.data() || {};
-          const email = String(d.id || x.user_email || x.userEmail || "").toLowerCase();
+          const uidKey = String(x.userId || d.id || "").toLowerCase();
+          const emailKey = String(x.user_email || x.userEmail || "").toLowerCase();
           const mb = Number(x.mainBalance || x.main_balance || x.balance || 0);
           const cb = Number(x.cashbackBalance || x.cashback_balance || 0);
           const rb = Number(x.referralBalance || x.referral_balance || 0);
-          balances[email] = { main_balance: mb, cashback_balance: cb, referral_balance: rb };
+          const value = { main_balance: mb, cashback_balance: cb, referral_balance: rb };
+          if (uidKey) {
+            balances[uidKey] = value;
+          }
+          if (emailKey) {
+            balances[emailKey] = value;
+          }
         }
       }
     } catch {}
     const users = baseUsers.map((u) => {
+      const uidKey = String(u.uid || u.id || "").toLowerCase();
       const emailKey = String(u.email || "").toLowerCase();
-      const bal = balances[emailKey];
+      const profile = profiles[uidKey] || profiles[emailKey];
+      const bal = balances[uidKey] || balances[emailKey];
+      const phone = u.phone || (profile ? profile.phone : "");
+      const displayName = u.displayName || (profile ? profile.displayName : "");
       return {
         id: u.id,
-        displayName: u.displayName,
+        displayName,
         email: u.email,
-        phone: u.phone,
+        phone,
         joinedAt: u.joinedAt,
         walletBalance: bal ? Number(bal.main_balance || 0) : 0,
         cashbackBalance: bal ? Number(bal.cashback_balance || 0) : 0,
@@ -224,6 +252,26 @@ export async function registerRoutes(
     const doInsert = async () => {
       try {
         const db = getFirestore();
+        let resolvedUid = "";
+        let resolvedEmail = "";
+        try {
+          if (userId.includes("@")) {
+            const u = await getAuth().getUserByEmail(userId);
+            resolvedUid = String(u.uid || "").toLowerCase();
+            resolvedEmail = String(u.email || userId || "").toLowerCase();
+          } else {
+            const u = await getAuth().getUser(userId);
+            resolvedUid = String(u.uid || userId || "").toLowerCase();
+            resolvedEmail = String(u.email || "").toLowerCase();
+          }
+        } catch {
+          if (userId.includes("@")) {
+            resolvedEmail = userId.toLowerCase();
+          } else {
+            resolvedUid = userId.toLowerCase();
+          }
+        }
+        const targetIds = Array.from(new Set([resolvedUid, resolvedEmail].filter(Boolean)));
         const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
         await db.collection("admin_transactions").doc(id).set({
           id,
@@ -235,28 +283,30 @@ export async function registerRoutes(
         });
         const keyA = walletType === "cashback" ? "cashback_balance" : walletType === "referral" ? "referral_balance" : "main_balance";
         const keyB = walletType === "cashback" ? "cashbackBalance" : walletType === "referral" ? "referralBalance" : "mainBalance";
-        const uw = db.collection("user_wallets").doc(userId.toLowerCase());
-        const snap = await uw.get();
-        const dataUW: any = snap.exists ? (snap.data() as any) : {};
-        const startUW = walletType === "cashback"
-          ? Number(dataUW.cashback_balance || dataUW.cashbackBalance || 0)
-          : walletType === "referral"
-          ? Number(dataUW.referral_balance || dataUW.referralBalance || 0)
-          : Number(dataUW.main_balance || dataUW.mainBalance || dataUW.balance || 0);
-        const updatedUW: any = { [keyA]: startUW + amount, [keyB]: startUW + amount, updated_at: Date.now() };
-        if (walletType === "main") updatedUW.balance = startUW + amount;
-        await uw.set(updatedUW, { merge: true });
-        const w = db.collection("wallets").doc(userId.toLowerCase());
-        const wsnap = await w.get();
-        const dataW: any = wsnap.exists ? (wsnap.data() as any) : {};
-        const startW = walletType === "cashback"
-          ? Number(dataW.cashback_balance || dataW.cashbackBalance || 0)
-          : walletType === "referral"
-          ? Number(dataW.referral_balance || dataW.referralBalance || 0)
-          : Number(dataW.main_balance || dataW.mainBalance || dataW.balance || 0);
-        const updatedW: any = { [keyA]: startW + amount, [keyB]: startW + amount, updated_at: Date.now() };
-        if (walletType === "main") updatedW.balance = startW + amount;
-        await w.set(updatedW, { merge: true });
+        for (const tid of targetIds) {
+          const uw = db.collection("user_wallets").doc(tid);
+          const snap = await uw.get();
+          const dataUW: any = snap.exists ? (snap.data() as any) : {};
+          const startUW = walletType === "cashback"
+            ? Number(dataUW.cashback_balance || dataUW.cashbackBalance || 0)
+            : walletType === "referral"
+            ? Number(dataUW.referral_balance || dataUW.referralBalance || 0)
+            : Number(dataUW.main_balance || dataUW.mainBalance || dataUW.balance || 0);
+          const updatedUW: any = { [keyA]: startUW + amount, [keyB]: startUW + amount, updated_at: Date.now() };
+          if (walletType === "main") updatedUW.balance = startUW + amount;
+          await uw.set(updatedUW, { merge: true });
+          const w = db.collection("wallets").doc(tid);
+          const wsnap = await w.get();
+          const dataW: any = wsnap.exists ? (wsnap.data() as any) : {};
+          const startW = walletType === "cashback"
+            ? Number(dataW.cashback_balance || dataW.cashbackBalance || 0)
+            : walletType === "referral"
+            ? Number(dataW.referral_balance || dataW.referralBalance || 0)
+            : Number(dataW.main_balance || dataW.mainBalance || dataW.balance || 0);
+          const updatedW: any = { [keyA]: startW + amount, [keyB]: startW + amount, updated_at: Date.now() };
+          if (walletType === "main") updatedW.balance = startW + amount;
+          await w.set(updatedW, { merge: true });
+        }
         const logId = `wl_${Date.now()}_${Math.random().toString(36).slice(2)}`;
         await db.collection("wallet_logs").doc(logId).set({
           id: logId,
@@ -279,6 +329,26 @@ export async function registerRoutes(
     const doInsert = async () => {
       try {
         const db = getFirestore();
+        let resolvedUid = "";
+        let resolvedEmail = "";
+        try {
+          if (userId.includes("@")) {
+            const u = await getAuth().getUserByEmail(userId);
+            resolvedUid = String(u.uid || "").toLowerCase();
+            resolvedEmail = String(u.email || userId || "").toLowerCase();
+          } else {
+            const u = await getAuth().getUser(userId);
+            resolvedUid = String(u.uid || userId || "").toLowerCase();
+            resolvedEmail = String(u.email || "").toLowerCase();
+          }
+        } catch {
+          if (userId.includes("@")) {
+            resolvedEmail = userId.toLowerCase();
+          } else {
+            resolvedUid = userId.toLowerCase();
+          }
+        }
+        const targetIds = Array.from(new Set([resolvedUid, resolvedEmail].filter(Boolean)));
         const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
         await db.collection("admin_transactions").doc(id).set({
           id,
@@ -290,28 +360,30 @@ export async function registerRoutes(
         });
         const keyA = walletType === "cashback" ? "cashback_balance" : walletType === "referral" ? "referral_balance" : "main_balance";
         const keyB = walletType === "cashback" ? "cashbackBalance" : walletType === "referral" ? "referralBalance" : "mainBalance";
-        const uw = db.collection("user_wallets").doc(userId.toLowerCase());
-        const snap = await uw.get();
-        const dataUW: any = snap.exists ? (snap.data() as any) : {};
-        const startUW = walletType === "cashback"
-          ? Number(dataUW.cashback_balance || dataUW.cashbackBalance || 0)
-          : walletType === "referral"
-          ? Number(dataUW.referral_balance || dataUW.referralBalance || 0)
-          : Number(dataUW.main_balance || dataUW.mainBalance || dataUW.balance || 0);
-        const updatedUW: any = { [keyA]: startUW - amount, [keyB]: startUW - amount, updated_at: Date.now() };
-        if (walletType === "main") updatedUW.balance = startUW - amount;
-        await uw.set(updatedUW, { merge: true });
-        const w = db.collection("wallets").doc(userId.toLowerCase());
-        const wsnap = await w.get();
-        const dataW: any = wsnap.exists ? (wsnap.data() as any) : {};
-        const startW = walletType === "cashback"
-          ? Number(dataW.cashback_balance || dataW.cashbackBalance || 0)
-          : walletType === "referral"
-          ? Number(dataW.referral_balance || dataW.referralBalance || 0)
-          : Number(dataW.main_balance || dataW.mainBalance || dataW.balance || 0);
-        const updatedW: any = { [keyA]: startW - amount, [keyB]: startW - amount, updated_at: Date.now() };
-        if (walletType === "main") updatedW.balance = startW - amount;
-        await w.set(updatedW, { merge: true });
+        for (const tid of targetIds) {
+          const uw = db.collection("user_wallets").doc(tid);
+          const snap = await uw.get();
+          const dataUW: any = snap.exists ? (snap.data() as any) : {};
+          const startUW = walletType === "cashback"
+            ? Number(dataUW.cashback_balance || dataUW.cashbackBalance || 0)
+            : walletType === "referral"
+            ? Number(dataUW.referral_balance || dataUW.referralBalance || 0)
+            : Number(dataUW.main_balance || dataUW.mainBalance || dataUW.balance || 0);
+          const updatedUW: any = { [keyA]: startUW - amount, [keyB]: startUW - amount, updated_at: Date.now() };
+          if (walletType === "main") updatedUW.balance = startUW - amount;
+          await uw.set(updatedUW, { merge: true });
+          const w = db.collection("wallets").doc(tid);
+          const wsnap = await w.get();
+          const dataW: any = wsnap.exists ? (wsnap.data() as any) : {};
+          const startW = walletType === "cashback"
+            ? Number(dataW.cashback_balance || dataW.cashbackBalance || 0)
+            : walletType === "referral"
+            ? Number(dataW.referral_balance || dataW.referralBalance || 0)
+            : Number(dataW.main_balance || dataW.mainBalance || dataW.balance || 0);
+          const updatedW: any = { [keyA]: startW - amount, [keyB]: startW - amount, updated_at: Date.now() };
+          if (walletType === "main") updatedW.balance = startW - amount;
+          await w.set(updatedW, { merge: true });
+        }
         const logId = `wl_${Date.now()}_${Math.random().toString(36).slice(2)}`;
         await db.collection("wallet_logs").doc(logId).set({
           id: logId,

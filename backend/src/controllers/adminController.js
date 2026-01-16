@@ -96,26 +96,56 @@ const listUsers = async (req, res) => {
         };
       });
     }
+    const profiles = {};
+    try {
+      const snap = await db.collection('users').limit(1000).get();
+      for (const d of snap.docs) {
+        const x = d.data() || {};
+        const uidKey = String(x.uid || d.id || '').toLowerCase();
+        const emailKey = String(x.email || '').toLowerCase();
+        const phone = String(x.phone || x.phoneNumber || '');
+        const displayName = String(x.displayName || x.name || '');
+        if (uidKey) {
+          profiles[uidKey] = { phone, displayName };
+        }
+        if (emailKey && !profiles[emailKey]) {
+          profiles[emailKey] = { phone, displayName };
+        }
+      }
+    } catch {}
     const balances = {};
     try {
-      const names = ['wallets', 'user_wallets'];
+      const names = ['user_wallets', 'wallets'];
       for (const n of names) {
         const snap = await db.collection(n).limit(1000).get();
         for (const d of snap.docs) {
           const x = d.data() || {};
-          const email = String(d.id || x.user_email || x.userEmail || '').toLowerCase();
+          const uidKey = String(x.userId || d.id || '').toLowerCase();
+          const emailKey = String(x.user_email || x.userEmail || '').toLowerCase();
           const mb = Number(x.mainBalance || x.main_balance || x.balance || 0);
           const cb = Number(x.cashbackBalance || x.cashback_balance || 0);
           const rb = Number(x.referralBalance || x.referral_balance || 0);
-          balances[email] = { main_balance: mb, cashback_balance: cb, referral_balance: rb };
+          const value = { main_balance: mb, cashback_balance: cb, referral_balance: rb };
+          if (uidKey) {
+            balances[uidKey] = value;
+          }
+          if (emailKey) {
+            balances[emailKey] = value;
+          }
         }
       }
     } catch {}
     const users = baseUsers.map(u => {
+      const uidKey = String(u.uid || u.id || '').toLowerCase();
       const emailKey = String(u.email || '').toLowerCase();
-      const bal = balances[emailKey];
+      const profile = profiles[uidKey] || profiles[emailKey];
+      const bal = balances[uidKey] || balances[emailKey];
+      const phone = u.phone || (profile ? profile.phone : '');
+      const displayName = u.displayName || (profile ? profile.displayName : '');
       return {
         ...u,
+        displayName,
+        phone,
         walletBalance: bal ? Number(bal.main_balance || 0) : 0,
         cashbackBalance: bal ? Number(bal.cashback_balance || 0) : 0,
         referralBalance: bal ? Number(bal.referral_balance || 0) : 0,
