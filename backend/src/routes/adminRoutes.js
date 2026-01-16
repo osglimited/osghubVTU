@@ -221,7 +221,7 @@ router.get('/finance/analytics', async (req, res) => {
     });
 
     // Transactions
-    const txNames = ['transactions', 'admin_transactions', 'wallet_transactions'];
+    const txNames = ['transactions', 'admin_transactions'];
     let transactions = [];
     for (const n of txNames) {
       const snap = await db.collection(n).orderBy('createdAt', 'desc').limit(5000).get();
@@ -230,6 +230,9 @@ router.get('/finance/analytics', async (req, res) => {
           const x = d.data() || {};
           const status = String(x.status || '');
           const sms = status === 'success' ? 5 : 0; // ₦5 per successful transaction
+          const type = String(x.type || '').toLowerCase();
+          const serviceType = String(x.serviceType || x.type || '');
+          const isService = !!serviceType && !['credit', 'debit', 'transfer', 'wallet', 'funding'].includes(type);
           return {
             id: d.id,
             userId: x.userId || '',
@@ -237,18 +240,20 @@ router.get('/finance/analytics', async (req, res) => {
             userPrice: Number(x.userPrice || x.amount || 0),
             providerCost: Number(x.providerCost || 0),
             smsCost: sms,
-            serviceType: String(x.serviceType || x.type || ''),
+            serviceType,
             status,
             createdAt: getCreatedMs(x.createdAt),
+            isService,
           };
         });
+        const filteredBase = rows.filter(r => r.isService);
         const filtered = scope === 'user'
-          ? rows.filter(r => {
+          ? filteredBase.filter(r => {
               const uId = String(r.userId || '').toLowerCase();
               const uEmail = String(r.user || '').toLowerCase();
               return (email && (uEmail === email)) || (uid && (uId === uid));
             })
-          : rows;
+          : filteredBase;
         const timeFiltered = filtered.filter(t => {
           const tt = Number(t.createdAt || 0);
           if (startTs !== undefined && tt < startTs) return false;
