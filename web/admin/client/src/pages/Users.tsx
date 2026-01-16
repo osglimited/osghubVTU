@@ -26,6 +26,7 @@ import { InputGroup } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { createUser } from "@/lib/backend";
 import { createAdmin } from "@/lib/backend";
+import { useLocation } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input as RawInput } from "@/components/ui/input";
 
@@ -34,6 +35,7 @@ export default function UsersPage() {
   const { toast } = useToast();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     let mounted = true;
@@ -175,9 +177,33 @@ export default function UsersPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>View Profile</DropdownMenuItem>
-                        <DropdownMenuItem>View Transactions</DropdownMenuItem>
-                        <DropdownMenuItem>Fund Wallet</DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setLocation("/profile");
+                          }}
+                        >
+                          View Profile
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            const qs = new URLSearchParams({
+                              uid: String(user.uid || user.id || ""),
+                              email: String(user.email || "")
+                            }).toString();
+                            setLocation(`/transactions?${qs}`);
+                          }}
+                        >
+                          View Transactions
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            const userId = String(user.email || user.uid || user.id || "");
+                            const qs = new URLSearchParams({ userId }).toString();
+                            setLocation(`/wallet?${qs}`);
+                          }}
+                        >
+                          Fund Wallet
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={async () => {
                             try {

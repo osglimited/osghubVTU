@@ -39,6 +39,14 @@ export default function WalletPage() {
       }
     };
     load();
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const prefill = params.get("userId");
+      if (prefill) {
+        setCreditForm(prev => ({ ...prev, userId: prefill }));
+        setDebitForm(prev => ({ ...prev, userId: prefill }));
+      }
+    } catch {}
     return () => { mounted = false; };
   }, []);
 

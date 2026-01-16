@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Smartphone, Wifi, Tv, Zap, Edit, Trash2, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getAllPlans, createPlan, updatePlan, deletePlan } from "@/lib/backend";
+import { getAllPlans, createPlan, updatePlan, deletePlan, getAdminSettings, updateAdminSettings } from "@/lib/backend";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function ServicesPage() {
@@ -18,15 +18,30 @@ export default function ServicesPage() {
   const [plans, setPlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState<boolean>(true);
   const [openNew, setOpenNew] = useState(false);
+  const [airtimeNetworks, setAirtimeNetworks] = useState<Record<string, { enabled: boolean; discount: number }>>({
+    MTN: { enabled: true, discount: 2 },
+    Airtel: { enabled: true, discount: 2 },
+    Glo: { enabled: true, discount: 2 },
+    "9mobile": { enabled: true, discount: 2 },
+  });
 
   useEffect(() => {
     let mounted = true;
     const loadPlans = async () => {
       setLoadingPlans(true);
       try {
-        const data = await getAllPlans();
+        const [data, settings] = await Promise.all([getAllPlans(), getAdminSettings()]);
         if (!mounted) return;
         setPlans(data);
+        const nets = (settings?.airtimeNetworks as any) || {};
+        const merged: Record<string, { enabled: boolean; discount: number }> = { ...airtimeNetworks };
+        for (const key of Object.keys(merged)) {
+          const v = nets[key];
+          if (v) {
+            merged[key] = { enabled: v.enabled !== false, discount: Number(v.discount ?? merged[key].discount) };
+          }
+        }
+        setAirtimeNetworks(merged);
       } catch (e: any) {
         toast({ title: "Failed to load plans", description: e.message || "Unable to fetch plans", variant: "destructive" });
       } finally {
@@ -73,12 +88,42 @@ export default function ServicesPage() {
                   {['MTN', 'Airtel', 'Glo', '9mobile'].map((network) => (
                     <TableRow key={network}>
                       <TableCell className="font-medium">{network}</TableCell>
-                      <TableCell>2%</TableCell>
+                      <TableCell>{airtimeNetworks[network]?.discount ?? 2}%</TableCell>
                       <TableCell>
-                        <Switch checked={true} />
+                        <Switch
+                          checked={Boolean(airtimeNetworks[network]?.enabled)}
+                          onCheckedChange={async (val) => {
+                            const updated = { ...airtimeNetworks, [network]: { ...(airtimeNetworks[network] || { discount: 2 }), enabled: Boolean(val) } };
+                            setAirtimeNetworks(updated);
+                            try {
+                              await updateAdminSettings({ pricing: undefined, cashbackEnabled: undefined, dailyReferralBudget: undefined, });
+                              await updateAdminSettings({ airtimeNetworks: updated as any });
+                            } catch (e: any) {
+                              toast({ title: "Update failed", description: e.message || "Unable to save settings", variant: "destructive" });
+                            }
+                          }}
+                        />
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm"><Edit className="h-4 w-4" /></Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            const cur = airtimeNetworks[network]?.discount ?? 2;
+                            const next = Number(prompt(`Set discount (%) for ${network}`, String(cur)) || "");
+                            if (isNaN(next) || next < 0) return;
+                            const updated = { ...airtimeNetworks, [network]: { ...(airtimeNetworks[network] || { enabled: true }), discount: next } };
+                            setAirtimeNetworks(updated);
+                            try {
+                              await updateAdminSettings({ airtimeNetworks: updated as any });
+                              toast({ title: "Discount updated", description: `${network} ${next}%` });
+                            } catch (e: any) {
+                              toast({ title: "Update failed", description: e.message || "Unable to save settings", variant: "destructive" });
+                            }
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

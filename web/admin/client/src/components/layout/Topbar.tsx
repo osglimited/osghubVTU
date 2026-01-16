@@ -11,9 +11,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth, signOut } from "@/lib/firebase";
+import { useLocation } from "wouter";
 
 export function Topbar() {
   const user = auth.currentUser || undefined;
+  const [, setLocation] = useLocation();
 
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-primary px-6 shadow-sm">
@@ -52,7 +54,8 @@ export function Topbar() {
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLocation("/profile")}>Profile</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLocation("/settings/api")}>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => signOut()}>
               Log out
