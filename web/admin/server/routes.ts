@@ -468,10 +468,10 @@ export async function registerRoutes(
         let rows: any[] = [];
         if (email) {
           const queries = [
-            db.collection(n).where("user_email", "==", email).orderBy("createdAt", "desc").limit(200).get(),
-            db.collection(n).where("user", "==", email).orderBy("createdAt", "desc").limit(200).get(),
-            db.collection(n).where("userEmail", "==", email).orderBy("createdAt", "desc").limit(200).get(),
-            db.collection(n).where("email", "==", email).orderBy("createdAt", "desc").limit(200).get(),
+            db.collection(n).where("user_email", "==", email).limit(500).get(),
+            db.collection(n).where("user", "==", email).limit(500).get(),
+            db.collection(n).where("userEmail", "==", email).limit(500).get(),
+            db.collection(n).where("email", "==", email).limit(500).get(),
           ];
           const snaps = await Promise.allSettled(queries);
           for (const s of snaps) {
@@ -501,8 +501,8 @@ export async function registerRoutes(
         }
         if (uid) {
           const queries = [
-            db.collection(n).where("userId", "==", uid).orderBy("createdAt", "desc").limit(200).get(),
-            db.collection(n).where("uid", "==", uid).orderBy("createdAt", "desc").limit(200).get(),
+            db.collection(n).where("userId", "==", uid).limit(500).get(),
+            db.collection(n).where("uid", "==", uid).limit(500).get(),
           ];
           const snaps = await Promise.allSettled(queries);
           for (const s of snaps) {
@@ -533,7 +533,9 @@ export async function registerRoutes(
         if (rows.length > 0) {
           const map: Record<string, any> = {};
           for (const r of rows) map[r.id] = r;
-          return res.json(Object.values(map));
+          const list = Object.values(map);
+          list.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+          return res.json(list);
         }
       }
       return res.json([]);
