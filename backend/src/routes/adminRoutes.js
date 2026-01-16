@@ -12,8 +12,11 @@ router.post('/settings', adminController.updateSettings);
 router.get('/settings', adminController.getSettings);
 router.get('/transactions', adminController.getAllTransactions);
 router.post('/wallet/credit', adminController.creditWallet);
+router.post('/wallet/debit', adminController.debitWallet);
 router.get('/users', adminController.listUsers);
 router.post('/users/promote', adminController.promoteToAdmin);
+router.post('/users/create', adminController.createUser);
+router.post('/admins', adminController.createAdmin);
 
 router.get('/stats', async (_req, res) => {
   const result = {

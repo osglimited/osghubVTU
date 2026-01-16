@@ -192,3 +192,72 @@ const promoteToAdmin = async (req, res) => {
 
 module.exports.listUsers = listUsers;
 module.exports.promoteToAdmin = promoteToAdmin;
+
+const debitWallet = async (req, res) => {
+  try {
+    const { userId, amount, walletType, description } = req.body || {};
+    if (!userId) return res.status(400).json({ error: 'userId is required' });
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return res.status(400).json({ error: 'Valid amount is required' });
+    const wtype = ['main', 'cashback', 'referral'].includes(walletType) ? walletType : 'main';
+    await walletService.createWallet(userId);
+    const newBalance = await walletService.debitWallet(userId, amt, wtype, description || 'Admin Debit');
+    res.json({ success: true, userId, newBalance, walletType: wtype });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const createUser = async (req, res) => {
+  try {
+    const { email, password, displayName, phoneNumber } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+    const user = await auth.createUser({
+      email,
+      password,
+      displayName: displayName || undefined,
+      phoneNumber: phoneNumber || undefined
+    });
+    const profileRef = db.collection('users').doc(user.uid);
+    await profileRef.set(
+      {
+        email: user.email,
+        displayName: user.displayName || displayName || '',
+        phone: phoneNumber || '',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      { merge: true }
+    );
+    await walletService.createWallet(user.uid);
+    res.json({ success: true, uid: user.uid, email: user.email });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const createAdmin = async (req, res) => {
+  try {
+    const { email, password, displayName } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+    const user = await auth.createUser({
+      email,
+      password,
+      displayName: displayName || undefined
+    });
+    await auth.setCustomUserClaims(user.uid, { admin: true });
+    await db.collection('admin_accounts').doc(email.toLowerCase()).set({
+      email: email.toLowerCase(),
+      uid: user.uid,
+      createdAt: new Date()
+    }, { merge: true });
+    await walletService.createWallet(user.uid);
+    res.json({ success: true, uid: user.uid, email: user.email });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports.debitWallet = debitWallet;
+module.exports.createUser = createUser;
+module.exports.createAdmin = createAdmin;
