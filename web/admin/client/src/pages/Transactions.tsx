@@ -3,72 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {app.post("/api/admin/wallet/credit", adminAuth, (req, res) => {
-  const userId = String((req.body?.userId as string) || "");
-  const amount = Number((req.body?.amount as number) || 0);
-  const walletType = String((req.body?.walletType as string) || "main");
-
-  const doInsert = async () => {
-    const db = getFirestore();
-    let resolvedUid = "";
-    let resolvedEmail = "";
-
-    // Resolve userId as email or uid
-    if (userId.includes("@")) {
-      const u = await getAuth().getUserByEmail(userId);
-      resolvedUid = String(u.uid || "").toLowerCase();
-      resolvedEmail = String(u.email || userId || "").toLowerCase();
-    } else {
-      const u = await getAuth().getUser(userId);
-      resolvedUid = String(u.uid || userId || "").toLowerCase();
-      resolvedEmail = String(u.email || "").toLowerCase();
-    }
-
-    const targetIds = Array.from(new Set([resolvedUid, resolvedEmail].filter(Boolean)));
-
-    // Write admin_transactions row for this user only
-    await db.collection("admin_transactions").doc(id).set({
-      id,
-      user_email: userId,
-      amount,
-      status: "success",
-      type: "credit",
-      createdAt: Date.now(),
-    });
-
-    // Update only that user's wallet/user_wallet documents
-    for (const tid of targetIds) {
-      // update user_wallets/<tid> and wallets/<tid> ...
-    }
-
-    // Wallet log per user
-    await db.collection("wallet_logs").doc(logId).set({
-      id: logId,
-      user_email: userId,
-      type: "credit",
-      amount,
-      description: String(req.body?.description || "Admin credit"),
-      createdAt: Date.now(),
-    });
-  };
-
-  res.json({ success: true<DropdownMenuItem
-  onClick={() => {
-    const targetUid = String(user.uid || user.id || "");
-    if (!targetUid) return;
-    setLocation(`/users/${encodeURIComponent(targetUid)}`);
-  }}
->
-  View Profile
-</DropdownMenuItem><DropdownMenuItem
-  onClick={() => {
-    const targetUid = String(user.uid || user.id || "");
-    if (!targetUid) return;
-    setLocation(`/users/${encodeURIComponent(targetUid)}`);
-  }}
->
-  View Profile
-</DropdownMenuItem><Route path="/users/:uid" component={UserProfilePage} />
+import {
   Table,
   TableBody,
   TableCell,
