@@ -34,14 +34,15 @@ export async function registerRoutes(
     return env.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   }
 
-  async function verifyTokenAndGetEmail(token?: string): Promise<string | undefined> {
+  async function verifyTokenAndGetEmail(token?: string): Promise<{ email?: string; isAdmin?: boolean }> {
     if (!token) return undefined;
     try {
-      const decoded = await getAuth().verifyIdToken(token);
+      const decoded: any = await getAuth().verifyIdToken(token);
       const email = String(decoded.email || "").toLowerCase();
-      return email || undefined;
+      const isAdmin = Boolean(decoded.admin === true || (decoded.customClaims && decoded.customClaims.admin === true));
+      return { email: email || undefined, isAdmin };
     } catch {
-      return undefined;
+      return { email: undefined, isAdmin: false };
     }
   }
 
@@ -51,8 +52,9 @@ export async function registerRoutes(
     if (headerEmail && allowed.includes(headerEmail)) return next();
     const authHeader = req.headers.authorization || "";
     const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
-    const emailFromToken = await verifyTokenAndGetEmail(bearer);
-    const candidateEmail = emailFromToken || headerEmail;
+    const tokenInfo = await verifyTokenAndGetEmail(bearer);
+    if (tokenInfo?.isAdmin) return next();
+    const candidateEmail = tokenInfo?.email || headerEmail;
     if (candidateEmail && allowed.includes(candidateEmail)) return next();
     return res.status(403).json({ message: "Forbidden" });
   }
