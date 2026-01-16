@@ -192,6 +192,28 @@ router.get('/finance/analytics', async (req, res) => {
     d.setDate(d.getDate() - days);
     return d.getTime();
   };
+  const pickNumber = (obj, keys) => {
+    for (const k of keys) {
+      const v = obj?.[k];
+      if (v !== undefined && v !== null && v !== '') return Number(v);
+    }
+    return 0;
+  };
+  const readMainBalance = async (id) => {
+    if (!id) return 0;
+    const cands = [
+      { col: 'wallets', doc: id },
+      { col: 'user_wallets', doc: id },
+    ];
+    for (const c of cands) {
+      const snap = await db.collection(c.col).doc(c.doc).get();
+      if (snap.exists) {
+        const x = snap.data() || {};
+        return pickNumber(x, ['mainBalance', 'main_balance', 'balance']);
+      }
+    }
+    return 0;
+  };
   const getCreatedMs = (v) => {
     if (!v) return 0;
     if (typeof v === 'number') return v;
@@ -236,8 +258,8 @@ router.get('/finance/analytics', async (req, res) => {
             id: d.id,
             userId: x.userId || '',
             user: x.user || x.user_email || x.userEmail || x.email || x.userId || '',
-            userPrice: Number(x.userPrice || x.amount || 0),
-            providerCost: Number(x.providerCost || 0),
+            userPrice: pickNumber(x, ['userPrice','priceUser','price_user','amount','user_amount','paid','userPaid']),
+            providerCost: pickNumber(x, ['providerCost','priceApi','price_api','apiPrice','provider_price','providerPrice','cost','serviceCost']),
             smsCost: Number(x.sms_cost ?? x.smsCost ?? 0),
             serviceType,
             status,
@@ -268,21 +290,24 @@ router.get('/finance/analytics', async (req, res) => {
     let providerBalanceRequired = 0;
     let walletBalance = 0;
     if (scope === 'user') {
-      if (uid) {
-        const doc = await db.collection('wallets').doc(uid).get();
-        if (doc.exists) {
-          const x = doc.data() || {};
-          walletBalance = Number(x.mainBalance || x.main_balance || x.balance || 0);
-        }
-      }
+      walletBalance = (await readMainBalance(uid)) || (await readMainBalance(email));
       providerBalanceRequired = walletBalance;
     } else {
-      const snap = await db.collection('wallets').limit(5000).get();
-      const allWallets = snap.empty ? [] : snap.docs.map(d => {
-        const x = d.data() || {};
-        return { main: Number(x.mainBalance || x.main_balance || x.balance || 0) };
-      });
-      providerBalanceRequired = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
+      const sources = ['wallets', 'user_wallets'];
+      const seen = new Map();
+      for (const src of sources) {
+        const snap = await db.collection(src).limit(5000).get();
+        if (!snap.empty) {
+          for (const d of snap.docs) {
+            const x = d.data() || {};
+            const key = String(x.uid || x.userId || x.email || d.id || '').toLowerCase();
+            const main = pickNumber(x, ['mainBalance','main_balance','balance']);
+            if (!seen.has(key)) seen.set(key, main);
+            else seen.set(key, Math.max(seen.get(key), main));
+          }
+        }
+      }
+      providerBalanceRequired = Array.from(seen.values()).reduce((s, v) => s + Number(v || 0), 0);
     }
 
     const computeBucket = (bucketStart) => {
