@@ -40,6 +40,24 @@ router.post('/users/suspend', async (req, res) => {
     return res.status(400).json({ success: false, message: error && error.message ? error.message : String(error) });
   }
 });
+router.post('/users/delete', async (req, res) => {
+  try {
+    const { uid, email } = req.body || {};
+    let userRecord;
+    if (uid) {
+      userRecord = await auth.getUser(String(uid));
+    } else if (email) {
+      userRecord = await auth.getUserByEmail(String(email));
+    } else {
+      return res.status(400).json({ success: false, message: 'uid or email required' });
+    }
+    const targetUid = userRecord.uid;
+    await auth.deleteUser(targetUid);
+    return res.json({ success: true, uid: targetUid, email: userRecord.email || '' });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error && error.message ? error.message : String(error) });
+  }
+});
 router.post('/admins', adminController.createAdmin);
 router.post('/users/verification-link', adminController.generateVerificationLink);
 
@@ -155,20 +173,82 @@ router.get('/wallet/deposits', async (_req, res) => {
 
 router.get('/users/transactions', async (req, res) => {
   const email = String(req.query.email || '').toLowerCase();
-  if (!email) return res.json([]);
+  const uid = String(req.query.uid || '').toLowerCase();
+  if (!email && !uid) return res.json([]);
   try {
     const names = ['admin_transactions', 'transactions', 'wallet_transactions'];
+    let rows = [];
     for (const n of names) {
-      const snap = await db.collection(n).where('user_email', '==', email).orderBy('createdAt', 'desc').limit(200).get();
-      if (!snap.empty) {
-        const rows = snap.docs.map(d => {
-          const x = d.data() || {};
-          return { id: d.id, user: x.user || x.user_email || x.userId || '', amount: Number(x.amount || 0), status: x.status || 'success', type: x.type || 'transaction', createdAt: x.createdAt || Date.now() };
-        });
-        return res.json(rows);
-      }
+      const col = db.collection(n);
+      try {
+        if (email) {
+          const snapEmailA = await col.where('user_email', '==', email).limit(500).get();
+          if (!snapEmailA.empty) {
+            rows = rows.concat(
+              snapEmailA.docs.map(d => {
+                const x = d.data() || {};
+                return {
+                  id: d.id,
+                  user: x.user || x.user_email || x.userEmail || x.userId || '',
+                  amount: Number(x.amount || 0),
+                  status: x.status || 'success',
+                  type: x.type || 'transaction',
+                  providerStatus: x.providerStatus || x.provider_status || '',
+                  providerErrorCode: x.providerErrorCode || x.provider_error_code || '',
+                  providerErrorMessage: x.providerErrorMessage || x.provider_error_message || '',
+                  providerRaw: x.providerRaw || x.provider_raw || null,
+                  createdAt: x.createdAt || x.timestamp || Date.now(),
+                };
+              })
+            );
+          }
+          const snapEmailB = await col.where('user', '==', email).limit(500).get();
+          if (!snapEmailB.empty) {
+            rows = rows.concat(
+              snapEmailB.docs.map(d => {
+                const x = d.data() || {};
+                return {
+                  id: d.id,
+                  user: x.user || x.user_email || x.userEmail || x.userId || '',
+                  amount: Number(x.amount || 0),
+                  status: x.status || 'success',
+                  type: x.type || 'transaction',
+                  providerStatus: x.providerStatus || x.provider_status || '',
+                  providerErrorCode: x.providerErrorCode || x.provider_error_code || '',
+                  providerErrorMessage: x.providerErrorMessage || x.provider_error_message || '',
+                  providerRaw: x.providerRaw || x.provider_raw || null,
+                  createdAt: x.createdAt || x.timestamp || Date.now(),
+                };
+              })
+            );
+          }
+        }
+        if (uid) {
+          const snapUid = await col.where('userId', '==', uid).limit(500).get();
+          if (!snapUid.empty) {
+            rows = rows.concat(
+              snapUid.docs.map(d => {
+                const x = d.data() || {};
+                return {
+                  id: d.id,
+                  user: x.user || x.user_email || x.userEmail || x.userId || '',
+                  amount: Number(x.amount || 0),
+                  status: x.status || 'success',
+                  type: x.type || 'transaction',
+                  providerStatus: x.providerStatus || x.provider_status || '',
+                  providerErrorCode: x.providerErrorCode || x.provider_error_code || '',
+                  providerErrorMessage: x.providerErrorMessage || x.provider_error_message || '',
+                  providerRaw: x.providerRaw || x.provider_raw || null,
+                  createdAt: x.createdAt || x.timestamp || Date.now(),
+                };
+              })
+            );
+          }
+        }
+      } catch {}
     }
-    return res.json([]);
+    rows.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    return res.json(rows);
   } catch {
     return res.json([]);
   }

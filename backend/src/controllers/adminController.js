@@ -4,15 +4,28 @@ const SETTINGS_DOC = 'settings/global';
 
 const updateSettings = async (req, res) => {
   try {
-    const { dailyReferralBudget, cashbackEnabled, pricing } = req.body;
-    
-    await db.doc(SETTINGS_DOC).set({
-      dailyReferralBudget,
-      cashbackEnabled,
-      pricing,
-      updatedAt: new Date()
-    }, { merge: true });
-
+    const body = req.body || {};
+    const clean = (v) => {
+      if (Array.isArray(v)) {
+        const arr = v.map((x) => clean(x)).filter((x) => x !== undefined);
+        return arr;
+      }
+      if (v && typeof v === 'object') {
+        const out = {};
+        for (const [k, val] of Object.entries(v)) {
+          const c = clean(val);
+          if (c !== undefined) {
+            out[k] = c;
+          }
+        }
+        return out;
+      }
+      if (v === undefined) return undefined;
+      return v;
+    };
+    const data = clean(body);
+    data.updatedAt = new Date();
+    await db.doc(SETTINGS_DOC).set(data, { merge: true });
     res.json({ message: 'Settings updated' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -51,9 +64,32 @@ const creditWallet = async (req, res) => {
     const amt = Number(amount);
     if (!amt || amt <= 0) return res.status(400).json({ error: 'Valid amount is required' });
     const wtype = ['main', 'cashback', 'referral'].includes(walletType) ? walletType : 'main';
-    await walletService.createWallet(userId);
-    const newBalance = await walletService.creditWallet(userId, amt, wtype, description || 'Admin Credit');
-    res.json({ success: true, userId, newBalance, walletType: wtype });
+    const raw = String(userId || '').trim();
+    let uidCandidate = '';
+    let emailCandidate = '';
+    try {
+      if (raw.includes('@')) {
+        emailCandidate = raw.toLowerCase();
+        const u = await auth.getUserByEmail(raw);
+        uidCandidate = u.uid;
+      } else {
+        uidCandidate = raw;
+        const u = await auth.getUser(raw);
+        emailCandidate = String(u.email || '').toLowerCase();
+      }
+    } catch {}
+    let chosenId = uidCandidate || emailCandidate || raw;
+    try {
+      const a = uidCandidate ? await db.collection('wallets').doc(uidCandidate).get() : null;
+      const b = emailCandidate ? await db.collection('wallets').doc(emailCandidate).get() : null;
+      const av = a && a.exists ? Number((a.data() || {}).mainBalance || 0) : -1;
+      const bv = b && b.exists ? Number((b.data() || {}).mainBalance || 0) : -1;
+      if (bv > av) chosenId = emailCandidate || chosenId;
+      if (av >= 0 && av >= bv) chosenId = uidCandidate || chosenId;
+    } catch {}
+    await walletService.createWallet(chosenId);
+    const newBalance = await walletService.creditWallet(chosenId, amt, wtype, description || 'Admin Credit');
+    res.json({ success: true, userId: chosenId, newBalance, walletType: wtype });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -200,9 +236,32 @@ const debitWallet = async (req, res) => {
     const amt = Number(amount);
     if (!amt || amt <= 0) return res.status(400).json({ error: 'Valid amount is required' });
     const wtype = ['main', 'cashback', 'referral'].includes(walletType) ? walletType : 'main';
-    await walletService.createWallet(userId);
-    const newBalance = await walletService.debitWallet(userId, amt, wtype, description || 'Admin Debit');
-    res.json({ success: true, userId, newBalance, walletType: wtype });
+    const raw = String(userId || '').trim();
+    let uidCandidate = '';
+    let emailCandidate = '';
+    try {
+      if (raw.includes('@')) {
+        emailCandidate = raw.toLowerCase();
+        const u = await auth.getUserByEmail(raw);
+        uidCandidate = u.uid;
+      } else {
+        uidCandidate = raw;
+        const u = await auth.getUser(raw);
+        emailCandidate = String(u.email || '').toLowerCase();
+      }
+    } catch {}
+    let chosenId = uidCandidate || emailCandidate || raw;
+    try {
+      const a = uidCandidate ? await db.collection('wallets').doc(uidCandidate).get() : null;
+      const b = emailCandidate ? await db.collection('wallets').doc(emailCandidate).get() : null;
+      const av = a && a.exists ? Number((a.data() || {}).mainBalance || 0) : -1;
+      const bv = b && b.exists ? Number((b.data() || {}).mainBalance || 0) : -1;
+      if (bv > av) chosenId = emailCandidate || chosenId;
+      if (av >= 0 && av >= bv) chosenId = uidCandidate || chosenId;
+    } catch {}
+    await walletService.createWallet(chosenId);
+    const newBalance = await walletService.debitWallet(chosenId, amt, wtype, description || 'Admin Debit');
+    res.json({ success: true, userId: chosenId, newBalance, walletType: wtype });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
