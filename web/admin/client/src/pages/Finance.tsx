@@ -8,6 +8,13 @@ import { useEffect, useState } from "react";
 export default function FinancePage() {
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUid, setSelectedUid] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const toRange = () => {
+    const start = startDate ? new Date(startDate + "T00:00:00").getTime() : undefined;
+    const end = endDate ? new Date(endDate + "T23:59:59").getTime() : undefined;
+    return { start, end };
+  };
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -19,8 +26,11 @@ export default function FinancePage() {
     return () => { mounted = false; };
   }, []);
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["finance-analytics", selectedUid],
-    queryFn: async () => await getFinanceAnalytics({ uid: selectedUid || undefined }),
+    queryKey: ["finance-analytics", selectedUid, startDate, endDate],
+    queryFn: async () => {
+      const { start, end } = toRange();
+      return await getFinanceAnalytics({ uid: selectedUid || undefined, start, end });
+    },
     refetchInterval: 10000,
     staleTime: 8000,
   });
@@ -28,6 +38,8 @@ export default function FinancePage() {
   const weekly = data?.weekly || { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 };
   const monthly = data?.monthly || { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 };
   const requiredProviderBalance = Number(data?.providerBalanceRequired || 0);
+  const walletBalance = Number(data?.walletBalance || 0);
+  const totals = data?.totals || { depositsTotal: 0, providerCostTotal: 0, smsCostTotal: 0, netProfitTotal: 0 };
   const txs = (data?.transactions || []).slice(0, 100);
 
   return (
@@ -55,6 +67,12 @@ export default function FinancePage() {
             ))}
           </select>
         </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-muted-foreground">Date</label>
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="border rounded-md px-3 py-2 text-sm bg-background" />
+          <span className="text-muted-foreground">to</span>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="border rounded-md px-3 py-2 text-sm bg-background" />
+        </div>
       </div>
 
       {isLoading && <div className="p-6 text-sm text-muted-foreground">Loading analytics...</div>}
@@ -70,6 +88,17 @@ export default function FinancePage() {
             <div className="text-3xl font-bold">₦{requiredProviderBalance.toLocaleString()}</div>
           </CardContent>
         </Card>
+        {selectedUid && (
+          <Card className="border-none shadow-sm md:col-span-1">
+            <CardHeader>
+              <CardTitle>User Balance</CardTitle>
+              <CardDescription>Main wallet balance of selected user</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">₦{walletBalance.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+        )}
         <Card className="border-none shadow-sm md:col-span-2">
           <CardHeader>
             <CardTitle>Summary</CardTitle>
@@ -110,6 +139,32 @@ export default function FinancePage() {
                 </TableRow>
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="border-none shadow-sm md:col-span-1">
+          <CardHeader>
+            <CardTitle>Totals (Filtered Range)</CardTitle>
+            <CardDescription>Combined across selected date range</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Deposits</span>
+              <span className="font-bold">₦{Number(totals.depositsTotal || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Provider Cost</span>
+              <span className="font-bold">₦{Number(totals.providerCostTotal || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">SMS Cost</span>
+              <span className="font-bold">₦{Number(totals.smsCostTotal || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Net Profit</span>
+              <span className="font-bold">₦{Number(totals.netProfitTotal || 0).toLocaleString()}</span>
+            </div>
           </CardContent>
         </Card>
       </div>

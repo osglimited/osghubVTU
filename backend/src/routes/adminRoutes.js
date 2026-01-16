@@ -176,21 +176,49 @@ router.get('/finance/analytics', async (req, res) => {
   const email = String(req.query.email || '').toLowerCase();
   const uid = String(req.query.uid || '').toLowerCase();
   const scope = (email || uid) ? 'user' : 'system';
+  const startRaw = req.query.start;
+  const endRaw = req.query.end;
+  const parseTs = (val) => {
+    if (val === undefined || val === null || val === '') return undefined;
+    const s = String(val);
+    if (/^\d+$/.test(s)) return Number(s);
+    const t = Date.parse(s);
+    return isNaN(t) ? undefined : t;
+  };
+  const startTs = parseTs(startRaw);
+  const endTs = parseTs(endRaw);
   const makePeriod = (days) => {
     const d = new Date();
     d.setDate(d.getDate() - days);
     return d.getTime();
   };
+  const getCreatedMs = (v) => {
+    if (!v) return 0;
+    if (typeof v === 'number') return v;
+    if (v instanceof Date) return v.getTime();
+    if (v._seconds) return Number(v._seconds) * 1000;
+    if (v.seconds) return Number(v.seconds) * 1000;
+    return 0;
+  };
   try {
     // Deposits
     const depSnap = await db.collection('wallet_deposits').orderBy('createdAt', 'desc').limit(5000).get();
-    const depositsAll = depSnap.docs.map(d => d.data() || {});
+    const depositsAll = depSnap.docs.map(d => {
+      const x = d.data() || {};
+      return { ...x, createdAt: getCreatedMs(x.createdAt) };
+    });
     const deposits = scope === 'user'
       ? depositsAll.filter(d => {
           const u = String((d.user || d.user_email || d.userId || '')).toLowerCase();
           return (email && u === email) || (uid && u === uid);
         })
       : depositsAll;
+    const depositsFiltered = deposits.filter(d => {
+      const t = Number(d.createdAt || 0);
+      if (startTs !== undefined && t < startTs) return false;
+      if (endTs !== undefined && t > endTs) return false;
+      return true;
+    });
 
     // Transactions
     const txNames = ['transactions', 'admin_transactions', 'wallet_transactions'];
@@ -211,7 +239,7 @@ router.get('/finance/analytics', async (req, res) => {
             smsCost: sms,
             serviceType: String(x.serviceType || x.type || ''),
             status,
-            createdAt: Number(x.createdAt || 0),
+            createdAt: getCreatedMs(x.createdAt),
           };
         });
         const filtered = scope === 'user'
@@ -221,15 +249,21 @@ router.get('/finance/analytics', async (req, res) => {
               return (email && (uEmail === email)) || (uid && (uId === uid));
             })
           : rows;
-        transactions = transactions.concat(filtered);
+        const timeFiltered = filtered.filter(t => {
+          const tt = Number(t.createdAt || 0);
+          if (startTs !== undefined && tt < startTs) return false;
+          if (endTs !== undefined && tt > endTs) return false;
+          return true;
+        });
+        transactions = transactions.concat(timeFiltered);
       }
     }
     transactions.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 
     // Provider balance required
     let providerBalanceRequired = 0;
+    let walletBalance = 0;
     if (scope === 'user') {
-      let walletBalance = 0;
       for (const n of ['wallets', 'user_wallets']) {
         const doc = await db.collection(n).doc(uid || email).get();
         if (doc.exists) {
@@ -255,8 +289,8 @@ router.get('/finance/analytics', async (req, res) => {
       providerBalanceRequired = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
     }
 
-    const computeBucket = (startTs) => {
-      const dep = deposits.filter(d => Number(d.createdAt || 0) >= startTs).reduce((s, d) => s + Number(d.amount || 0), 0);
+    const computeBucket = (bucketStart) => {
+      const dep = depositsFiltered.filter(d => Number(d.createdAt || 0) >= bucketStart).reduce((s, d) => s + Number(d.amount || 0), 0);
       const tx = transactions.filter(t => Number(t.createdAt || 0) >= startTs);
       const provider = tx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
       const sms = tx.reduce((s, t) => s + Number(t.smsCost || 0), 0);
@@ -269,9 +303,15 @@ router.get('/finance/analytics', async (req, res) => {
     const weekly = computeBucket(makePeriod(7));
     const monthly = computeBucket(makePeriod(30));
 
-    return res.json({ scope, providerBalanceRequired, daily, weekly, monthly, transactions });
+    const depositsTotal = depositsFiltered.reduce((s, d) => s + Number(d.amount || 0), 0);
+    const providerCostTotal = transactions.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+    const smsCostTotal = transactions.reduce((s, t) => s + Number(t.smsCost || 0), 0);
+    const revenueTotal = transactions.filter(t => String(t.status || '') === 'success').reduce((s, t) => s + Number(t.userPrice || 0), 0);
+    const netProfitTotal = revenueTotal - providerCostTotal - smsCostTotal;
+
+    return res.json({ scope, providerBalanceRequired, walletBalance, daily, weekly, monthly, totals: { depositsTotal, providerCostTotal, smsCostTotal, netProfitTotal }, transactions });
   } catch (e) {
-    return res.json({ scope: (email || uid) ? 'user' : 'system', providerBalanceRequired: 0, daily: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, weekly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, monthly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, transactions: [] });
+    return res.json({ scope: (email || uid) ? 'user' : 'system', providerBalanceRequired: 0, walletBalance: 0, daily: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, weekly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, monthly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, totals: { depositsTotal: 0, providerCostTotal: 0, smsCostTotal: 0, netProfitTotal: 0 }, transactions: [] });
   }
 });
 

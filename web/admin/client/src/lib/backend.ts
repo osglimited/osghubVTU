@@ -129,12 +129,14 @@ export async function getAdminStats(): Promise<{
   return await request("GET", "/api/admin/stats");
 }
 
-export async function getFinanceAnalytics(input?: { uid?: string; email?: string }): Promise<{
+export async function getFinanceAnalytics(input?: { uid?: string; email?: string; start?: number; end?: number }): Promise<{
   scope: "system" | "user";
   providerBalanceRequired: number;
+  walletBalance?: number;
   daily: { deposits: number; providerCost: number; smsCost: number; netProfit: number };
   weekly: { deposits: number; providerCost: number; smsCost: number; netProfit: number };
   monthly: { deposits: number; providerCost: number; smsCost: number; netProfit: number };
+  totals: { depositsTotal: number; providerCostTotal: number; smsCostTotal: number; netProfitTotal: number };
   transactions: Array<{
     id: string;
     userId: string;
@@ -147,7 +149,7 @@ export async function getFinanceAnalytics(input?: { uid?: string; email?: string
     createdAt: number;
   }>;
 }> {
-  const qs = new URLSearchParams({ uid: String(input?.uid || ""), email: String(input?.email || "") }).toString();
+  const qs = new URLSearchParams({ uid: String(input?.uid || ""), email: String(input?.email || ""), start: input?.start ? String(input.start) : "", end: input?.end ? String(input.end) : "" }).toString();
   return await request("GET", `/api/admin/finance/analytics?${qs}`);
 }
 export async function getWalletLogs(): Promise<any[]> {
