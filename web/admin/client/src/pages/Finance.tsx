@@ -1,20 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
-import { getFinanceSystem } from "@/lib/backend";
+import { getFinanceAnalytics, listUsers } from "@/lib/backend";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export default function FinancePage() {
+  const [users, setUsers] = useState<any[]>([]);
+  const [selectedUid, setSelectedUid] = useState<string>("");
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const rows = await listUsers(500);
+        if (mounted) setUsers(rows || []);
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, []);
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["finance-system"],
-    queryFn: async () => await getFinanceSystem(),
+    queryKey: ["finance-analytics", selectedUid],
+    queryFn: async () => await getFinanceAnalytics({ uid: selectedUid || undefined }),
     refetchInterval: 10000,
     staleTime: 8000,
   });
   const daily = data?.daily || { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 };
   const weekly = data?.weekly || { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 };
   const monthly = data?.monthly || { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 };
-  const requiredProviderBalance = Number(data?.requiredProviderBalance || 0);
+  const requiredProviderBalance = Number(data?.providerBalanceRequired || 0);
+  const txs = (data?.transactions || []).slice(0, 100);
 
   return (
     <div className="space-y-6">
@@ -23,8 +37,23 @@ export default function FinancePage() {
           <TrendingUp className="h-6 w-6 text-primary" />
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-foreground">Financial Intelligence</h2>
-            <p className="text-muted-foreground">System-wide analytics from real transaction data.</p>
+            <p className="text-muted-foreground">Single engine: All Users or specific user.</p>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-muted-foreground">Scope</label>
+          <select
+            value={selectedUid}
+            onChange={(e) => setSelectedUid(e.target.value)}
+            className="border rounded-md px-3 py-2 text-sm bg-background"
+          >
+            <option value="">All Users</option>
+            {users.map((u) => (
+              <option key={u.uid || u.id} value={u.uid || u.id}>
+                {u.displayName || u.email || u.uid}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -84,6 +113,53 @@ export default function FinancePage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-none shadow-sm">
+        <CardHeader>
+          <CardTitle>Transaction Breakdown</CardTitle>
+          <CardDescription>Recent transactions in selected scope</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>User Price</TableHead>
+                <TableHead>Provider Cost</TableHead>
+                <TableHead>SMS Cost</TableHead>
+                <TableHead>Net</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {txs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">No transactions</TableCell>
+                </TableRow>
+              ) : txs.map((t) => {
+                const net = Number(t.userPrice || 0) - Number(t.providerCost || 0) - Number(t.smsCost || 0);
+                const created = t.createdAt ? new Date(t.createdAt).toLocaleString() : "-";
+                return (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-mono text-xs">{t.id}</TableCell>
+                    <TableCell>{t.user}</TableCell>
+                    <TableCell>{t.serviceType}</TableCell>
+                    <TableCell>₦{Number(t.userPrice || 0).toLocaleString()}</TableCell>
+                    <TableCell>₦{Number(t.providerCost || 0).toLocaleString()}</TableCell>
+                    <TableCell>₦{Number(t.smsCost || 0).toLocaleString()}</TableCell>
+                    <TableCell>₦{net.toLocaleString()}</TableCell>
+                    <TableCell>{t.status}</TableCell>
+                    <TableCell>{created}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
