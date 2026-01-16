@@ -82,7 +82,9 @@ export default function FinancePage() {
         <Card className="border-none shadow-sm md:col-span-1">
           <CardHeader>
             <CardTitle>Provider Balance Required</CardTitle>
-            <CardDescription>Sum of all users' main wallet balances</CardDescription>
+            <CardDescription>
+              {selectedUid ? "User’s main wallet balance" : "Sum of all users’ main wallet balances"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">₦{requiredProviderBalance.toLocaleString()}</div>

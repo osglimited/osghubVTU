@@ -290,11 +290,15 @@ router.get('/finance/analytics', async (req, res) => {
     }
 
     const computeBucket = (bucketStart) => {
-      const dep = depositsFiltered.filter(d => Number(d.createdAt || 0) >= bucketStart).reduce((s, d) => s + Number(d.amount || 0), 0);
-      const tx = transactions.filter(t => Number(t.createdAt || 0) >= startTs);
+      const dep = depositsFiltered
+        .filter(d => Number(d.createdAt || 0) >= bucketStart)
+        .reduce((s, d) => s + Number(d.amount || 0), 0);
+      const tx = transactions.filter(t => Number(t.createdAt || 0) >= bucketStart);
       const provider = tx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
       const sms = tx.reduce((s, t) => s + Number(t.smsCost || 0), 0);
-      const revenue = tx.filter(t => String(t.status || '') === 'success').reduce((s, t) => s + Number(t.userPrice || 0), 0);
+      const revenue = tx
+        .filter(t => String(t.status || '') === 'success')
+        .reduce((s, t) => s + Number(t.userPrice || 0), 0);
       const net = revenue - provider - sms;
       return { deposits: dep, providerCost: provider, smsCost: sms, netProfit: net };
     };
@@ -309,6 +313,24 @@ router.get('/finance/analytics', async (req, res) => {
     const revenueTotal = transactions.filter(t => String(t.status || '') === 'success').reduce((s, t) => s + Number(t.userPrice || 0), 0);
     const netProfitTotal = revenueTotal - providerCostTotal - smsCostTotal;
 
+    // Audit log (non-blocking)
+    try {
+      const logDoc = {
+        id: `al_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        type: 'finance_analytics',
+        scope,
+        uid,
+        email,
+        start: startTs || null,
+        end: endTs || null,
+        providerBalanceRequired,
+        walletBalance,
+        totals: { depositsTotal, providerCostTotal, smsCostTotal, netProfitTotal },
+        txCount: transactions.length,
+        createdAt: Date.now(),
+      };
+      await db.collection('admin_logs').doc(logDoc.id).set(logDoc, { merge: true });
+    } catch {}
     return res.json({ scope, providerBalanceRequired, walletBalance, daily, weekly, monthly, totals: { depositsTotal, providerCostTotal, smsCostTotal, netProfitTotal }, transactions });
   } catch (e) {
     return res.json({ scope: (email || uid) ? 'user' : 'system', providerBalanceRequired: 0, walletBalance: 0, daily: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, weekly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, monthly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, totals: { depositsTotal: 0, providerCostTotal: 0, smsCostTotal: 0, netProfitTotal: 0 }, transactions: [] });
