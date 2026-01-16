@@ -229,7 +229,6 @@ router.get('/finance/analytics', async (req, res) => {
         const rows = snap.docs.map(d => {
           const x = d.data() || {};
           const status = String(x.status || '');
-          const sms = status === 'success' ? 5 : 0; // ₦5 per successful transaction
           const type = String(x.type || '').toLowerCase();
           const serviceType = String(x.serviceType || x.type || '');
           const isService = !!serviceType && !['credit', 'debit', 'transfer', 'wallet', 'funding'].includes(type);
@@ -239,7 +238,7 @@ router.get('/finance/analytics', async (req, res) => {
             user: x.user || x.user_email || x.userEmail || x.email || x.userId || '',
             userPrice: Number(x.userPrice || x.amount || 0),
             providerCost: Number(x.providerCost || 0),
-            smsCost: sms,
+            smsCost: Number(x.sms_cost ?? x.smsCost ?? 0),
             serviceType,
             status,
             createdAt: getCreatedMs(x.createdAt),
@@ -269,28 +268,20 @@ router.get('/finance/analytics', async (req, res) => {
     let providerBalanceRequired = 0;
     let walletBalance = 0;
     if (scope === 'user') {
-      for (const n of ['wallets', 'user_wallets']) {
-        const doc = await db.collection(n).doc(uid || email).get();
+      if (uid) {
+        const doc = await db.collection('wallets').doc(uid).get();
         if (doc.exists) {
           const x = doc.data() || {};
           walletBalance = Number(x.mainBalance || x.main_balance || x.balance || 0);
-          break;
         }
       }
       providerBalanceRequired = walletBalance;
     } else {
-      const allWallets = [];
-      for (const n of ['wallets', 'user_wallets']) {
-        const snap = await db.collection(n).limit(5000).get();
-        if (!snap.empty) {
-          allWallets.push(
-            ...snap.docs.map(d => {
-              const x = d.data() || {};
-              return { main: Number(x.mainBalance || x.main_balance || x.balance || 0) };
-            })
-          );
-        }
-      }
+      const snap = await db.collection('wallets').limit(5000).get();
+      const allWallets = snap.empty ? [] : snap.docs.map(d => {
+        const x = d.data() || {};
+        return { main: Number(x.mainBalance || x.main_balance || x.balance || 0) };
+      });
       providerBalanceRequired = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
     }
 
