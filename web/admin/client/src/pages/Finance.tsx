@@ -84,7 +84,7 @@ export default function FinancePage() {
           <CardHeader>
             <CardTitle>Provider Balance Required</CardTitle>
             <CardDescription>
-              {selectedUid ? "User’s main wallet balance" : "Sum of all users’ main wallet balances"}
+              {selectedScope ? "User’s main wallet balance" : "Sum of all users’ main wallet balances"}
             </CardDescription>
           </CardHeader>
           <CardContent>
