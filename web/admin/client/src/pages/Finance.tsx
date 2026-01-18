@@ -184,36 +184,38 @@ export default function FinancePage() {
                 <TableHead>User</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>User Price</TableHead>
-                <TableHead>Provider Cost</TableHead>
-                <TableHead>SMS Cost</TableHead>
-                <TableHead>Net</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
+              <TableHead>Provider Cost</TableHead>
+              <TableHead>SMS Cost</TableHead>
+              <TableHead>Net</TableHead>
+              <TableHead>Error Source</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Date</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {txs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center text-muted-foreground">No transactions</TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {txs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground">No transactions</TableCell>
+            ) : txs.map((t) => {
+              const net = Number(t.userPrice || 0) - Number(t.providerCost || 0) - Number(t.smsCost || 0);
+              const created = t.createdAt ? new Date(t.createdAt).toLocaleString() : "-";
+              return (
+                <TableRow key={t.id}>
+                  <TableCell className="font-mono text-xs">{t.id}</TableCell>
+                  <TableCell>{t.user}</TableCell>
+                  <TableCell>{t.serviceType}</TableCell>
+                  <TableCell>₦{Number(t.userPrice || 0).toLocaleString()}</TableCell>
+                  <TableCell>₦{Number(t.providerCost || 0).toLocaleString()}</TableCell>
+                  <TableCell>₦{Number(t.smsCost || 0).toLocaleString()}</TableCell>
+                  <TableCell>₦{net.toLocaleString()}</TableCell>
+                  <TableCell>{String(t.status || '').toLowerCase() === 'success' ? '-' : (t.failureSource || 'unknown')}</TableCell>
+                  <TableCell>{t.status}</TableCell>
+                  <TableCell>{created}</TableCell>
                 </TableRow>
-              ) : txs.map((t) => {
-                const net = Number(t.userPrice || 0) - Number(t.providerCost || 0) - Number(t.smsCost || 0);
-                const created = t.createdAt ? new Date(t.createdAt).toLocaleString() : "-";
-                return (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-mono text-xs">{t.id}</TableCell>
-                    <TableCell>{t.user}</TableCell>
-                    <TableCell>{t.serviceType}</TableCell>
-                    <TableCell>₦{Number(t.userPrice || 0).toLocaleString()}</TableCell>
-                    <TableCell>₦{Number(t.providerCost || 0).toLocaleString()}</TableCell>
-                    <TableCell>₦{Number(t.smsCost || 0).toLocaleString()}</TableCell>
-                    <TableCell>₦{net.toLocaleString()}</TableCell>
-                    <TableCell>{t.status}</TableCell>
-                    <TableCell>{created}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
+              );
+            })}
+          </TableBody>
           </Table>
         </CardContent>
       </Card>

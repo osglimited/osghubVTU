@@ -281,7 +281,20 @@ router.get('/finance/analytics', async (req, res) => {
           if (endTs !== undefined && tt > endTs) return false;
           return true;
         });
-        transactions = transactions.concat(timeFiltered);
+        transactions = transactions.concat(
+          timeFiltered.map(t => {
+            const s = String(t.status || '').toLowerCase();
+            const ps = String(x.providerStatus || x.provider_status || '');
+            const pe = String(x.providerErrorCode || x.provider_error_code || '');
+            const pm = String(x.providerErrorMessage || x.provider_error_message || '');
+            const se = String(x.error || x.errorMessage || '');
+            const failureSource = s === 'success'
+              ? ''
+              : (pe || ps || pm) ? 'provider' : (se ? 'system' : 'unknown');
+            const failureReason = s === 'success' ? '' : (pm || pe || ps || se || '');
+            return { ...t, failureSource, failureReason };
+          })
+        );
       }
     }
     transactions.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
@@ -315,8 +328,9 @@ router.get('/finance/analytics', async (req, res) => {
         .filter(d => Number(d.createdAt || 0) >= bucketStart)
         .reduce((s, d) => s + Number(d.amount || 0), 0);
       const tx = transactions.filter(t => Number(t.createdAt || 0) >= bucketStart);
-      const provider = tx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
-      const sms = tx.reduce((s, t) => s + Number(t.smsCost || 0), 0);
+      const txSuccess = tx.filter(t => String(t.status || '').toLowerCase() === 'success');
+      const provider = txSuccess.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+      const sms = txSuccess.reduce((s, t) => s + Number(t.smsCost || 0), 0);
       const revenue = tx
         .filter(t => String(t.status || '') === 'success')
         .reduce((s, t) => s + Number(t.userPrice || 0), 0);
@@ -329,9 +343,10 @@ router.get('/finance/analytics', async (req, res) => {
     const monthly = computeBucket(makePeriod(30));
 
     const depositsTotal = depositsFiltered.reduce((s, d) => s + Number(d.amount || 0), 0);
-    const providerCostTotal = transactions.reduce((s, t) => s + Number(t.providerCost || 0), 0);
-    const smsCostTotal = transactions.reduce((s, t) => s + Number(t.smsCost || 0), 0);
-    const revenueTotal = transactions.filter(t => String(t.status || '') === 'success').reduce((s, t) => s + Number(t.userPrice || 0), 0);
+    const successTx = transactions.filter(t => String(t.status || '').toLowerCase() === 'success');
+    const providerCostTotal = successTx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+    const smsCostTotal = successTx.reduce((s, t) => s + Number(t.smsCost || 0), 0);
+    const revenueTotal = successTx.reduce((s, t) => s + Number(t.userPrice || 0), 0);
     const netProfitTotal = revenueTotal - providerCostTotal - smsCostTotal;
 
     // Audit log (non-blocking)
