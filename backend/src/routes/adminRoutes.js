@@ -173,9 +173,11 @@ router.get('/wallet/deposits', async (_req, res) => {
 
 // Unified Financial Intelligence: system or user scope
 router.get('/finance/analytics', async (req, res) => {
-  const email = String(req.query.email || '').toLowerCase();
-  const uid = String(req.query.uid || '').toLowerCase();
-  const scope = (email || uid) ? 'user' : 'system';
+  const rawEmail = String(req.query.email || '').trim();
+  const rawUid = String(req.query.uid || '').trim();
+  const email = rawEmail.toLowerCase();
+  const uid = rawUid.toLowerCase();
+  const scope = (rawEmail || rawUid) ? 'user' : 'system';
   const startRaw = req.query.start;
   const endRaw = req.query.end;
   const parseTs = (val) => {
@@ -199,42 +201,28 @@ router.get('/finance/analytics', async (req, res) => {
     }
     return 0;
   };
-  const readMainBalanceBest = async (uid, email) => {
-    const keys = [String(uid || '').toLowerCase(), String(email || '').toLowerCase()].filter(Boolean);
+  const readMainBalanceBest = async (uidRaw, emailRaw) => {
+    const targets = [String(uidRaw || '').toLowerCase(), String(emailRaw || '').toLowerCase()].filter(Boolean);
+    if (targets.length === 0) return 0;
     let best = 0;
     const pickMain = (x) => pickNumber(x, ['mainBalance', 'main_balance', 'balance']);
     const sources = ['wallets', 'user_wallets'];
     for (const src of sources) {
-      // 1) Try direct doc lookups by uid/email
-      for (const k of keys) {
-        try {
-          const doc = await db.collection(src).doc(k).get();
-          if (doc.exists) {
-            best = Math.max(best, pickMain(doc.data() || {}));
-          }
-        } catch {}
-      }
-      // 2) Try field-based lookups where docs aren't keyed by uid/email
       try {
-        const col = db.collection(src);
-        const queries = [];
-        if (keys[0]) {
-          queries.push(col.where('uid', '==', keys[0]).limit(1).get());
-          queries.push(col.where('userId', '==', keys[0]).limit(1).get());
-        }
-        if (keys[1]) {
-          queries.push(col.where('email', '==', keys[1]).limit(1).get());
-          queries.push(col.where('user_email', '==', keys[1]).limit(1).get());
-        }
-        const results = await Promise.allSettled(queries);
-        for (const r of results) {
-          if (r.status === 'fulfilled') {
-            const snap = r.value;
-            if (!snap.empty) {
-              for (const d of snap.docs) {
-                best = Math.max(best, pickMain(d.data() || {}));
-              }
-            }
+        const snap = await db.collection(src).limit(5000).get();
+        if (snap.empty) continue;
+        for (const d of snap.docs) {
+          const x = d.data() || {};
+          const candidates = [
+            String(x.uid || '').toLowerCase(),
+            String(x.userId || '').toLowerCase(),
+            String(x.email || '').toLowerCase(),
+            String(x.user_email || '').toLowerCase(),
+            String(d.id || '').toLowerCase(),
+          ].filter(Boolean);
+          const match = candidates.some(k => targets.includes(k));
+          if (match) {
+            best = Math.max(best, pickMain(x));
           }
         }
       } catch {}
@@ -284,13 +272,19 @@ router.get('/finance/analytics', async (req, res) => {
             (!!serviceType && !['credit', 'debit', 'transfer', 'wallet', 'funding'].includes(type))
             || (pickNumber(x, ['providerCost','priceApi','price_api']) > 0)
           );
+          const userPrice = pickNumber(x, ['userPrice','priceUser','price_user','amount','user_amount','paid','userPaid']);
+          let providerCost = pickNumber(x, ['providerCost','priceApi','price_api','apiPrice','provider_price','providerPrice','cost','serviceCost']);
+          if (isService && providerCost <= 0) {
+            providerCost = userPrice;
+          }
+          const smsCost = Number(x.sms_cost ?? x.smsCost ?? 0);
           return {
             id: d.id,
             userId: x.userId || '',
             user: x.user || x.user_email || x.userEmail || x.email || x.userId || '',
-            userPrice: pickNumber(x, ['userPrice','priceUser','price_user','amount','user_amount','paid','userPaid']),
-            providerCost: pickNumber(x, ['providerCost','priceApi','price_api','apiPrice','provider_price','providerPrice','cost','serviceCost']),
-            smsCost: Number(x.sms_cost ?? x.smsCost ?? 0),
+            userPrice,
+            providerCost,
+            smsCost,
             serviceType,
             status,
             createdAt: getCreatedMs(x.createdAt),
@@ -335,7 +329,7 @@ router.get('/finance/analytics', async (req, res) => {
     let providerBalanceRequired = 0;
     let walletBalance = 0;
     if (scope === 'user') {
-      walletBalance = await readMainBalanceBest(uid, email);
+      walletBalance = await readMainBalanceBest(rawUid, rawEmail);
       providerBalanceRequired = walletBalance;
     } else {
       const sources = ['wallets', 'user_wallets'];
@@ -401,13 +395,13 @@ router.get('/finance/analytics', async (req, res) => {
     } catch {}
     return res.json({ scope, providerBalanceRequired, walletBalance, daily, weekly, monthly, totals: { depositsTotal, providerCostTotal, smsCostTotal, netProfitTotal }, transactions });
   } catch (e) {
-    return res.json({ scope: (email || uid) ? 'user' : 'system', providerBalanceRequired: 0, walletBalance: 0, daily: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, weekly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, monthly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, totals: { depositsTotal: 0, providerCostTotal: 0, smsCostTotal: 0, netProfitTotal: 0 }, transactions: [] });
+    return res.json({ scope: (rawEmail || rawUid) ? 'user' : 'system', providerBalanceRequired: 0, walletBalance: 0, daily: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, weekly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, monthly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, totals: { depositsTotal: 0, providerCostTotal: 0, smsCostTotal: 0, netProfitTotal: 0 }, transactions: [] });
   }
 });
 
 router.get('/users/transactions', async (req, res) => {
-  const email = String(req.query.email || '').toLowerCase();
-  const uid = String(req.query.uid || '').toLowerCase();
+  const email = String(req.query.email || '').trim();
+  const uid = String(req.query.uid || '').trim();
   if (!email && !uid) return res.json([]);
   try {
     const names = ['admin_transactions', 'transactions', 'wallet_transactions'];

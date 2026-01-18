@@ -21,7 +21,7 @@ export async function registerRoutes(
         const rawKey = process.env.FIREBASE_PRIVATE_KEY;
         if (clientEmail && rawKey) {
           const privateKey = String(rawKey).replace(/\\n/g, "\n");
-          initializeApp({ credential: cert({ project_id: projectId, client_email: clientEmail, private_key: privateKey }), projectId } as any);
+          initializeApp({ credential: cert({ projectId: projectId, clientEmail: clientEmail, privateKey: privateKey }), projectId } as any);
         } else {
           initializeApp({ credential: applicationDefault(), projectId } as any);
         }
@@ -35,7 +35,7 @@ export async function registerRoutes(
   }
 
   async function verifyTokenAndGetEmail(token?: string): Promise<{ email?: string; isAdmin?: boolean }> {
-    if (!token) return undefined;
+    if (!token) return { email: undefined, isAdmin: false };
     try {
       const decoded: any = await getAuth().verifyIdToken(token);
       const email = String(decoded.email || "").toLowerCase();
@@ -460,8 +460,8 @@ export async function registerRoutes(
   });
 
   app.get("/api/admin/users/transactions", adminAuth, async (req: Request, res: Response) => {
-    const email = String((req.query?.email as string) || "").toLowerCase();
-    const uid = String((req.query as any)?.uid || "").toLowerCase();
+    const email = String((req.query?.email as string) || "").trim();
+    const uid = String((req.query as any)?.uid || "").trim();
     if (!email && !uid) return res.json([]);
     try {
       const db = getFirestore();
@@ -830,8 +830,10 @@ export async function registerRoutes(
   });
 
   app.get("/api/admin/finance/analytics", adminAuth, async (req: Request, res: Response) => {
-    const email = String((req.query?.email as string) || "").toLowerCase();
-    const uid = String((req.query as any)?.uid || "").toLowerCase();
+    const rawEmail = String((req.query?.email as string) || "").trim();
+    const rawUid = String((req.query as any)?.uid || "").trim();
+    const email = rawEmail.toLowerCase();
+    const uid = rawUid.toLowerCase();
     const makePeriod = (days: number) => {
       const d = new Date();
       d.setDate(d.getDate() - days);
@@ -856,12 +858,17 @@ export async function registerRoutes(
             const x: any = d.data() || {};
             const status = String(x.status || "");
             const sms = status === "success" ? 5 : 0;
+            const userPrice = Number(x.userPrice || x.amount || 0);
+            let providerCost = Number(x.providerCost || 0);
+            if (providerCost <= 0) {
+              providerCost = userPrice;
+            }
             return {
               id: d.id,
               userId: x.userId || "",
               user: x.user || x.user_email || x.userEmail || x.email || x.userId || "",
-              userPrice: Number(x.userPrice || x.amount || 0),
-              providerCost: Number(x.providerCost || 0),
+              userPrice,
+              providerCost,
               smsCost: sms,
               serviceType: String(x.serviceType || x.type || ""),
               status,
@@ -883,7 +890,7 @@ export async function registerRoutes(
       if (email || uid) {
         let walletBalance = 0;
         for (const n of ["wallets", "user_wallets"]) {
-          const doc = await db.collection(n).doc(uid || email).get();
+          const doc = await db.collection(n).doc(rawUid || rawEmail).get();
           if (doc.exists) {
             const x: any = doc.data() || {};
             walletBalance = Number(x.mainBalance || x.main_balance || x.balance || 0);
@@ -918,9 +925,9 @@ export async function registerRoutes(
       const daily = computeBucket(makePeriod(1));
       const weekly = computeBucket(makePeriod(7));
       const monthly = computeBucket(makePeriod(30));
-      res.json({ scope: (email || uid) ? "user" : "system", providerBalanceRequired, daily, weekly, monthly, transactions });
+      res.json({ scope: (rawEmail || rawUid) ? "user" : "system", providerBalanceRequired, daily, weekly, monthly, transactions });
     } catch {
-      res.json({ scope: (email || uid) ? "user" : "system", providerBalanceRequired: 0, daily: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, weekly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, monthly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, transactions: [] });
+      res.json({ scope: (rawEmail || rawUid) ? "user" : "system", providerBalanceRequired: 0, daily: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, weekly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, monthly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, transactions: [] });
     }
   });
 
