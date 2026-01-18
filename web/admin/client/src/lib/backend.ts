@@ -147,6 +147,8 @@ export async function getFinanceAnalytics(input?: { uid?: string; email?: string
     serviceType: string;
     status: string;
     createdAt: number;
+    failureSource?: string;
+    failureReason?: string;
   }>;
 }> {
   const qs = new URLSearchParams({ uid: String(input?.uid || ""), email: String(input?.email || ""), start: input?.start ? String(input.start) : "", end: input?.end ? String(input.end) : "" }).toString();

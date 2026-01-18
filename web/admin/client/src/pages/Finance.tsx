@@ -84,7 +84,7 @@ export default function FinancePage() {
           <CardHeader>
             <CardTitle>Provider Balance Required</CardTitle>
             <CardDescription>
-              {selectedScope ? "User’s main wallet balance" : "Sum of all users’ main wallet balances"}
+              {selectedScope ? "Estimated provider funds needed for this user’s balance" : "Estimated provider funds needed for all users"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -243,7 +243,7 @@ function CapacityTable({ walletBalance }: { walletBalance: number }) {
     staleTime: 60000,
   });
   const rows = (plans || []).map((p: any) => {
-    const price = Number(p.priceUser || 0);
+    const price = Number(p.priceApi || p.priceUser || 0);
     const capacity = price > 0 ? Math.floor(Number(walletBalance || 0) / price) : 0;
     return { name: `${p.network || ""} ${p.name || ""}`.trim(), price, capacity };
   }).filter((r: any) => r.price > 0);
