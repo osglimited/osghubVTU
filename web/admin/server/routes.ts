@@ -881,7 +881,7 @@ export async function registerRoutes(
     try {
       const db = getFirestore();
       const txNames = ["transactions", "admin_transactions", "wallet_transactions"];
-      const depositsSnap = await db.collection("wallet_deposits").orderBy("createdAt", "desc").limit(5000).get();
+      const depositsSnap = await db.collection("wallet_deposits").orderBy("createdAt", "desc").limit(1000).get();
       const depositsAll = depositsSnap.docs.map(d => d.data() || {});
       const depositsScoped = scope === "user"
         ? depositsAll.filter(d => {
@@ -897,7 +897,7 @@ export async function registerRoutes(
       });
       let transactions: any[] = [];
       for (const n of txNames) {
-        const snap = await db.collection(n).orderBy("createdAt", "desc").limit(5000).get();
+        const snap = await db.collection(n).orderBy("createdAt", "desc").limit(1000).get();
         if (!snap.empty) {
           const rows = snap.docs.map(d => {
             const x: any = d.data() || {};
@@ -982,7 +982,7 @@ export async function registerRoutes(
       } else {
         const allWallets: Array<{ main: number }> = [];
         for (const n of ["wallets", "user_wallets"]) {
-          const snap = await db.collection(n).limit(5000).get();
+          const snap = await db.collection(n).limit(2000).get();
           if (!snap.empty) {
             allWallets.push(
               ...snap.docs.map(d => {

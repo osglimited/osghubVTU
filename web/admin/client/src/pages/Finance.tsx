@@ -32,8 +32,7 @@ export default function FinancePage() {
       const [uid, email] = selectedScope ? selectedScope.split("|") : ["", ""];
       return await getFinanceAnalytics({ uid: uid || undefined, email: email || undefined, start, end });
     },
-    refetchInterval: 10000,
-    staleTime: 8000,
+    staleTime: 10000,
   });
   const daily = data?.daily || { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 };
   const weekly = data?.weekly || { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 };
