@@ -243,7 +243,7 @@ router.get('/finance/analytics', async (req, res) => {
     });
 
     // Transactions
-    const txNames = ['transactions', 'admin_transactions'];
+    const txNames = ['transactions', 'admin_transactions', 'wallet_transactions'];
     let transactions = [];
     for (const n of txNames) {
       const snap = await db.collection(n).orderBy('createdAt', 'desc').limit(5000).get();
