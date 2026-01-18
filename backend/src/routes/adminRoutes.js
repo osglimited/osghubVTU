@@ -253,7 +253,7 @@ router.get('/finance/analytics', async (req, res) => {
           const status = String(x.status || '');
           const type = String(x.type || '').toLowerCase();
           const serviceType = String(x.serviceType || x.type || '');
-          const isService = !!serviceType && !['credit', 'debit', 'transfer', 'wallet', 'funding'].includes(type);
+          const isService = (!!serviceType && !['credit', 'transfer', 'wallet', 'funding'].includes(type)) || (pickNumber(x, ['providerCost','priceApi','price_api']) > 0);
           return {
             id: d.id,
             userId: x.userId || '',
@@ -265,6 +265,7 @@ router.get('/finance/analytics', async (req, res) => {
             status,
             createdAt: getCreatedMs(x.createdAt),
             isService,
+            raw: x,
           };
         });
         const filteredBase = rows.filter(r => r.isService);
@@ -283,6 +284,7 @@ router.get('/finance/analytics', async (req, res) => {
         });
         transactions = transactions.concat(
           timeFiltered.map(t => {
+            const x = t.raw || {};
             const s = String(t.status || '').toLowerCase();
             const ps = String(x.providerStatus || x.provider_status || '');
             const pe = String(x.providerErrorCode || x.provider_error_code || '');
