@@ -199,20 +199,47 @@ router.get('/finance/analytics', async (req, res) => {
     }
     return 0;
   };
-  const readMainBalance = async (id) => {
-    if (!id) return 0;
-    const cands = [
-      { col: 'wallets', doc: id },
-      { col: 'user_wallets', doc: id },
-    ];
-    for (const c of cands) {
-      const snap = await db.collection(c.col).doc(c.doc).get();
-      if (snap.exists) {
-        const x = snap.data() || {};
-        return pickNumber(x, ['mainBalance', 'main_balance', 'balance']);
+  const readMainBalanceBest = async (uid, email) => {
+    const keys = [String(uid || '').toLowerCase(), String(email || '').toLowerCase()].filter(Boolean);
+    let best = 0;
+    const pickMain = (x) => pickNumber(x, ['mainBalance', 'main_balance', 'balance']);
+    const sources = ['wallets', 'user_wallets'];
+    for (const src of sources) {
+      // 1) Try direct doc lookups by uid/email
+      for (const k of keys) {
+        try {
+          const doc = await db.collection(src).doc(k).get();
+          if (doc.exists) {
+            best = Math.max(best, pickMain(doc.data() || {}));
+          }
+        } catch {}
       }
+      // 2) Try field-based lookups where docs aren't keyed by uid/email
+      try {
+        const col = db.collection(src);
+        const queries = [];
+        if (keys[0]) {
+          queries.push(col.where('uid', '==', keys[0]).limit(1).get());
+          queries.push(col.where('userId', '==', keys[0]).limit(1).get());
+        }
+        if (keys[1]) {
+          queries.push(col.where('email', '==', keys[1]).limit(1).get());
+          queries.push(col.where('user_email', '==', keys[1]).limit(1).get());
+        }
+        const results = await Promise.allSettled(queries);
+        for (const r of results) {
+          if (r.status === 'fulfilled') {
+            const snap = r.value;
+            if (!snap.empty) {
+              for (const d of snap.docs) {
+                best = Math.max(best, pickMain(d.data() || {}));
+              }
+            }
+          }
+        }
+      } catch {}
     }
-    return 0;
+    return best;
   };
   const getCreatedMs = (v) => {
     if (!v) return 0;
@@ -308,7 +335,7 @@ router.get('/finance/analytics', async (req, res) => {
     let providerBalanceRequired = 0;
     let walletBalance = 0;
     if (scope === 'user') {
-      walletBalance = (await readMainBalance(uid)) || (await readMainBalance(email));
+      walletBalance = await readMainBalanceBest(uid, email);
       providerBalanceRequired = walletBalance;
     } else {
       const sources = ['wallets', 'user_wallets'];
