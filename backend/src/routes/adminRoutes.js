@@ -253,7 +253,10 @@ router.get('/finance/analytics', async (req, res) => {
           const status = String(x.status || '');
           const type = String(x.type || '').toLowerCase();
           const serviceType = String(x.serviceType || x.type || '');
-          const isService = (!!serviceType && !['credit', 'transfer', 'wallet', 'funding'].includes(type)) || (pickNumber(x, ['providerCost','priceApi','price_api']) > 0);
+          const isService = (
+            (!!serviceType && !['credit', 'debit', 'transfer', 'wallet', 'funding'].includes(type))
+            || (pickNumber(x, ['providerCost','priceApi','price_api']) > 0)
+          );
           return {
             id: d.id,
             userId: x.userId || '',
@@ -334,7 +337,7 @@ router.get('/finance/analytics', async (req, res) => {
       const provider = txSuccess.reduce((s, t) => s + Number(t.providerCost || 0), 0);
       const sms = txSuccess.reduce((s, t) => s + Number(t.smsCost || 0), 0);
       const revenue = tx
-        .filter(t => String(t.status || '') === 'success')
+        .filter(t => String(t.status || '').toLowerCase() === 'success')
         .reduce((s, t) => s + Number(t.userPrice || 0), 0);
       const net = revenue - provider - sms;
       return { deposits: dep, providerCost: provider, smsCost: sms, netProfit: net };
