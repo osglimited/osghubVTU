@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getFinanceAnalytics, listUsers } from "@/lib/backend";
+import { getFinanceAnalytics, listUsers, getAllPlans } from "@/lib/backend";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TrendingUp } from "lucide-react";
@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 
 export default function FinancePage() {
   const [users, setUsers] = useState<any[]>([]);
-  const [selectedUid, setSelectedUid] = useState<string>("");
+  const [selectedScope, setSelectedScope] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const toRange = () => {
@@ -26,10 +26,11 @@ export default function FinancePage() {
     return () => { mounted = false; };
   }, []);
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["finance-analytics", selectedUid, startDate, endDate],
+    queryKey: ["finance-analytics", selectedScope, startDate, endDate],
     queryFn: async () => {
       const { start, end } = toRange();
-      return await getFinanceAnalytics({ uid: selectedUid || undefined, start, end });
+      const [uid, email] = selectedScope ? selectedScope.split("|") : ["", ""];
+      return await getFinanceAnalytics({ uid: uid || undefined, email: email || undefined, start, end });
     },
     refetchInterval: 10000,
     staleTime: 8000,
@@ -55,13 +56,13 @@ export default function FinancePage() {
         <div className="flex items-center gap-2">
           <label className="text-sm text-muted-foreground">Scope</label>
           <select
-            value={selectedUid}
-            onChange={(e) => setSelectedUid(e.target.value)}
+            value={selectedScope}
+            onChange={(e) => setSelectedScope(e.target.value)}
             className="border rounded-md px-3 py-2 text-sm bg-background"
           >
             <option value="">All Users</option>
             {users.map((u) => (
-              <option key={u.uid || u.id} value={u.uid || u.id}>
+              <option key={u.uid || u.id} value={`${u.uid || u.id}|${u.email || ""}`}>
                 {u.displayName || u.email || u.uid}
               </option>
             ))}
@@ -90,7 +91,7 @@ export default function FinancePage() {
             <div className="text-3xl font-bold">₦{requiredProviderBalance.toLocaleString()}</div>
           </CardContent>
         </Card>
-        {selectedUid && (
+        {selectedScope && (
           <Card className="border-none shadow-sm md:col-span-1">
             <CardHeader>
               <CardTitle>User Balance</CardTitle>
@@ -188,37 +189,86 @@ export default function FinancePage() {
               <TableHead>SMS Cost</TableHead>
               <TableHead>Net</TableHead>
               <TableHead>Error Source</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Date</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {txs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground">No transactions</TableCell>
+                <TableHead>Status</TableHead>
+                <TableHead>Date</TableHead>
               </TableRow>
-            ) : txs.map((t) => {
-              const net = Number(t.userPrice || 0) - Number(t.providerCost || 0) - Number(t.smsCost || 0);
-              const created = t.createdAt ? new Date(t.createdAt).toLocaleString() : "-";
-              return (
-                <TableRow key={t.id}>
-                  <TableCell className="font-mono text-xs">{t.id}</TableCell>
-                  <TableCell>{t.user}</TableCell>
-                  <TableCell>{t.serviceType}</TableCell>
-                  <TableCell>₦{Number(t.userPrice || 0).toLocaleString()}</TableCell>
-                  <TableCell>₦{Number(t.providerCost || 0).toLocaleString()}</TableCell>
-                  <TableCell>₦{Number(t.smsCost || 0).toLocaleString()}</TableCell>
-                  <TableCell>₦{net.toLocaleString()}</TableCell>
-                  <TableCell>{String(t.status || '').toLowerCase() === 'success' ? '-' : (t.failureSource || 'unknown')}</TableCell>
-                  <TableCell>{t.status}</TableCell>
-                  <TableCell>{created}</TableCell>
+            </TableHeader>
+            <TableBody>
+              {txs.length === 0 ? (
+              <TableRow>
+                  <TableCell colSpan={10} className="text-center text-muted-foreground">No transactions</TableCell>
                 </TableRow>
-              );
-            })}
-          </TableBody>
+              ) : txs.map((t) => {
+                const net = Number(t.userPrice || 0) - Number(t.providerCost || 0) - Number(t.smsCost || 0);
+                const created = t.createdAt ? new Date(t.createdAt).toLocaleString() : "-";
+                return (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-mono text-xs">{t.id}</TableCell>
+                    <TableCell>{t.user}</TableCell>
+                    <TableCell>{t.serviceType}</TableCell>
+                    <TableCell>₦{Number(t.userPrice || 0).toLocaleString()}</TableCell>
+                    <TableCell>₦{Number(t.providerCost || 0).toLocaleString()}</TableCell>
+                    <TableCell>₦{Number(t.smsCost || 0).toLocaleString()}</TableCell>
+                    <TableCell>₦{net.toLocaleString()}</TableCell>
+                    <TableCell>{String(t.status || '').toLowerCase() === 'success' ? '-' : (t.failureSource || 'unknown')}</TableCell>
+                    <TableCell>{t.status}</TableCell>
+                    <TableCell>{created}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {selectedScope && (
+        <Card className="border-none shadow-sm">
+          <CardHeader>
+            <CardTitle>Capacity by Service</CardTitle>
+            <CardDescription>Estimated transactions based on user balance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CapacityTable walletBalance={walletBalance} />
+          </CardContent>
+        </Card>
+      )}
     </div>
+  );
+}
+
+function CapacityTable({ walletBalance }: { walletBalance: number }) {
+  const { data: plans } = useQuery({
+    queryKey: ["service-plans"],
+    queryFn: () => getAllPlans(),
+    staleTime: 60000,
+  });
+  const rows = (plans || []).map((p: any) => {
+    const price = Number(p.priceUser || 0);
+    const capacity = price > 0 ? Math.floor(Number(walletBalance || 0) / price) : 0;
+    return { name: `${p.network || ""} ${p.name || ""}`.trim(), price, capacity };
+  }).filter((r: any) => r.price > 0);
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Service</TableHead>
+          <TableHead>Price</TableHead>
+          <TableHead>Capacity</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={3} className="text-center text-muted-foreground">No service plans</TableCell>
+          </TableRow>
+        ) : rows.map((r: any, i: number) => (
+          <TableRow key={i}>
+            <TableCell>{r.name}</TableCell>
+            <TableCell>₦{r.price.toLocaleString()}</TableCell>
+            <TableCell>{r.capacity.toLocaleString()}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
