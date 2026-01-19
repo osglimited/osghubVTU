@@ -347,12 +347,34 @@ router.get('/finance/analytics', async (req, res) => {
     
     // Filter for Ratio Calculation: Only use transactions with VALID cost > 0
     // This avoids skewing the ratio with "0 cost" data (which implies 100% margin if raw, or 0% if forced to price)
-    const validCostTxs = successfulServiceTxs.filter(t => t.providerCost > 0);
+    // ADDITIONALLY: We exclude transactions where providerCost == userPrice (approx).
+    // This is because the system defaults providerCost = userPrice when cost is unknown.
+    // Including these would skew the ratio towards 1.0 (0% margin), hiding the actual margin.
+    const validCostTxs = successfulServiceTxs.filter(t => {
+       if (t.providerCost <= 0) return false;
+       // Check if Cost is suspiciously close to Price (within 0.1%)
+       // This filters out the "Default Cost = Price" records
+       const isDefaultCost = Math.abs(t.providerCost - t.userPrice) < 0.01; 
+       return !isDefaultCost;
+    });
+
+    // Fallback: If filtering leaves us with NOTHING, it means ALL data is either 0 cost or Cost=Price.
+    // In that case, we can't estimate a margin from data.
+    // However, if we have *any* data with margin, we prefer using that to estimate the global ratio.
+    let calculationTxs = validCostTxs;
+    if (validCostTxs.length === 0) {
+       // No "good" data found. We must fall back to using the Cost=Price data (Ratio 1.0)
+       // Or we could check if there are ANY valid costs > 0 at all.
+       const anyCostTxs = successfulServiceTxs.filter(t => t.providerCost > 0);
+       if (anyCostTxs.length > 0) {
+          calculationTxs = anyCostTxs;
+       }
+    }
     
     let costRatio = 1.0; // Default conservative (100% of balance needed)
-    if (validCostTxs.length > 0) {
-      const totalValidCost = validCostTxs.reduce((s, t) => s + t.providerCost, 0);
-      const totalValidPrice = validCostTxs.reduce((s, t) => s + t.userPrice, 0);
+    if (calculationTxs.length > 0) {
+      const totalValidCost = calculationTxs.reduce((s, t) => s + t.providerCost, 0);
+      const totalValidPrice = calculationTxs.reduce((s, t) => s + t.userPrice, 0);
       if (totalValidPrice > 0) {
         costRatio = totalValidCost / totalValidPrice;
       }
@@ -438,6 +460,7 @@ router.get('/finance/analytics', async (req, res) => {
         walletBalance,
         costRatio,
         validCostTxCount: validCostTxs ? validCostTxs.length : 0,
+        calculationTxCount: calculationTxs ? calculationTxs.length : 0,
         totals,
         txCount: rangeFilteredTxs.length,
         createdAt: Date.now(),
