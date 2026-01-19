@@ -251,17 +251,18 @@ export default function FinancePage() {
                   <TableCell colSpan={10} className="text-center text-muted-foreground">No transactions</TableCell>
                 </TableRow>
               ) : txs.map((t) => {
-                const net = Number(t.userPrice || 0) - Number(t.providerCost || 0) - Number(t.smsCost || 0);
+                const isService = t.isService || ['airtime', 'data', 'electricity', 'exam', 'cable', 'bill'].includes(String(t.serviceType || t.type || '').toLowerCase());
+                const net = isService ? (Number(t.userPrice || 0) - Number(t.providerCost || 0) - Number(t.smsCost || 0)) : 0;
                 const created = t.createdAt ? new Date(t.createdAt).toLocaleString() : "-";
                 return (
                   <TableRow key={t.id}>
                     <TableCell className="font-mono text-xs">{t.id}</TableCell>
                     <TableCell>{t.user}</TableCell>
-                    <TableCell>{t.serviceType}</TableCell>
+                    <TableCell>{t.serviceType || t.type}</TableCell>
                     <TableCell>₦{Number(t.userPrice || 0).toLocaleString()}</TableCell>
                     <TableCell>₦{Number(t.providerCost || 0).toLocaleString()}</TableCell>
                     <TableCell>₦{Number(t.smsCost || 0).toLocaleString()}</TableCell>
-                    <TableCell>₦{net.toLocaleString()}</TableCell>
+                    <TableCell className={net > 0 ? "text-green-600 font-bold" : ""}>₦{net.toLocaleString()}</TableCell>
                     <TableCell>{String(t.status || '').toLowerCase() === 'success' ? '-' : (t.failureSource || 'unknown')}</TableCell>
                     <TableCell>{t.status}</TableCell>
                     <TableCell>{created}</TableCell>

@@ -261,12 +261,14 @@ router.get('/finance/analytics', async (req, res) => {
           // User Rule: "Use ONLY service transactions: airtime, data, electricity, exam"
           const validServiceTypes = ['airtime', 'data', 'electricity', 'exam', 'cable', 'bill'];
           
-          // Check if it's a known service type AND explicitly NOT a credit/refund
-          const isCredit = type === 'credit' || type === 'refund' || type === 'deposit';
-          const isService = !isCredit && (
-            validServiceTypes.includes(type) ||
-            (type === 'debit' && validServiceTypes.includes(serviceType)) ||
-            (validServiceTypes.includes(serviceType))
+          // Check if it's a known service type AND explicitly NOT a credit/refund/debit/wallet_credit/wallet_debit
+          const lowerType = type.toLowerCase();
+          const lowerSType = serviceType.toLowerCase();
+          const isInternal = lowerType === 'credit' || lowerType === 'refund' || lowerType === 'deposit' || lowerType === 'debit' || lowerType === 'wallet_credit' || lowerType === 'wallet_debit';
+          
+          const isService = !isInternal && (
+            validServiceTypes.includes(lowerType) ||
+            validServiceTypes.includes(lowerSType)
           );
 
           const userPrice = pickNumber(x, ['userPrice','priceUser','price_user','amount','user_amount','paid','userPaid']);
