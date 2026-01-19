@@ -655,6 +655,64 @@ export async function registerRoutes(
     return res.json({ success: true, id });
   });
 
+  app.get("/api/admin/profile", adminAuth, async (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization || "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+    const tokenInfo = await verifyTokenAndGetEmail(bearer);
+    if (!tokenInfo?.email) return res.status(401).json({ message: "Unauthorized" });
+
+    try {
+      const user = await getAuth().getUserByEmail(tokenInfo.email);
+      return res.json({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || "",
+        phoneNumber: user.phoneNumber || "",
+        disabled: user.disabled,
+        metadata: user.metadata,
+      });
+    } catch (e: any) {
+      return res.status(400).json({ message: e.message || "Error fetching profile" });
+    }
+  });
+
+  app.post("/api/admin/profile/update", adminAuth, async (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization || "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+    const tokenInfo = await verifyTokenAndGetEmail(bearer);
+    if (!tokenInfo?.email) return res.status(401).json({ message: "Unauthorized" });
+
+    const { displayName, phoneNumber } = req.body;
+    try {
+      const user = await getAuth().getUserByEmail(tokenInfo.email);
+      await getAuth().updateUser(user.uid, {
+        displayName: displayName || user.displayName,
+        phoneNumber: phoneNumber || user.phoneNumber,
+      });
+      return res.json({ success: true, message: "Profile updated successfully" });
+    } catch (e: any) {
+      return res.status(400).json({ message: e.message || "Error updating profile" });
+    }
+  });
+
+  app.post("/api/admin/profile/password", adminAuth, async (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization || "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+    const tokenInfo = await verifyTokenAndGetEmail(bearer);
+    if (!tokenInfo?.email) return res.status(401).json({ message: "Unauthorized" });
+
+    const { newPassword } = req.body;
+    try {
+      const user = await getAuth().getUserByEmail(tokenInfo.email);
+      await getAuth().updateUser(user.uid, {
+        password: newPassword,
+      });
+      return res.json({ success: true, message: "Password updated successfully" });
+    } catch (e: any) {
+      return res.status(400).json({ message: e.message || "Error updating password" });
+    }
+  });
+
   app.get("/api/ping", (_req: Request, res: Response) => {
     res.json({ ok: true });
   });

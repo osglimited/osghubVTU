@@ -118,15 +118,22 @@ export async function deletePlan(id: string): Promise<{ success: boolean; id: st
   return await request<{ success: boolean; id: string }>("DELETE", `/api/admin/plans/${encodeURIComponent(id)}`);
 }
 
-export async function getAdminStats(): Promise<{
-  totalUsers: number;
-  walletBalance: number;
-  totalTransactions: number;
-  todaySales: number;
-  dailyTotals: Array<{ day: string; total: number }>;
-  recentTransactions: any[];
-}> {
-  return await request("GET", "/api/admin/stats");
+export async function updateAdminProfile(payload: {
+  displayName?: string;
+  phoneNumber?: string;
+}): Promise<{ success: boolean; message: string }> {
+  return await request<{ success: boolean; message: string }>("POST", "/api/admin/profile/update", payload);
+}
+
+export async function changeAdminPassword(payload: {
+  currentPassword?: string;
+  newPassword?: string;
+}): Promise<{ success: boolean; message: string }> {
+  return await request<{ success: boolean; message: string }>("POST", "/api/admin/profile/password", payload);
+}
+
+export async function getAdminProfile(): Promise<any> {
+  return await request<any>("GET", "/api/admin/profile");
 }
 
 export async function getFinanceAnalytics(input?: { uid?: string; email?: string; start?: number; end?: number }): Promise<{
