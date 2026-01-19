@@ -82,7 +82,7 @@ export default function SupportPage() {
     if (!file || !selectedTicket || !auth.currentUser) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Max size is 5MB", variant: "destructive" });
+      toast({ title: "File too large", description: "Max size is 5MB", type: "destructive" });
       return;
     }
 
@@ -111,7 +111,7 @@ export default function SupportPage() {
         });
       });
     } catch (e: any) {
-      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+      toast({ title: "Upload failed", description: e.message, type: "destructive" });
     } finally {
       setIsUploading(false);
     }
@@ -120,7 +120,7 @@ export default function SupportPage() {
   const handleReply = async () => {
     if (!auth.currentUser || !replyMessage || !selectedTicket) return;
     if (selectedTicket.status === 'solved' || selectedTicket.status === 'closed') {
-      toast({ title: "Ticket Locked", description: "Please reopen the ticket to reply." });
+      toast({ title: "Ticket Locked", description: "Please reopen the ticket to reply.", type: "destructive" });
       return;
     }
 
@@ -145,7 +145,7 @@ export default function SupportPage() {
 
       setReplyMessage('');
     } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: "Error", description: e.message, type: "destructive" });
     } finally {
       setSendingReply(false);
     }
@@ -161,9 +161,9 @@ export default function SupportPage() {
           lastMessageAt: Date.now()
         });
       });
-      toast({ title: "Ticket Reopened" });
+      toast({ title: "Ticket Reopened", type: "default" });
     } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: "Error", description: e.message, type: "destructive" });
     }
   };
 
@@ -182,13 +182,13 @@ export default function SupportPage() {
         lastMessageAt: Date.now()
       };
       const docRef = await addDoc(collection(db, 'support_tickets'), ticketData);
-      toast({ title: "Ticket Submitted", description: "We'll get back to you soon." });
+      toast({ title: "Ticket Submitted", description: "We'll get back to you soon.", type: "default" });
       setSubject('');
       setMessage('');
       setShowNewTicket(false);
       setSelectedTicket({ id: docRef.id, ...ticketData });
     } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: "Error", description: e.message, type: "destructive" });
     } finally {
       setSubmitting(false);
     }
