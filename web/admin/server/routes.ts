@@ -878,6 +878,7 @@ export async function registerRoutes(
     };
     let providerBalanceRequired = 0;
     let walletBalance = 0;
+    let totalWalletBalance = 0;
     try {
       const db = getFirestore();
       const txNames = ["transactions", "admin_transactions", "wallet_transactions"];
@@ -910,11 +911,14 @@ export async function registerRoutes(
             const userPrice = pickNumber(x, ["userPrice", "priceUser", "price_user", "amount", "user_amount", "paid", "userPaid"]);
             let providerCost = pickNumber(x, ["providerCost", "priceApi", "price_api", "apiPrice", "provider_price", "providerPrice", "cost", "serviceCost"]);
             
-            // If providerCost is missing, try to derive it from profit
+            // If providerCost is missing, try to derive it from profit or use fallback ratio
             if (providerCost <= 0) {
               const profit = pickNumber(x, ["profit", "adminProfit", "admin_profit", "commission", "gain"]);
               if (profit > 0 && userPrice > 0) {
                 providerCost = userPrice - profit;
+              } else if (userPrice > 0) {
+                // Fallback: Use 0.90 as a likely cost if both profit and providerCost are missing
+                providerCost = userPrice * 0.90;
               }
             }
             const smsCost = Number((x as any).sms_cost ?? (x as any).smsCost ?? 0);
@@ -994,7 +998,7 @@ export async function registerRoutes(
       } else {
         const allWallets: Array<{ main: number }> = [];
         for (const n of ["wallets", "user_wallets"]) {
-          const snap = await db.collection(n).limit(2000).get();
+          const snap = await db.collection(n).get();
           if (!snap.empty) {
             allWallets.push(
               ...snap.docs.map(d => {
@@ -1013,9 +1017,11 @@ export async function registerRoutes(
           );
           if (validTx.length === 0) return 0.97;
           const ratios = validTx.map(t => Number(t.providerCost || 0) / Number(t.userPrice || 0));
+          // Always ensure at least 0.97 safety for system-wide solvency
           return Math.max(...ratios, 0.97);
         };
         providerBalanceRequired = totalMain * getWorstRatio();
+        totalWalletBalance = totalMain; // Map to the correct key for response
       }
 
       const computeBucket = (bucketStart: number) => {
@@ -1046,7 +1052,7 @@ export async function registerRoutes(
         scope,
         providerBalanceRequired,
         walletBalance: scope === "user" ? walletBalance : 0,
-        totalWalletBalance: scope === "system" ? totalMain : 0,
+        totalWalletBalance,
         daily,
         weekly,
         monthly,
