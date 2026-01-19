@@ -909,6 +909,15 @@ export async function registerRoutes(
               pickNumber(x, ["providerCost", "priceApi", "price_api"]) > 0;
             const userPrice = pickNumber(x, ["userPrice", "priceUser", "price_user", "amount", "user_amount", "paid", "userPaid"]);
             let providerCost = pickNumber(x, ["providerCost", "priceApi", "price_api", "apiPrice", "provider_price", "providerPrice", "cost", "serviceCost"]);
+            
+            // If providerCost is missing, try to derive it from profit
+            if (providerCost <= 0) {
+              const profit = pickNumber(x, ["profit", "adminProfit", "admin_profit", "commission", "gain"]);
+              if (profit > 0 && userPrice > 0) {
+                providerCost = userPrice - profit;
+              }
+            }
+
             if (isService && providerCost <= 0) {
               providerCost = userPrice;
             }
@@ -975,8 +984,11 @@ export async function registerRoutes(
           }
         }
         const sample = transactions.filter(t => String(t.status || "").toLowerCase() === "success").slice(0, 50);
-        const rateDen = sample.reduce((s, t) => s + Number(t.userPrice || 0), 0);
-        const rateNum = sample.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+        // Prioritize transactions where we have a recorded margin
+        const sampleMargin = sample.filter(t => t.providerCost > 0 && t.providerCost < t.userPrice);
+        const targetSample = sampleMargin.length > 0 ? sampleMargin : sample;
+        const rateDen = targetSample.reduce((s, t) => s + Number(t.userPrice || 0), 0);
+        const rateNum = targetSample.reduce((s, t) => s + Number(t.providerCost || 0), 0);
         const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
         providerBalanceRequired = walletBalance * providerRate;
       } else {
@@ -994,8 +1006,11 @@ export async function registerRoutes(
         }
         const totalMain = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
         const successTx = transactions.filter(t => String(t.status || "").toLowerCase() === "success");
-        const rateDen = successTx.reduce((s, t) => s + Number(t.userPrice || 0), 0);
-        const rateNum = successTx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+        // Prioritize transactions where we have a recorded margin
+        const successMargin = successTx.filter(t => t.providerCost > 0 && t.providerCost < t.userPrice);
+        const targetTx = successMargin.length > 0 ? successMargin : successTx;
+        const rateDen = targetTx.reduce((s, t) => s + Number(t.userPrice || 0), 0);
+        const rateNum = targetTx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
         const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
         providerBalanceRequired = totalMain * providerRate;
       }
