@@ -191,6 +191,7 @@ router.get('/finance/analytics', async (req, res) => {
   const endTs = parseTs(endRaw);
   const makePeriod = (days) => {
     const d = new Date();
+    d.setHours(0, 0, 0, 0); // Start of today
     d.setDate(d.getDate() - days);
     return d.getTime();
   };
@@ -442,7 +443,8 @@ router.get('/finance/analytics', async (req, res) => {
     const filterByDate = (txs, start, end) => {
       return txs.filter(t => {
         if (start !== undefined && t.createdAt < start) return false;
-        if (end !== undefined && t.createdAt > end) return false;
+        // If end is specified, it should be the end of that day (23:59:59)
+        if (end !== undefined && t.createdAt > (end + 86399999)) return false;
         return true;
       });
     };
@@ -474,7 +476,9 @@ router.get('/finance/analytics', async (req, res) => {
       return { deposits, providerCost, smsCost, netProfit };
     };
 
-    const daily = computeBucket(filterByDate(scopedTransactions, makePeriod(1)));
+    // Today starts at 00:00:00 of the current day
+    const dailyStart = makePeriod(0);
+    const daily = computeBucket(filterByDate(scopedTransactions, dailyStart));
     const weekly = computeBucket(filterByDate(scopedTransactions, makePeriod(7)));
     const monthly = computeBucket(filterByDate(scopedTransactions, makePeriod(30)));
 
