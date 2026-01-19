@@ -325,9 +325,138 @@ const createAdmin = async (req, res) => {
   }
 };
 
+const listAdmins = async (req, res) => {
+  try {
+    const snap = await db.collection('admin_accounts').get();
+    const admins = snap.docs.map(d => d.data());
+    res.json(admins);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getAdminProfile = async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const user = await auth.getUser(uid);
+    const profileSnap = await db.collection('users').doc(uid).get();
+    const profile = profileSnap.exists ? profileSnap.data() : {};
+    res.json({
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName || profile.displayName || '',
+      phoneNumber: user.phoneNumber || profile.phone || '',
+      role: 'admin',
+      status: user.disabled ? 'inactive' : 'active'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const updateAdminProfile = async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { displayName, phoneNumber } = req.body;
+    await auth.updateUser(uid, {
+      displayName: displayName || undefined,
+      phoneNumber: phoneNumber || undefined
+    });
+    await db.collection('users').doc(uid).set({
+      displayName,
+      phone: phoneNumber,
+      updatedAt: new Date()
+    }, { merge: true });
+    res.json({ success: true, message: 'Profile updated' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const changeAdminPassword = async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { newPassword } = req.body;
+    await auth.updateUser(uid, { password: newPassword });
+    res.json({ success: true, message: 'Password changed' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getTickets = async (req, res) => {
+  try {
+    const snap = await db.collection('support_tickets').orderBy('createdAt', 'desc').get();
+    const tickets = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    res.json(tickets);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const replyTicket = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+    await db.collection('support_tickets').doc(id).collection('replies').add({
+      message,
+      adminId: req.user.uid,
+      createdAt: new Date()
+    });
+    await db.collection('support_tickets').doc(id).update({ status: 'replied', updatedAt: new Date() });
+    res.json({ success: true, message: 'Reply sent' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getAnnouncements = async (req, res) => {
+  try {
+    const snap = await db.collection('announcements').orderBy('createdAt', 'desc').get();
+    const announcements = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    res.json(announcements);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const createAnnouncement = async (req, res) => {
+  try {
+    const { title, content, type } = req.body;
+    const docRef = await db.collection('announcements').add({
+      title,
+      content,
+      type: type || 'info',
+      createdAt: new Date()
+    });
+    res.json({ success: true, id: docRef.id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const deleteAnnouncement = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.collection('announcements').doc(id).delete();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports.debitWallet = debitWallet;
 module.exports.createUser = createUser;
 module.exports.createAdmin = createAdmin;
+module.exports.listAdmins = listAdmins;
+module.exports.getAdminProfile = getAdminProfile;
+module.exports.updateAdminProfile = updateAdminProfile;
+module.exports.changeAdminPassword = changeAdminPassword;
+module.exports.getTickets = getTickets;
+module.exports.replyTicket = replyTicket;
+module.exports.getAnnouncements = getAnnouncements;
+module.exports.createAnnouncement = createAnnouncement;
+module.exports.deleteAnnouncement = deleteAnnouncement;
 
 const generateVerificationLink = async (req, res) => {
   try {

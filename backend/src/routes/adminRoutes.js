@@ -58,7 +58,21 @@ router.post('/users/delete', async (req, res) => {
     return res.status(400).json({ success: false, message: error && error.message ? error.message : String(error) });
   }
 });
+router.get('/admins', adminController.listAdmins);
 router.post('/admins', adminController.createAdmin);
+
+// Profile
+router.get('/profile', adminController.getAdminProfile);
+router.post('/profile/update', adminController.updateAdminProfile);
+router.post('/profile/password', adminController.changeAdminPassword);
+
+// Support & Announcements
+router.get('/support/tickets', adminController.getTickets);
+router.post('/support/tickets/:id/reply', adminController.replyTicket);
+router.get('/announcements', adminController.getAnnouncements);
+router.post('/announcements', adminController.createAnnouncement);
+router.delete('/announcements/:id', adminController.deleteAnnouncement);
+
 router.post('/users/verification-link', adminController.generateVerificationLink);
 
 router.get('/stats', async (_req, res) => {
