@@ -344,12 +344,12 @@ router.get('/finance/analytics', async (req, res) => {
       walletBalance = Array.from(seen.values()).reduce((s, v) => s + Number(v || 0), 0);
     }
 
-    // 4. Calculate Provider Balance Required (WORST CASE SCENARIO)
-    // User Constraint: "Select the WORST (highest) ratio... guarantees provider solvency"
-    // "Provider Balance Required < User Wallet Balance"
+    // 4. Calculate Provider Balance Required (CAPACITY / BEST CASE)
+    // The user wants to see the minimum funds needed to fulfill services.
+    // We look for the BEST (lowest) ratio to show how much more service they can get.
     
-    let worstRatio = 0; // Start low, find max
-    let worstRatioSource = 'default';
+    let bestRatio = 1.0; // Default to 1:1 if no plans found
+    let bestRatioSource = 'default';
 
     try {
       // A. Fetch Data Plans (Active Only)
@@ -359,13 +359,11 @@ router.get('/finance/analytics', async (req, res) => {
            const p = d.data();
            const cost = Number(p.priceApi || p.price_api || 0);
            const price = Number(p.priceUser || p.price_user || 0);
-           // Calculate Ratio: Cost / Price
-           // e.g. Cost 80, Price 100 -> Ratio 0.8
            if (cost > 0 && price > 0) {
              const ratio = cost / price;
-             if (ratio > worstRatio) {
-               worstRatio = ratio;
-               worstRatioSource = `plan:${d.id} (${cost}/${price})`;
+             if (ratio < bestRatio) {
+               bestRatio = ratio;
+               bestRatioSource = `plan:${d.id} (${cost}/${price})`;
              }
            }
         });
@@ -376,34 +374,23 @@ router.get('/finance/analytics', async (req, res) => {
       const st = settingsDoc.exists ? settingsDoc.data() || {} : {};
       const airtimeNetworks = st.airtimeNetworks || {};
       
-      // Iterate networks
       Object.values(airtimeNetworks).forEach(net => {
          const discount = Number(net.discount || 0);
-         // If discount is 2%, we pay 98%. Ratio = 0.98
-         // If discount is 0%, Ratio = 1.0 (Risk!)
          const ratio = (100 - discount) / 100;
-         if (ratio > worstRatio) {
-           worstRatio = ratio;
-           worstRatioSource = `airtime:${net.name || 'network'} (${discount}%)`;
+         if (ratio < bestRatio) {
+           bestRatio = ratio;
+           bestRatioSource = `airtime:${net.name || 'network'} (${discount}%)`;
          }
        });
       
     } catch (err) {
-      console.error("Error calculating worst case ratio:", err);
-    }
-
-    // Safety Fallback: If no plans/settings found, assume worst case 1.0 (we pay what we sell for)
-    // This implies 0% profit margin, but ensures we have enough funds.
-    if (worstRatio <= 0) {
-      worstRatio = 1.0;
-      worstRatioSource = 'fallback_safety';
+      console.error("Error calculating best case ratio:", err);
     }
     
-    // User Rule: "provider_required_user = user_wallet_balance * worst_ratio"
-    const providerBalanceRequired = walletBalance * worstRatio;
+    // User Rule: provider_required = user_wallet_balance * best_ratio
+    const providerBalanceRequired = walletBalance * bestRatio;
     
-    // For logging/frontend display
-    const costRatio = worstRatio;
+    const costRatio = bestRatio;
 
     // IMPUTE missing provider costs using the worstRatio (Conservative Estimate)
     // This ensures that if historical data lacks cost info, we don't show 100% profit.
