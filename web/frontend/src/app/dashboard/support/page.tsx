@@ -89,15 +89,19 @@ export default function SupportPage() {
   useEffect(() => {
     const loadReplies = async () => {
       if (!selectedTicket) return;
-      const q = query(
-        collection(db, 'support_tickets', selectedTicket.id, 'replies'),
-        orderBy('createdAt', 'asc')
-      );
-      const snap = await getDocs(q);
-      setReplies(snap.docs.map(d => d.data()));
+      try {
+        const q = query(
+          collection(db, 'support_tickets', selectedTicket.id, 'replies'),
+          orderBy('createdAt', 'asc')
+        );
+        const snap = await getDocs(q);
+        setReplies(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        console.error("Error loading replies:", e);
+      }
     };
     loadReplies();
-    const interval = setInterval(loadReplies, 5000);
+    const interval = setInterval(loadReplies, 3000);
     return () => clearInterval(interval);
   }, [selectedTicket?.id]);
 
@@ -176,8 +180,11 @@ export default function SupportPage() {
               {tickets.map((t) => (
                 <div 
                   key={t.id} 
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedTicket?.id === t.id ? 'border-[#F97316] bg-[#F97316]/5' : 'hover:border-gray-300'}`}
-                  onClick={() => setSelectedTicket(t)}
+                  className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ${selectedTicket?.id === t.id ? 'border-[#F97316] bg-[#F97316]/5 ring-1 ring-[#F97316]' : 'hover:border-gray-300 bg-white shadow-sm'}`}
+                  onClick={() => {
+                    setSelectedTicket(t);
+                    setReplies([]); // Clear old replies while loading
+                  }}
                 >
                   <div className="flex justify-between items-start">
                     <h4 className="font-bold truncate max-w-[120px]">{t.subject}</h4>
