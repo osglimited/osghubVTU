@@ -274,8 +274,11 @@ router.get('/finance/analytics', async (req, res) => {
           );
           const userPrice = pickNumber(x, ['userPrice','priceUser','price_user','amount','user_amount','paid','userPaid']);
           let providerCost = pickNumber(x, ['providerCost','priceApi','price_api','apiPrice','provider_price','providerPrice','cost','serviceCost']);
-          if (isService && providerCost <= 0) {
-            providerCost = userPrice;
+          if (providerCost <= 0) {
+            const profit = pickNumber(x, ['profit','adminProfit','admin_profit','commission','gain']);
+            if (profit > 0 && userPrice > 0) {
+              providerCost = Number(userPrice) - Number(profit);
+            }
           }
           const smsCost = Number(x.sms_cost ?? x.smsCost ?? 0);
           return {
@@ -328,9 +331,18 @@ router.get('/finance/analytics', async (req, res) => {
     // Provider balance required
     let providerBalanceRequired = 0;
     let walletBalance = 0;
+    let providerRate = 1;
+    const validTxForRate = transactions.filter(t =>
+      String(t.status || '').toLowerCase() === 'success' &&
+      Number(t.providerCost || 0) > 0 &&
+      Number(t.userPrice || 0) > 0
+    );
+    const rateDen = validTxForRate.reduce((s, t) => s + Number(t.userPrice || 0), 0);
+    const rateNum = validTxForRate.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+    providerRate = rateDen > 0 ? rateNum / rateDen : 1;
     if (scope === 'user') {
       walletBalance = await readMainBalanceBest(rawUid, rawEmail);
-      providerBalanceRequired = walletBalance;
+      providerBalanceRequired = walletBalance * providerRate;
     } else {
       const sources = ['wallets', 'user_wallets'];
       const seen = new Map();
@@ -346,7 +358,8 @@ router.get('/finance/analytics', async (req, res) => {
           }
         }
       }
-      providerBalanceRequired = Array.from(seen.values()).reduce((s, v) => s + Number(v || 0), 0);
+      const totalMain = Array.from(seen.values()).reduce((s, v) => s + Number(v || 0), 0);
+      providerBalanceRequired = totalMain * providerRate;
     }
 
     const computeBucket = (bucketStart) => {
@@ -355,7 +368,11 @@ router.get('/finance/analytics', async (req, res) => {
         .reduce((s, d) => s + Number(d.amount || 0), 0);
       const tx = transactions.filter(t => Number(t.createdAt || 0) >= bucketStart);
       const txSuccess = tx.filter(t => String(t.status || '').toLowerCase() === 'success');
-      const provider = txSuccess.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+      const provider = txSuccess.reduce((s, t) => {
+        let c = Number(t.providerCost || 0);
+        if (c <= 0) c = Number(t.userPrice || 0) * providerRate;
+        return s + c;
+      }, 0);
       const sms = txSuccess.reduce((s, t) => s + Number(t.smsCost || 0), 0);
       const revenue = tx
         .filter(t => String(t.status || '').toLowerCase() === 'success')
@@ -370,7 +387,11 @@ router.get('/finance/analytics', async (req, res) => {
 
     const depositsTotal = depositsFiltered.reduce((s, d) => s + Number(d.amount || 0), 0);
     const successTx = transactions.filter(t => String(t.status || '').toLowerCase() === 'success');
-    const providerCostTotal = successTx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+    const providerCostTotal = successTx.reduce((s, t) => {
+      let c = Number(t.providerCost || 0);
+      if (c <= 0) c = Number(t.userPrice || 0) * providerRate;
+      return s + c;
+    }, 0);
     const smsCostTotal = successTx.reduce((s, t) => s + Number(t.smsCost || 0), 0);
     const revenueTotal = successTx.reduce((s, t) => s + Number(t.userPrice || 0), 0);
     const netProfitTotal = revenueTotal - providerCostTotal - smsCostTotal;
