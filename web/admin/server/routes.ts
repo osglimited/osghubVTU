@@ -917,10 +917,6 @@ export async function registerRoutes(
                 providerCost = userPrice - profit;
               }
             }
-
-            if (isService && providerCost <= 0) {
-              providerCost = userPrice;
-            }
             const smsCost = Number((x as any).sms_cost ?? (x as any).smsCost ?? 0);
             return {
               id: d.id,
@@ -983,12 +979,13 @@ export async function registerRoutes(
             break;
           }
         }
-        const sample = transactions.filter(t => String(t.status || "").toLowerCase() === "success").slice(0, 50);
-        // Prioritize transactions where we have a recorded margin
-        const sampleMargin = sample.filter(t => t.providerCost > 0 && t.providerCost < t.userPrice);
-        const targetSample = sampleMargin.length > 0 ? sampleMargin : sample;
-        const rateDen = targetSample.reduce((s, t) => s + Number(t.userPrice || 0), 0);
-        const rateNum = targetSample.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+        const validTx = transactions.filter(t => 
+          String(t.status || "").toLowerCase() === "success" && 
+          Number(t.providerCost || 0) > 0 && 
+          Number(t.userPrice || 0) > 0
+        );
+        const rateDen = validTx.reduce((s, t) => s + Number(t.userPrice || 0), 0);
+        const rateNum = validTx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
         const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
         providerBalanceRequired = walletBalance * providerRate;
       } else {
@@ -1005,12 +1002,13 @@ export async function registerRoutes(
           }
         }
         const totalMain = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
-        const successTx = transactions.filter(t => String(t.status || "").toLowerCase() === "success");
-        // Prioritize transactions where we have a recorded margin
-        const successMargin = successTx.filter(t => t.providerCost > 0 && t.providerCost < t.userPrice);
-        const targetTx = successMargin.length > 0 ? successMargin : successTx;
-        const rateDen = targetTx.reduce((s, t) => s + Number(t.userPrice || 0), 0);
-        const rateNum = targetTx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+        const validTx = transactions.filter(t => 
+          String(t.status || "").toLowerCase() === "success" && 
+          Number(t.providerCost || 0) > 0 && 
+          Number(t.userPrice || 0) > 0
+        );
+        const rateDen = validTx.reduce((s, t) => s + Number(t.userPrice || 0), 0);
+        const rateNum = validTx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
         const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
         providerBalanceRequired = totalMain * providerRate;
       }
@@ -1021,7 +1019,11 @@ export async function registerRoutes(
           .reduce((s, d) => s + Number(d.amount || 0), 0);
         const tx = transactions.filter(t => Number(t.createdAt || 0) >= bucketStart);
         const txSuccess = tx.filter(t => String(t.status || "").toLowerCase() === "success");
-        const provider = txSuccess.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+        const provider = txSuccess.reduce((s, t) => {
+          let c = Number(t.providerCost || 0);
+          if (c <= 0) c = Number(t.userPrice || 0) * providerRate;
+          return s + c;
+        }, 0);
         const sms = txSuccess.reduce((s, t) => s + Number(t.smsCost || 0), 0);
         const revenue = txSuccess.reduce((s, t) => s + Number(t.userPrice || 0), 0);
         const net = revenue - provider - sms;
@@ -1034,7 +1036,11 @@ export async function registerRoutes(
 
       const depositsTotal = depositsFiltered.reduce((s, d) => s + Number(d.amount || 0), 0);
       const successTxAll = transactions.filter(t => String(t.status || "").toLowerCase() === "success");
-      const providerCostTotal = successTxAll.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+      const providerCostTotal = successTxAll.reduce((s, t) => {
+        let c = Number(t.providerCost || 0);
+        if (c <= 0) c = Number(t.userPrice || 0) * providerRate;
+        return s + c;
+      }, 0);
       const smsCostTotal = successTxAll.reduce((s, t) => s + Number(t.smsCost || 0), 0);
       const revenueTotal = successTxAll.reduce((s, t) => s + Number(t.userPrice || 0), 0);
       const netProfitTotal = revenueTotal - providerCostTotal - smsCostTotal;
