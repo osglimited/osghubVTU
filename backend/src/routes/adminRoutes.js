@@ -339,7 +339,48 @@ router.get('/finance/analytics', async (req, res) => {
     );
     const rateDen = validTxForRate.reduce((s, t) => s + Number(t.userPrice || 0), 0);
     const rateNum = validTxForRate.reduce((s, t) => s + Number(t.providerCost || 0), 0);
-    providerRate = rateDen > 0 ? rateNum / rateDen : 1;
+    if (rateDen > 0) {
+      providerRate = rateNum / rateDen;
+    } else {
+      // Fallback: compute a provider/user price ratio from service_plans and airtime network discounts
+      try {
+        let planDen = 0;
+        let planNum = 0;
+        // Data/electricity/exam plans
+        const planSnap = await db.collection('service_plans').limit(5000).get();
+        if (!planSnap.empty) {
+          for (const d of planSnap.docs) {
+            const p = d.data() || {};
+            const pu = Number(p.priceUser || p.price_user || 0);
+            const pa = Number(p.priceApi || p.price_api || 0);
+            if (pu > 0 && pa > 0) {
+              planDen += pu;
+              planNum += pa;
+            }
+          }
+        }
+        // Airtime discounts in admin_settings.settings.airtimeNetworks
+        try {
+          const settingsDoc = await db.collection('admin_settings').doc('settings').get();
+          if (settingsDoc.exists) {
+            const st = settingsDoc.data() || {};
+            const airtimeNetworks = st.airtimeNetworks || {};
+            const keys = Object.keys(airtimeNetworks);
+            for (const k of keys) {
+              const discount = Number((airtimeNetworks[k] && airtimeNetworks[k].discount) || 0);
+              const ratio = (100 - discount) / 100;
+              // Add a normalized sample to the ratio pool
+              const sampleUser = 100;
+              planDen += sampleUser;
+              planNum += sampleUser * ratio;
+            }
+          }
+        } catch {}
+        providerRate = planDen > 0 ? (planNum / planDen) : 1;
+      } catch {
+        providerRate = 1;
+      }
+    }
     if (scope === 'user') {
       walletBalance = await readMainBalanceBest(rawUid, rawEmail);
       providerBalanceRequired = walletBalance * providerRate;
