@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Smartphone, Wifi, Tv, Zap, CreditCard, GraduationCap, Eye, EyeOff } from 'lucide-react';
+import { Smartphone, Wifi, Tv, Zap, CreditCard, GraduationCap, Eye, EyeOff, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, runTransaction } from 'firebase/firestore';
@@ -21,6 +21,30 @@ export default function Dashboard() {
   const { addNotification } = useNotifications();
   const [recent, setRecent] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [currentAnnIndex, setCurrentAnnIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  const nextAnnouncement = useCallback(() => {
+    setAnnouncements(prev => {
+      if (prev.length <= 1) return prev;
+      setCurrentAnnIndex(current => (current + 1) % prev.length);
+      return prev;
+    });
+  }, []);
+
+  const prevAnnouncement = useCallback(() => {
+    setAnnouncements(prev => {
+      if (prev.length <= 1) return prev;
+      setCurrentAnnIndex(current => (current - 1 + prev.length) % prev.length);
+      return prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (announcements.length <= 1 || isPaused) return;
+    const timer = setInterval(nextAnnouncement, 6000);
+    return () => clearInterval(timer);
+  }, [announcements.length, isPaused, nextAnnouncement]);
 
   useEffect(() => {
     const loadAnnouncements = async () => {
@@ -129,16 +153,47 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
         {announcements.length > 0 && (
-          <div className="space-y-4">
-            {announcements.map((ann) => (
-              <div key={ann.id} className="bg-[#F97316]/10 border-l-4 border-[#F97316] p-4 rounded-r-xl">
-                <div className="flex justify-between items-start">
-                  <h4 className="font-bold text-[#0A1F44]">{ann.title}</h4>
-                  <span className="text-[10px] text-gray-500">{new Date(ann.createdAt).toLocaleDateString()}</span>
-                </div>
-                <p className="text-sm text-gray-700 mt-1">{ann.content}</p>
+          <div 
+            className="relative bg-[#F97316]/10 border-l-4 border-[#F97316] p-4 rounded-r-xl group transition-all duration-500"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
+            <div className="flex justify-between items-start">
+              <h4 className="font-bold text-[#0A1F44]">{announcements[currentAnnIndex].title}</h4>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-500">
+                  {currentAnnIndex + 1} / {announcements.length}
+                </span>
+                <span className="text-[10px] text-gray-500">
+                  {new Date(announcements[currentAnnIndex].createdAt).toLocaleDateString()}
+                </span>
               </div>
-            ))}
+            </div>
+            <p className="text-sm text-gray-700 mt-1 min-h-[40px]">{announcements[currentAnnIndex].content}</p>
+            
+            {announcements.length > 1 && (
+              <div className="absolute right-2 bottom-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={() => setIsPaused(!isPaused)}
+                  className="p-1 hover:bg-[#F97316]/20 rounded-full text-[#F97316]"
+                  title={isPaused ? "Play" : "Pause"}
+                >
+                  {isPaused ? <Play size={14} /> : <Pause size={14} />}
+                </button>
+                <button 
+                  onClick={prevAnnouncement}
+                  className="p-1 hover:bg-[#F97316]/20 rounded-full text-[#F97316]"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <button 
+                  onClick={nextAnnouncement}
+                  className="p-1 hover:bg-[#F97316]/20 rounded-full text-[#F97316]"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
