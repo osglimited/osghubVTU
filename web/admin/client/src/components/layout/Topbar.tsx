@@ -53,7 +53,6 @@ export function Topbar() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
             <DropdownMenuItem onClick={() => setLocation("/profile")}>Profile</DropdownMenuItem>
             <DropdownMenuItem onClick={() => setLocation("/settings/api")}>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
