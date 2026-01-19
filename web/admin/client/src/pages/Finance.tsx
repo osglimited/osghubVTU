@@ -79,60 +79,75 @@ export default function FinancePage() {
       {isError && <div className="p-6 text-sm text-destructive">Failed to load analytics</div>}
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-none shadow-sm md:col-span-1 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="text-primary">Provider Balance Required</CardTitle>
-            <CardDescription>
-              Future obligation: Minimum funds needed in provider accounts to cover user balances (User Balance × Worst Ratio).
+        <Card className="border-none shadow-md md:col-span-1 bg-gradient-to-br from-primary/10 to-primary/5 hover:shadow-lg transition-all duration-300">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-primary text-lg font-bold flex items-center gap-2">
+              <span className="p-1.5 rounded-full bg-primary/10">💰</span>
+              Provider Balance Required
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Minimum funds needed in provider accounts to cover user obligations.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-primary">₦{requiredProviderBalance.toLocaleString()}</div>
+            <div className="text-3xl font-black text-primary tracking-tight">₦{requiredProviderBalance.toLocaleString()}</div>
+            <div className="mt-2 text-[10px] text-muted-foreground bg-white/50 w-fit px-2 py-0.5 rounded-full border border-primary/10">
+              Auto-calculated: User Balance × Optimization Ratio
+            </div>
           </CardContent>
         </Card>
         {selectedScope ? (
-          <Card className="border-none shadow-sm md:col-span-1">
-            <CardHeader>
-              <CardTitle>User Wallet Balance</CardTitle>
-              <CardDescription>The exact amount this user currently owns in their wallet.</CardDescription>
+          <Card className="border-none shadow-md md:col-span-1 bg-gradient-to-br from-blue-50 to-white hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-blue-700 text-lg font-bold flex items-center gap-2">
+                <span className="p-1.5 rounded-full bg-blue-100">👤</span>
+                User Wallet Balance
+              </CardTitle>
+              <CardDescription className="text-xs">Current available funds for this specific user.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">₦{walletBalance.toLocaleString()}</div>
+              <div className="text-3xl font-black text-blue-700 tracking-tight">₦{walletBalance.toLocaleString()}</div>
             </CardContent>
           </Card>
         ) : (
-          <Card className="border-none shadow-sm md:col-span-1">
-            <CardHeader>
-              <CardTitle>Total User Balances</CardTitle>
-              <CardDescription>Sum of all main wallet balances across all users.</CardDescription>
+          <Card className="border-none shadow-md md:col-span-1 bg-gradient-to-br from-indigo-50 to-white hover:shadow-lg transition-all duration-300 border-l-4 border-l-indigo-500">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-indigo-700 text-lg font-bold flex items-center gap-2">
+                <span className="p-1.5 rounded-full bg-indigo-100">📊</span>
+                Total User Balances
+              </CardTitle>
+              <CardDescription className="text-xs">Aggregate of all user wallet balances platform-wide.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">₦{Number(data?.totalWalletBalance || 0).toLocaleString()}</div>
+              <div className="text-3xl font-black text-indigo-700 tracking-tight">₦{Number(data?.totalWalletBalance || 0).toLocaleString()}</div>
             </CardContent>
           </Card>
         )}
-        <Card className="border-none shadow-sm md:col-span-1">
-          <CardHeader>
-            <CardTitle>Profit Logic</CardTitle>
-            <CardDescription>Profit = Revenue - Provider Cost - SMS Cost.</CardDescription>
+        <Card className="border-none shadow-md md:col-span-1 bg-gradient-to-br from-green-50 to-white hover:shadow-lg transition-all duration-300 border-l-4 border-l-green-500">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-green-700 text-lg font-bold flex items-center gap-2">
+              <span className="p-1.5 rounded-full bg-green-100">📈</span>
+              Profit Analysis
+            </CardTitle>
+            <CardDescription className="text-xs">Revenue vs Costs breakdown for selected range.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Total Revenue</span>
-                <span className="font-bold text-green-600">₦{Number(totals.netProfitTotal + totals.providerCostTotal + totals.smsCostTotal).toLocaleString()}</span>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-sm p-2 rounded-lg bg-green-50/50">
+                <span className="text-muted-foreground font-medium">Total Revenue</span>
+                <span className="font-bold text-green-700">₦{Number(totals.netProfitTotal + totals.providerCostTotal + totals.smsCostTotal).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between items-center text-sm px-2">
                 <span className="text-muted-foreground">Provider Cost</span>
                 <span className="font-bold text-red-600">₦{Number(totals.providerCostTotal).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between items-center text-sm px-2 pb-2 border-b border-green-100">
                 <span className="text-muted-foreground">SMS Cost</span>
                 <span className="font-bold text-red-400">₦{Number(totals.smsCostTotal).toLocaleString()}</span>
               </div>
-              <div className="pt-2 border-t flex justify-between">
-                <span className="font-semibold">Actual Profit</span>
-                <span className="font-bold text-primary">₦{Number(totals.netProfitTotal).toLocaleString()}</span>
+              <div className="flex justify-between items-center pt-1 px-2">
+                <span className="font-bold text-sm text-green-800">Actual Profit</span>
+                <span className="text-xl font-black text-primary animate-pulse-slow">₦{Number(totals.netProfitTotal).toLocaleString()}</span>
               </div>
             </div>
           </CardContent>
