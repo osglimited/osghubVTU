@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  allowedDevOrigins: ['*'],
+  turbopack: {},
   productionBrowserSourceMaps: false,
   images: {
     unoptimized: true,
