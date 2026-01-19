@@ -574,6 +574,35 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/plans", adminAuth, async (req: Request, res: Response) => {
+    const body = req.body || {};
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const network = String(body.network || "");
+    const name = String(body.name || "");
+    const priceUser = Number(body.priceUser || 0);
+    const priceApi = Number(body.priceApi || 0);
+    const active = body.active === undefined ? true : Boolean(body.active);
+    const type = String(body.metadata?.type || body.type || "data");
+    
+    if (!network || !name || !priceUser || !priceApi) {
+      return res.status(400).json({ message: "network, name, priceUser, priceApi required" });
+    }
+    try {
+      const db = getFirestore();
+      await db.collection("service_plans").doc(id).set({
+        network,
+        name,
+        priceUser,
+        priceApi,
+        active,
+        type,
+        metadata: body.metadata || null,
+        createdAt: Date.now(),
+      });
+    } catch {}
+    return res.json({ id, network, name, priceUser, priceApi, active, type, metadata: body.metadata || null });
+  });
+
   app.get("/api/admin/plans", adminAuth, async (_req: Request, res: Response) => {
     try {
       const db = getFirestore();
@@ -587,6 +616,7 @@ export async function registerRoutes(
           priceUser: Number(x.priceUser || x.price_user || 0),
           priceApi: Number(x.priceApi || x.price_api || 0),
           active: Boolean(x.active !== false),
+          type: x.type || "data",
           metadata: x.metadata || null,
           createdAt: x.createdAt || Date.now(),
         };
@@ -595,32 +625,6 @@ export async function registerRoutes(
     } catch {
       return res.json([]);
     }
-  });
-
-  app.post("/api/admin/plans", adminAuth, async (req: Request, res: Response) => {
-    const body = req.body || {};
-    const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const network = String(body.network || "");
-    const name = String(body.name || "");
-    const priceUser = Number(body.priceUser || 0);
-    const priceApi = Number(body.priceApi || 0);
-    const active = body.active === undefined ? true : Boolean(body.active);
-    if (!network || !name || !priceUser || !priceApi) {
-      return res.status(400).json({ message: "network, name, priceUser, priceApi required" });
-    }
-    try {
-      const db = getFirestore();
-      await db.collection("service_plans").doc(id).set({
-        network,
-        name,
-        priceUser,
-        priceApi,
-        active,
-        metadata: body.metadata || null,
-        createdAt: Date.now(),
-      });
-    } catch {}
-    return res.json({ id, network, name, priceUser, priceApi, active, metadata: body.metadata || null });
   });
 
   app.put("/api/admin/plans/:id", adminAuth, async (req: Request, res: Response) => {
