@@ -256,12 +256,16 @@ router.get('/finance/analytics', async (req, res) => {
           const walletType = String(x.walletType || '').toLowerCase();
           const description = String(x.description || '').toLowerCase();
           
-          // Identify Service Transactions
-          // Must NOT be funding/wallet/credit/debit types
-          // OR must have explicit provider cost
+          // Identify Service Transactions (STRICT)
+          // User Rule: "Use ONLY service transactions: airtime, data, electricity, exam"
+          const validServiceTypes = ['airtime', 'data', 'electricity', 'exam', 'cable', 'bill'];
+          
+          // Check if it's a known service type
+          // Or if it's a generic debit with a serviceType field that matches
           const isService = (
-            (!!serviceType && !['credit', 'debit', 'transfer', 'wallet', 'funding'].includes(type))
-            || (pickNumber(x, ['providerCost','priceApi','price_api']) > 0)
+            validServiceTypes.includes(type) ||
+            (type === 'debit' && validServiceTypes.includes(serviceType)) ||
+            (validServiceTypes.includes(serviceType))
           );
 
           const userPrice = pickNumber(x, ['userPrice','priceUser','price_user','amount','user_amount','paid','userPaid']);
@@ -340,26 +344,25 @@ router.get('/finance/analytics', async (req, res) => {
       walletBalance = Array.from(seen.values()).reduce((s, v) => s + Number(v || 0), 0);
     }
 
-    // 4. Calculate Provider Balance Required & Ratio
-    // PLAN-BASED APPROACH (User Request):
-    // Instead of relying solely on transaction history (which can be messy or have 0 costs),
-    // we calculate the "Theoretical Ratio" based on the Active Service Plans and Airtime Discounts.
-    // This answers: "Based on what we SET, how much do we need?"
+    // 4. Calculate Provider Balance Required (WORST CASE SCENARIO)
+    // User Constraint: "Select the WORST (highest) ratio... guarantees provider solvency"
+    // "Provider Balance Required < User Wallet Balance"
     
-    let systemRatio = 1.0;
+    let worstRatio = 0; // Start low, find max
+    
     try {
-      // A. Fetch Data Plans
+      // A. Fetch Data Plans (Active Only)
       const plansSnap = await db.collection('service_plans').where('active', '==', true).get();
-      let planCostSum = 0;
-      let planPriceSum = 0;
       if (!plansSnap.empty) {
         plansSnap.docs.forEach(d => {
            const p = d.data();
            const cost = Number(p.priceApi || p.price_api || 0);
            const price = Number(p.priceUser || p.price_user || 0);
+           // Calculate Ratio: Cost / Price
+           // e.g. Cost 80, Price 100 -> Ratio 0.8
            if (cost > 0 && price > 0) {
-             planCostSum += cost;
-             planPriceSum += price;
+             const ratio = cost / price;
+             if (ratio > worstRatio) worstRatio = ratio;
            }
         });
       }
@@ -368,81 +371,41 @@ router.get('/finance/analytics', async (req, res) => {
       const settingsDoc = await db.collection('admin_settings').doc('settings').get();
       const st = settingsDoc.exists ? settingsDoc.data() || {} : {};
       const airtimeNetworks = st.airtimeNetworks || {};
-      let airtimeRatioSum = 0;
-      let airtimeCount = 0;
       
-      // Average the discount ratios (e.g. 2% discount -> 0.98 ratio)
+      // Iterate networks
       Object.values(airtimeNetworks).forEach(net => {
          const discount = Number(net.discount || 0);
          // If discount is 2%, we pay 98%. Ratio = 0.98
-         if (discount > 0) {
-           airtimeRatioSum += (100 - discount) / 100;
-           airtimeCount++;
-         }
+         // If discount is 0%, Ratio = 1.0 (Risk!)
+         const ratio = (100 - discount) / 100;
+         if (ratio > worstRatio) worstRatio = ratio;
       });
       
-      // C. Combine Ratios
-      // We take a weighted approach or simple average. 
-      // Let's assume Data and Airtime are equally important for the "General Exposure".
-      let validRatios = [];
-      
-      if (planPriceSum > 0) {
-        validRatios.push(planCostSum / planPriceSum);
-      }
-      if (airtimeCount > 0) {
-        validRatios.push(airtimeRatioSum / airtimeCount);
-      }
-      
-      if (validRatios.length > 0) {
-        systemRatio = validRatios.reduce((a, b) => a + b, 0) / validRatios.length;
-      } else {
-        // Fallback to Transaction History if no plans found (Safety net)
-        // ... (Existing logic below) ...
-      }
     } catch (err) {
-      console.error("Error calculating system ratio:", err);
+      console.error("Error calculating worst case ratio:", err);
     }
 
-    // Historical Ratio (Safety / Sanity Check)
-    const successfulServiceTxs = scopedTransactions.filter(t => t.isService && t.status === 'success');
-    // Filter for Ratio Calculation: Only use transactions with VALID cost > 0
-    // ADDITIONALLY: We exclude transactions where providerCost == userPrice (approx).
-     const validCostTxs = successfulServiceTxs.filter(t => {
-        if (t.providerCost <= 0) return false;
-        // Check if Cost is suspiciously close to Price (within 0.1%)
-        const isDefaultCost = Math.abs(t.providerCost - t.userPrice) < 0.01; 
-        return !isDefaultCost;
-     });
-     
-     let historicalRatio = 1.0;
-     if (validCostTxs.length > 0) {
-       const totalValidCost = validCostTxs.reduce((s, t) => s + t.providerCost, 0);
-       const totalValidPrice = validCostTxs.reduce((s, t) => s + t.userPrice, 0);
-       if (totalValidPrice > 0) {
-         historicalRatio = totalValidCost / totalValidPrice;
-       }
-     }
-     
-     // DECISION: Use System Ratio if available and reasonable (< 1.0), else Historical
-     // Or average them? 
-     // User explicitly asked to use "existing plan and service we already set".
-     // So SystemRatio is King.
-     // However, if SystemRatio is 1.0 (defaults), fallback to Historical.
-     let costRatio = systemRatio < 1.0 ? systemRatio : historicalRatio;
-     
-     // Final Safety: If both are 1.0, maybe hardcode a safe margin estimate (e.g. 0.95)? 
-     // No, stick to data.
-
-     // Now, IMPUTE missing provider costs in the dataset using this ratio
-     for (const t of successfulServiceTxs) {
-       if (t.providerCost <= 0) {
-         t.providerCost = t.userPrice * costRatio;
-         t.imputed = true;
-       }
-     }
+    // Safety Fallback: If no plans/settings found, assume worst case 1.0 (we pay what we sell for)
+    // This implies 0% profit margin, but ensures we have enough funds.
+    if (worstRatio <= 0) worstRatio = 1.0;
     
-    // "Provider Balance Required ... Must be LOWER than total user balances."
-    const providerBalanceRequired = walletBalance * costRatio;
+    // User Rule: "provider_required_user = user_wallet_balance * worst_ratio"
+    const providerBalanceRequired = walletBalance * worstRatio;
+    
+    // For logging/frontend display
+    const costRatio = worstRatio;
+
+    // IMPUTE missing provider costs using the worstRatio (Conservative Estimate)
+    // This ensures that if historical data lacks cost info, we don't show 100% profit.
+    // We use the "Worst Case" ratio to avoid overstating profit.
+    const successfulServiceTxs = scopedTransactions.filter(t => t.isService && t.status === 'success');
+    for (const t of successfulServiceTxs) {
+      if (t.providerCost <= 0) {
+        t.providerCost = t.userPrice * costRatio;
+        t.imputed = true;
+      }
+    }
+
 
     // 5. Compute Financials (Deposits, Cost, Profit) for Date Ranges
     // Helper to filter by date
@@ -509,9 +472,7 @@ router.get('/finance/analytics', async (req, res) => {
         providerBalanceRequired,
         walletBalance,
         costRatio,
-        systemRatio,
-        historicalRatio,
-        validCostTxCount: validCostTxs ? validCostTxs.length : 0,
+        worstRatio,
         totals,
         txCount: rangeFilteredTxs.length,
         createdAt: Date.now(),
@@ -562,41 +523,29 @@ router.get('/users/transactions', async (req, res) => {
                   snap.docs.map(d => {
                     const x = d.data() || {};
       const type = String(x.type || '').toLowerCase();
-      // Only calculate Net Profit for Services
-      // For Deposits (credit), Net should be 0 (it's not profit).
-      // For Transfers/Refunds, Net should be 0.
-      let netProfit = 0;
-      let userPrice = Number(x.amount || 0);
-      let providerCost = 0;
-      let smsCost = 0;
-      
-      // Re-use logic if possible, or simplified check
-      // We don't have the 'isService' flag here unless we duplicate logic or trust 'providerCost' existence
-      // But in /users/transactions, we just dump data.
-      // Let's rely on 'providerCost' field if it exists, else 0.
-      
-      // Wait, 'rows' here comes from DIRECT DB QUERY, not the processed 'allTransactions' above.
-      // We need to be consistent.
-      
-      return {
-        id: d.id,
-        user: x.user || x.user_email || x.userEmail || x.email || x.userId || '',
-        amount: userPrice,
-        status: x.status || 'success',
-        type,
-        providerStatus: x.providerStatus || x.provider_status || '',
-        providerErrorCode: x.providerErrorCode || x.provider_error_code || '',
-        providerErrorMessage: x.providerErrorMessage || x.provider_error_message || '',
-        providerRaw: x.providerRaw || x.provider_raw || null,
-        createdAt: x.createdAt || x.timestamp || Date.now(),
-        // Add explicit profit fields for frontend
-        providerCost: Number(x.providerCost || x.provider_price || 0),
-        smsCost: Number(x.smsCost || x.sms_cost || 0),
-        // Net Profit logic: Only if type is NOT credit/wallet/funding
-        netProfit: (type !== 'credit' && type !== 'wallet' && type !== 'funding') 
-          ? (userPrice - Number(x.providerCost || 0) - Number(x.smsCost || 0)) 
-          : 0
-      };
+       const sType = String(x.serviceType || x.type || '').toLowerCase();
+       const validServiceTypes = ['airtime', 'data', 'electricity', 'exam', 'cable', 'bill'];
+       const isService = validServiceTypes.includes(type) || (type === 'debit' && validServiceTypes.includes(sType));
+       
+       let userPrice = Number(x.amount || 0);
+       
+       return {
+         id: d.id,
+         user: x.user || x.user_email || x.userEmail || x.email || x.userId || '',
+         amount: userPrice,
+         status: x.status || 'success',
+         type,
+         providerStatus: x.providerStatus || x.provider_status || '',
+         providerErrorCode: x.providerErrorCode || x.provider_error_code || '',
+         providerErrorMessage: x.providerErrorMessage || x.provider_error_message || '',
+         providerRaw: x.providerRaw || x.provider_raw || null,
+         createdAt: x.createdAt || x.timestamp || Date.now(),
+         providerCost: Number(x.providerCost || x.provider_price || 0),
+         smsCost: Number(x.smsCost || x.sms_cost || 0),
+         netProfit: isService 
+           ? (userPrice - Number(x.providerCost || x.provider_price || 0) - Number(x.smsCost || x.sms_cost || 0)) 
+           : 0
+       };
                   })
                 );
               }
@@ -617,6 +566,10 @@ router.get('/users/transactions', async (req, res) => {
                   snap.docs.map(d => {
                     const x = d.data() || {};
                     const type = String(x.type || '').toLowerCase();
+                    const sType = String(x.serviceType || x.type || '').toLowerCase();
+                    const validServiceTypes = ['airtime', 'data', 'electricity', 'exam', 'cable', 'bill'];
+                    const isService = validServiceTypes.includes(type) || (type === 'debit' && validServiceTypes.includes(sType));
+                    
                     let userPrice = Number(x.amount || 0);
                     return {
                       id: d.id,
@@ -631,8 +584,8 @@ router.get('/users/transactions', async (req, res) => {
                       createdAt: x.createdAt || x.timestamp || Date.now(),
                       providerCost: Number(x.providerCost || x.provider_price || 0),
                       smsCost: Number(x.smsCost || x.sms_cost || 0),
-                      netProfit: (type !== 'credit' && type !== 'wallet' && type !== 'funding') 
-                        ? (userPrice - Number(x.providerCost || 0) - Number(x.smsCost || 0)) 
+                      netProfit: isService 
+                        ? (userPrice - Number(x.providerCost || x.provider_price || 0) - Number(x.smsCost || x.sms_cost || 0)) 
                         : 0
                     };
                   })
