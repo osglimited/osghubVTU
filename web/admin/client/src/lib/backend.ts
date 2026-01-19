@@ -52,6 +52,10 @@ async function request<T>(method: string, path: string, data?: unknown): Promise
   }
 }
 
+export async function getAdminStats(): Promise<any> {
+  return await request<any>("GET", "/api/admin/stats");
+}
+
 export async function getAdminSettings(): Promise<any> {
   return await request<any>("GET", "/api/admin/settings");
 }
