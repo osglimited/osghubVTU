@@ -272,8 +272,12 @@ router.get('/finance/analytics', async (req, res) => {
             (!!serviceType && !['credit', 'debit', 'transfer', 'wallet', 'funding'].includes(type))
             || (pickNumber(x, ['providerCost','priceApi','price_api']) > 0)
           );
-          const userPrice = pickNumber(x, ['userPrice','priceUser','price_user','amount','user_amount','paid','userPaid']);
-          let providerCost = pickNumber(x, ['providerCost','priceApi','price_api','apiPrice','provider_price','providerPrice','cost','serviceCost']);
+          const userPrice = pickNumber(x, ['userPrice','priceUser','price_user','amount','user_amount','paid','userPaid','selling_price','sellPrice']);
+          let providerCost = pickNumber(x, [
+            'providerCost','priceApi','price_api','apiPrice','provider_price','providerPrice','cost','serviceCost',
+            'provider_amount','providerAmount','api_amount','apiAmount','buy_price','buyPrice','cost_price','costPrice',
+            'wholesale_price','wholesalePrice','amount_api','amountApi','unit_price_api','unitPriceApi','purchase_cost'
+          ]);
           if (providerCost <= 0) {
             const profit = pickNumber(x, ['profit','adminProfit','admin_profit','commission','gain']);
             if (profit > 0 && userPrice > 0) {
