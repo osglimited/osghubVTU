@@ -976,7 +976,7 @@ export async function registerRoutes(
 
       if (scope === "user") {
         for (const n of ["wallets", "user_wallets"]) {
-          const doc = await db.collection(n).doc(rawUid || rawEmail).get();
+          const doc = await db.collection(n).doc(rawUid || rawEmail || email || uid).get();
           if (doc.exists) {
             const x: any = doc.data() || {};
             walletBalance = Number(x.mainBalance || x.main_balance || x.balance || 0);
@@ -996,28 +996,25 @@ export async function registerRoutes(
         };
         providerBalanceRequired = walletBalance * getAvgRatio();
       } else {
-        const allWallets: Array<{ main: number }> = [];
-        for (const n of ["wallets", "user_wallets"]) {
-          const snap = await db.collection(n).get();
+        const allWallets: any[] = [];
+        const walletColls = ["wallets", "user_wallets"];
+        for (const coll of walletColls) {
+          const snap = await db.collection(coll).get();
           if (!snap.empty) {
-            allWallets.push(
-              ...snap.docs.map(d => {
-                const x: any = d.data() || {};
-                return { main: Number(x.mainBalance || x.main_balance || x.balance || 0) };
-              }),
-            );
+            snap.docs.forEach(d => {
+              const x: any = d.data() || {};
+              allWallets.push(Number(x.mainBalance || x.main_balance || x.balance || 0));
+            });
           }
         }
-        totalWalletBalance = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
+        totalWalletBalance = allWallets.reduce((s, b) => s + b, 0);
         const getAvgRatio = () => {
-          // Find the average provider_cost / selling_price ratio
-          // This ensures provider balance required is less than user balance
           const validTx = transactions.filter(t => 
             String(t.status || "").toLowerCase() === "success" && 
             Number(t.providerCost || 0) > 0 && 
             Number(t.userPrice || 0) > 0
           );
-          if (validTx.length === 0) return 0.92; // 92% default ratio
+          if (validTx.length === 0) return 0.92;
           const sumUser = validTx.reduce((s, t) => s + Number(t.userPrice), 0);
           const sumProv = validTx.reduce((s, t) => s + Number(t.providerCost), 0);
           return sumProv / sumUser;
