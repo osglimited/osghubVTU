@@ -174,7 +174,7 @@ export default function Dashboard() {
                       {transaction.status === 'success' ? <ArrowUpRight className="h-4 w-4" /> : transaction.status === 'pending' ? <Activity className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
                     </div>
                     <div>
-                      <p className="text-sm font-medium leading-none group-hover:text-primary transition-colors">{transaction.user || transaction.userId}</p>
+                      <p className="text-sm font-medium leading-none group-hover:text-primary transition-colors">{transaction.user || transaction.user_email || transaction.userEmail || transaction.userId || "System"}</p>
                       <p className="text-xs text-muted-foreground mt-1">{transaction.type} • {new Date(transaction.createdAt ? (transaction.createdAt._seconds ? transaction.createdAt._seconds * 1000 : transaction.createdAt) : Date.now()).toLocaleDateString()}</p>
                     </div>
                   </div>

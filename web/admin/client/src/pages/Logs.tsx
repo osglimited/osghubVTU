@@ -15,7 +15,7 @@ export default function LogsPage() {
         const mapped = (tx || []).map((t: any) => ({
           id: t.id,
           action: t.type || "transaction",
-          user: t.user || t.user_email || "",
+          user: t.user || t.user_email || t.userEmail || t.email || t.userId || "System",
           status: t.status || "success",
           timestamp: t.createdAt || t.created_at || Date.now(),
           ip: "",

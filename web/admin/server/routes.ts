@@ -706,7 +706,7 @@ export async function registerRoutes(
       result.totalUsers = usersCount;
       const now = new Date();
       result.todaySales = txs.filter(t => {
-        const d = new Date(t.createdAt);
+        const d = new Date(getCreatedMs(t.createdAt));
         return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       }).reduce((sum, t) => sum + Number(t.amount || 0), 0);
       let walletSum = 0;
@@ -728,7 +728,7 @@ export async function registerRoutes(
         d.setDate(d.getDate() - i);
         const key = d.toLocaleDateString(undefined, { weekday: "short" });
         const total = txs.filter(t => {
-          const td = new Date(t.createdAt);
+          const td = new Date(getCreatedMs(t.createdAt));
           return td.getDate() === d.getDate() && td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
         }).reduce((sum, t) => sum + Number(t.amount || 0), 0);
         days.push({ day: key, total });
