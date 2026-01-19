@@ -511,6 +511,7 @@ router.get('/finance/analytics', async (req, res) => {
       scope, 
       providerBalanceRequired, 
       walletBalance, 
+      totalWalletBalance: walletBalance,
       daily, 
       weekly, 
       monthly, 
