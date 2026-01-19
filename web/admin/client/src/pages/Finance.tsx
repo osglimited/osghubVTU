@@ -117,7 +117,20 @@ export default function FinancePage() {
             <CardDescription>Profit = User Price - Provider Cost - SMS Cost. Deposits are not profit.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-muted-foreground italic">Determininstic accounting applied.</div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total Revenue</span>
+                <span className="font-bold text-green-600">₦{Number(totals.netProfitTotal + totals.providerCostTotal + totals.smsCostTotal).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Provider/SMS Costs</span>
+                <span className="font-bold text-red-600">₦{Number(totals.providerCostTotal + totals.smsCostTotal).toLocaleString()}</span>
+              </div>
+              <div className="pt-2 border-t flex justify-between">
+                <span className="font-semibold">Calculated Profit</span>
+                <span className="font-bold text-primary">₦{Number(totals.netProfitTotal).toLocaleString()}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

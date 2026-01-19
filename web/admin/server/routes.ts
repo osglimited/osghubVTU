@@ -984,15 +984,15 @@ export async function registerRoutes(
           }
         }
         const getWorstRatio = () => {
-          // Default to 0.97 as per requirement to guarantee provider solvency
+          // Safety margin: 1.05 (105%) ensures provider funds exceed user balances
           const validTx = transactions.filter(t => 
             String(t.status || "").toLowerCase() === "success" && 
             Number(t.providerCost || 0) > 0 && 
             Number(t.userPrice || 0) > 0
           );
-          if (validTx.length === 0) return 0.97;
+          if (validTx.length === 0) return 1.05;
           const ratios = validTx.map(t => Number(t.providerCost || 0) / Number(t.userPrice || 0));
-          return Math.max(...ratios, 0.97);
+          return Math.max(...ratios, 1.05);
         };
         providerBalanceRequired = walletBalance * getWorstRatio();
       } else {
@@ -1008,20 +1008,18 @@ export async function registerRoutes(
             );
           }
         }
-        const totalMain = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
+        totalWalletBalance = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
         const getWorstRatio = () => {
           const validTx = transactions.filter(t => 
             String(t.status || "").toLowerCase() === "success" && 
             Number(t.providerCost || 0) > 0 && 
             Number(t.userPrice || 0) > 0
           );
-          if (validTx.length === 0) return 0.97;
+          if (validTx.length === 0) return 1.05; // 5% safety margin default
           const ratios = validTx.map(t => Number(t.providerCost || 0) / Number(t.userPrice || 0));
-          // Always ensure at least 0.97 safety for system-wide solvency
-          return Math.max(...ratios, 0.97);
+          return Math.max(...ratios, 1.05);
         };
-        providerBalanceRequired = totalMain * getWorstRatio();
-        totalWalletBalance = totalMain; // Map to the correct key for response
+        providerBalanceRequired = totalWalletBalance * getWorstRatio();
       }
 
       const computeBucket = (bucketStart: number) => {
