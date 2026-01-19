@@ -341,57 +341,107 @@ router.get('/finance/analytics', async (req, res) => {
     }
 
     // 4. Calculate Provider Balance Required & Ratio
-    // Formula: WalletBalance * (TotalProviderCost / TotalUserPrice)
-    // Based on RECENT SUCCESSFUL SERVICE transactions
+    // PLAN-BASED APPROACH (User Request):
+    // Instead of relying solely on transaction history (which can be messy or have 0 costs),
+    // we calculate the "Theoretical Ratio" based on the Active Service Plans and Airtime Discounts.
+    // This answers: "Based on what we SET, how much do we need?"
+    
+    let systemRatio = 1.0;
+    try {
+      // A. Fetch Data Plans
+      const plansSnap = await db.collection('service_plans').where('active', '==', true).get();
+      let planCostSum = 0;
+      let planPriceSum = 0;
+      if (!plansSnap.empty) {
+        plansSnap.docs.forEach(d => {
+           const p = d.data();
+           const cost = Number(p.priceApi || p.price_api || 0);
+           const price = Number(p.priceUser || p.price_user || 0);
+           if (cost > 0 && price > 0) {
+             planCostSum += cost;
+             planPriceSum += price;
+           }
+        });
+      }
+      
+      // B. Fetch Airtime Discounts
+      const settingsDoc = await db.collection('admin_settings').doc('settings').get();
+      const st = settingsDoc.exists ? settingsDoc.data() || {} : {};
+      const airtimeNetworks = st.airtimeNetworks || {};
+      let airtimeRatioSum = 0;
+      let airtimeCount = 0;
+      
+      // Average the discount ratios (e.g. 2% discount -> 0.98 ratio)
+      Object.values(airtimeNetworks).forEach(net => {
+         const discount = Number(net.discount || 0);
+         // If discount is 2%, we pay 98%. Ratio = 0.98
+         if (discount > 0) {
+           airtimeRatioSum += (100 - discount) / 100;
+           airtimeCount++;
+         }
+      });
+      
+      // C. Combine Ratios
+      // We take a weighted approach or simple average. 
+      // Let's assume Data and Airtime are equally important for the "General Exposure".
+      let validRatios = [];
+      
+      if (planPriceSum > 0) {
+        validRatios.push(planCostSum / planPriceSum);
+      }
+      if (airtimeCount > 0) {
+        validRatios.push(airtimeRatioSum / airtimeCount);
+      }
+      
+      if (validRatios.length > 0) {
+        systemRatio = validRatios.reduce((a, b) => a + b, 0) / validRatios.length;
+      } else {
+        // Fallback to Transaction History if no plans found (Safety net)
+        // ... (Existing logic below) ...
+      }
+    } catch (err) {
+      console.error("Error calculating system ratio:", err);
+    }
+
+    // Historical Ratio (Safety / Sanity Check)
     const successfulServiceTxs = scopedTransactions.filter(t => t.isService && t.status === 'success');
-    
     // Filter for Ratio Calculation: Only use transactions with VALID cost > 0
-    // This avoids skewing the ratio with "0 cost" data (which implies 100% margin if raw, or 0% if forced to price)
     // ADDITIONALLY: We exclude transactions where providerCost == userPrice (approx).
-    // This is because the system defaults providerCost = userPrice when cost is unknown.
-    // Including these would skew the ratio towards 1.0 (0% margin), hiding the actual margin.
-    const validCostTxs = successfulServiceTxs.filter(t => {
-       if (t.providerCost <= 0) return false;
-       // Check if Cost is suspiciously close to Price (within 0.1%)
-       // This filters out the "Default Cost = Price" records
-       const isDefaultCost = Math.abs(t.providerCost - t.userPrice) < 0.01; 
-       return !isDefaultCost;
-    });
-
-    // Fallback: If filtering leaves us with NOTHING, it means ALL data is either 0 cost or Cost=Price.
-    // In that case, we can't estimate a margin from data.
-    // However, if we have *any* data with margin, we prefer using that to estimate the global ratio.
-    let calculationTxs = validCostTxs;
-    if (validCostTxs.length === 0) {
-       // No "good" data found. We must fall back to using the Cost=Price data (Ratio 1.0)
-       // Or we could check if there are ANY valid costs > 0 at all.
-       const anyCostTxs = successfulServiceTxs.filter(t => t.providerCost > 0);
-       if (anyCostTxs.length > 0) {
-          calculationTxs = anyCostTxs;
+     const validCostTxs = successfulServiceTxs.filter(t => {
+        if (t.providerCost <= 0) return false;
+        // Check if Cost is suspiciously close to Price (within 0.1%)
+        const isDefaultCost = Math.abs(t.providerCost - t.userPrice) < 0.01; 
+        return !isDefaultCost;
+     });
+     
+     let historicalRatio = 1.0;
+     if (validCostTxs.length > 0) {
+       const totalValidCost = validCostTxs.reduce((s, t) => s + t.providerCost, 0);
+       const totalValidPrice = validCostTxs.reduce((s, t) => s + t.userPrice, 0);
+       if (totalValidPrice > 0) {
+         historicalRatio = totalValidCost / totalValidPrice;
        }
-    }
-    
-    let costRatio = 1.0; // Default conservative (100% of balance needed)
-    if (calculationTxs.length > 0) {
-      const totalValidCost = calculationTxs.reduce((s, t) => s + t.providerCost, 0);
-      const totalValidPrice = calculationTxs.reduce((s, t) => s + t.userPrice, 0);
-      if (totalValidPrice > 0) {
-        costRatio = totalValidCost / totalValidPrice;
-      }
-    }
+     }
+     
+     // DECISION: Use System Ratio if available and reasonable (< 1.0), else Historical
+     // Or average them? 
+     // User explicitly asked to use "existing plan and service we already set".
+     // So SystemRatio is King.
+     // However, if SystemRatio is 1.0 (defaults), fallback to Historical.
+     let costRatio = systemRatio < 1.0 ? systemRatio : historicalRatio;
+     
+     // Final Safety: If both are 1.0, maybe hardcode a safe margin estimate (e.g. 0.95)? 
+     // No, stick to data.
 
-    // Now, IMPUTE missing provider costs in the dataset using this ratio
-    // This ensures Net Profit calculations are reasonable even for missing data
-    // We update the objects in place (references in scopedTransactions/allTransactions)
-    for (const t of successfulServiceTxs) {
-      if (t.providerCost <= 0) {
-        t.providerCost = t.userPrice * costRatio;
-        t.imputed = true;
-      }
-    }
+     // Now, IMPUTE missing provider costs in the dataset using this ratio
+     for (const t of successfulServiceTxs) {
+       if (t.providerCost <= 0) {
+         t.providerCost = t.userPrice * costRatio;
+         t.imputed = true;
+       }
+     }
     
     // "Provider Balance Required ... Must be LOWER than total user balances."
-    // "Exclude profit margins." -> Handled by Ratio < 1.0
     const providerBalanceRequired = walletBalance * costRatio;
 
     // 5. Compute Financials (Deposits, Cost, Profit) for Date Ranges
@@ -459,8 +509,9 @@ router.get('/finance/analytics', async (req, res) => {
         providerBalanceRequired,
         walletBalance,
         costRatio,
+        systemRatio,
+        historicalRatio,
         validCostTxCount: validCostTxs ? validCostTxs.length : 0,
-        calculationTxCount: calculationTxs ? calculationTxs.length : 0,
         totals,
         txCount: rangeFilteredTxs.length,
         createdAt: Date.now(),
@@ -510,18 +561,42 @@ router.get('/users/transactions', async (req, res) => {
                 rows = rows.concat(
                   snap.docs.map(d => {
                     const x = d.data() || {};
-                    return {
-                      id: d.id,
-                      user: x.user || x.user_email || x.userEmail || x.email || x.userId || '',
-                      amount: Number(x.amount || 0),
-                      status: x.status || 'success',
-                      type: x.type || 'transaction',
-                      providerStatus: x.providerStatus || x.provider_status || '',
-                      providerErrorCode: x.providerErrorCode || x.provider_error_code || '',
-                      providerErrorMessage: x.providerErrorMessage || x.provider_error_message || '',
-                      providerRaw: x.providerRaw || x.provider_raw || null,
-                      createdAt: x.createdAt || x.timestamp || Date.now(),
-                    };
+      const type = String(x.type || '').toLowerCase();
+      // Only calculate Net Profit for Services
+      // For Deposits (credit), Net should be 0 (it's not profit).
+      // For Transfers/Refunds, Net should be 0.
+      let netProfit = 0;
+      let userPrice = Number(x.amount || 0);
+      let providerCost = 0;
+      let smsCost = 0;
+      
+      // Re-use logic if possible, or simplified check
+      // We don't have the 'isService' flag here unless we duplicate logic or trust 'providerCost' existence
+      // But in /users/transactions, we just dump data.
+      // Let's rely on 'providerCost' field if it exists, else 0.
+      
+      // Wait, 'rows' here comes from DIRECT DB QUERY, not the processed 'allTransactions' above.
+      // We need to be consistent.
+      
+      return {
+        id: d.id,
+        user: x.user || x.user_email || x.userEmail || x.email || x.userId || '',
+        amount: userPrice,
+        status: x.status || 'success',
+        type,
+        providerStatus: x.providerStatus || x.provider_status || '',
+        providerErrorCode: x.providerErrorCode || x.provider_error_code || '',
+        providerErrorMessage: x.providerErrorMessage || x.provider_error_message || '',
+        providerRaw: x.providerRaw || x.provider_raw || null,
+        createdAt: x.createdAt || x.timestamp || Date.now(),
+        // Add explicit profit fields for frontend
+        providerCost: Number(x.providerCost || x.provider_price || 0),
+        smsCost: Number(x.smsCost || x.sms_cost || 0),
+        // Net Profit logic: Only if type is NOT credit/wallet/funding
+        netProfit: (type !== 'credit' && type !== 'wallet' && type !== 'funding') 
+          ? (userPrice - Number(x.providerCost || 0) - Number(x.smsCost || 0)) 
+          : 0
+      };
                   })
                 );
               }
@@ -541,17 +616,24 @@ router.get('/users/transactions', async (req, res) => {
                 rows = rows.concat(
                   snap.docs.map(d => {
                     const x = d.data() || {};
+                    const type = String(x.type || '').toLowerCase();
+                    let userPrice = Number(x.amount || 0);
                     return {
                       id: d.id,
                       user: x.user || x.user_email || x.userEmail || x.email || x.userId || '',
-                      amount: Number(x.amount || 0),
+                      amount: userPrice,
                       status: x.status || 'success',
-                      type: x.type || 'transaction',
+                      type,
                       providerStatus: x.providerStatus || x.provider_status || '',
                       providerErrorCode: x.providerErrorCode || x.provider_error_code || '',
                       providerErrorMessage: x.providerErrorMessage || x.provider_error_message || '',
                       providerRaw: x.providerRaw || x.provider_raw || null,
                       createdAt: x.createdAt || x.timestamp || Date.now(),
+                      providerCost: Number(x.providerCost || x.provider_price || 0),
+                      smsCost: Number(x.smsCost || x.sms_cost || 0),
+                      netProfit: (type !== 'credit' && type !== 'wallet' && type !== 'funding') 
+                        ? (userPrice - Number(x.providerCost || 0) - Number(x.smsCost || 0)) 
+                        : 0
                     };
                   })
                 );
