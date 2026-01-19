@@ -746,6 +746,61 @@ export async function registerRoutes(
     }
   });
 
+  // Support Tickets
+  app.get("/api/admin/support/tickets", adminAuth, async (_req: Request, res: Response) => {
+    try {
+      const db = getFirestore();
+      const snap = await db.collection("support_tickets").orderBy("createdAt", "desc").limit(200).get();
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      return res.json(rows);
+    } catch { return res.json([]); }
+  });
+
+  app.post("/api/admin/support/tickets/:id/reply", adminAuth, async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { message } = req.body;
+    try {
+      const db = getFirestore();
+      await db.collection("support_tickets").doc(id).update({
+        status: "replied",
+        adminReply: message,
+        repliedAt: Date.now()
+      });
+      return res.json({ success: true });
+    } catch (e: any) { return res.status(400).json({ message: e.message }); }
+  });
+
+  // Announcements
+  app.get("/api/admin/announcements", adminAuth, async (_req: Request, res: Response) => {
+    try {
+      const db = getFirestore();
+      const snap = await db.collection("announcements").orderBy("createdAt", "desc").get();
+      return res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch { return res.json([]); }
+  });
+
+  app.post("/api/admin/announcements", adminAuth, async (req: Request, res: Response) => {
+    const { title, content, type = "info" } = req.body;
+    try {
+      const db = getFirestore();
+      const doc = await db.collection("announcements").add({
+        title,
+        content,
+        type,
+        active: true,
+        createdAt: Date.now()
+      });
+      return res.json({ id: doc.id });
+    } catch (e: any) { return res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete("/api/admin/announcements/:id", adminAuth, async (req: Request, res: Response) => {
+    try {
+      await getFirestore().collection("announcements").doc(req.params.id).delete();
+      return res.json({ success: true });
+    } catch (e: any) { return res.status(400).json({ message: e.message }); }
+  });
+
   app.get("/api/ping", (_req: Request, res: Response) => {
     res.json({ ok: true });
   });

@@ -144,6 +144,27 @@ export async function rejectWalletRequest(id: string): Promise<any> {
   return await request<any>("POST", `/api/admin/wallet/requests/${encodeURIComponent(id)}/reject`);
 }
 
+// Support & Announcements
+export async function getTickets(): Promise<any[]> {
+  return await request<any[]>("GET", "/api/admin/support/tickets");
+}
+
+export async function replyTicket(id: string, message: string): Promise<any> {
+  return await request<any>("POST", `/api/admin/support/tickets/${encodeURIComponent(id)}/reply`, { message });
+}
+
+export async function getAnnouncements(): Promise<any[]> {
+  return await request<any[]>("GET", "/api/admin/announcements");
+}
+
+export async function createAnnouncement(payload: { title: string; content: string; type?: string }): Promise<any> {
+  return await request<any>("POST", "/api/admin/announcements", payload);
+}
+
+export async function deleteAnnouncement(id: string): Promise<any> {
+  return await request<any>("DELETE", `/api/admin/announcements/${encodeURIComponent(id)}`);
+}
+
 export async function getAdminProfile(): Promise<any> {
   return await request<any>("GET", "/api/admin/profile");
 }

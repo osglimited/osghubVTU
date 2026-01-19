@@ -10,7 +10,8 @@ import {
   User,
   FileText,
   TrendingUp,
-  LogOut
+  LogOut,
+  MessageSquare
 } from "lucide-react";
 import { signOut } from "@/lib/firebase";
 // Use the copied admin logo in public assets
@@ -26,6 +27,7 @@ export function Sidebar() {
     { icon: ArrowRightLeft, label: "Transactions", href: "/transactions" },
     { icon: TrendingUp, label: "Financial Intelligence", href: "/finance" },
     { icon: Server, label: "VTU Services", href: "/services" },
+    { icon: MessageSquare, label: "Support", href: "/support" },
     { icon: Settings, label: "API Settings", href: "/settings/api" },
     { icon: FileText, label: "System Logs", href: "/logs" },
     { icon: User, label: "My Profile", href: "/profile" },
