@@ -151,87 +151,52 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
         {announcements.length > 0 && (
           <div 
-            className="relative bg-white border border-gray-100 p-6 rounded-2xl shadow-sm group transition-all duration-500 overflow-hidden"
+            className="relative bg-[#0A1F44] text-white p-3 rounded-xl shadow-md group transition-all duration-500 overflow-hidden"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
           >
-            {/* Background Accent */}
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-[#F97316]" />
-            
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-[#F97316]/10 rounded-lg text-[#F97316]">
-                  <Megaphone size={18} />
-                </div>
-                <h4 className="font-bold text-[#0A1F44] text-lg uppercase tracking-tight">Announcement</h4>
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0 p-2 bg-white/10 rounded-lg text-[#F97316]">
+                <Megaphone size={16} />
               </div>
-              <div className="flex items-center gap-3">
-                <div className="flex gap-1">
+              
+              <div className="flex-grow relative h-[40px] flex flex-col justify-center">
+                {announcements.map((ann, index) => (
+                  <div 
+                    key={ann.id}
+                    className={`absolute inset-0 flex flex-col justify-center transition-all duration-700 ease-in-out ${
+                      index === currentAnnIndex 
+                        ? 'opacity-100 translate-y-0' 
+                        : index < currentAnnIndex 
+                          ? 'opacity-0 -translate-y-full' 
+                          : 'opacity-0 translate-y-full'
+                    }`}
+                  >
+                    <h5 className="font-bold text-xs text-[#F97316] uppercase tracking-wider">{ann.title}</h5>
+                    <p className="text-sm text-blue-100 line-clamp-1 leading-tight">{ann.content}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex gap-0.5">
                   {announcements.map((_, i) => (
                     <div 
                       key={i} 
-                      className={`h-1 rounded-full transition-all duration-300 ${i === currentAnnIndex ? 'w-6 bg-[#F97316]' : 'w-2 bg-gray-200'}`} 
+                      className={`h-1 rounded-full transition-all duration-300 ${i === currentAnnIndex ? 'w-4 bg-[#F97316]' : 'w-1 bg-white/20'}`} 
                     />
                   ))}
                 </div>
-                <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
-                  {currentAnnIndex + 1} / {announcements.length}
-                </span>
-              </div>
-            </div>
-
-            <div className="relative h-[80px]">
-              {announcements.map((ann, index) => (
-                <div 
-                  key={ann.id}
-                  className={`absolute inset-0 transition-all duration-700 ease-in-out ${
-                    index === currentAnnIndex 
-                      ? 'opacity-100 translate-x-0' 
-                      : index < currentAnnIndex 
-                        ? 'opacity-0 -translate-x-full' 
-                        : 'opacity-0 translate-x-full'
-                  }`}
-                >
-                  <h5 className="font-bold text-[#0A1F44] mb-1">{ann.title}</h5>
-                  <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{ann.content}</p>
-                </div>
-              ))}
-            </div>
-            
-            <div className="mt-4 flex justify-between items-center">
-               <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  Published {new Date(announcements[currentAnnIndex].createdAt).toLocaleDateString()}
-                </span>
-
-              {announcements.length > 1 && (
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => setIsPaused(!isPaused)}
-                    className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#0A1F44] transition-colors"
-                    title={isPaused ? "Play" : "Pause"}
-                  >
-                    {isPaused ? <Play size={16} fill="currentColor" /> : <Pause size={16} fill="currentColor" />}
-                  </button>
-                  <div className="flex gap-1">
-                    <button 
-                      onClick={prevAnnouncement}
-                      className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#0A1F44] transition-colors border border-gray-100"
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    <button 
-                      onClick={nextAnnouncement}
-                      className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#0A1F44] transition-colors border border-gray-100"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
+                {announcements.length > 1 && (
+                  <div className="flex items-center gap-1 ml-2">
+                    <button onClick={prevAnnouncement} className="p-1 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft size={14} /></button>
+                    <button onClick={nextAnnouncement} className="p-1 hover:bg-white/10 rounded-full transition-colors"><ChevronRight size={14} /></button>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         )}

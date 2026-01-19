@@ -57,6 +57,20 @@ export default function SupportPage() {
     }
   };
 
+  const markAsSolved = async (id: string) => {
+    try {
+      await db.collection('support_tickets').doc(id).update({ 
+        status: 'solved', 
+        updatedAt: Date.now(),
+        lastMessageAt: Date.now()
+      });
+      toast({ title: "Ticket Marked as Solved" });
+      loadData();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
   const handleCreateAnn = async () => {
     if (!newAnn.title || !newAnn.content) return;
     try {
@@ -181,7 +195,12 @@ export default function SupportPage() {
                         onChange={(e) => setReplyMsg(e.target.value)}
                         className="min-h-[100px]"
                       />
-                      <div className="flex justify-end">
+                      <div className="flex justify-end gap-2">
+                        {selectedTicket.status !== 'solved' && (
+                          <Button variant="outline" onClick={() => markAsSolved(selectedTicket.id)} className="border-green-600 text-green-600 hover:bg-green-50">
+                            Mark as Solved
+                          </Button>
+                        )}
                         <Button onClick={() => handleReply(selectedTicket.id)} disabled={!replyMsg}>
                           <Send className="mr-2 h-4 w-4" /> Send Reply
                         </Button>
