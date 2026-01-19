@@ -348,18 +348,18 @@ router.get('/finance/analytics', async (req, res) => {
     // The user wants to see the minimum funds needed to fulfill services.
     // We look for the BEST (lowest) ratio to show how much more service they can get.
     
-    let bestRatio = 1.0; // Default to 1:1 if no plans found
+    let bestRatio = 0.95; // Default to a realistic 5% margin if no plans found
     let bestRatioSource = 'default';
 
     try {
       // A. Fetch Data Plans (Active Only)
-      const plansSnap = await db.collection('service_plans').where('active', '==', true).get();
+      const plansSnap = await db.collection('service_plans').get();
       if (!plansSnap.empty) {
         plansSnap.docs.forEach(d => {
            const p = d.data();
            const cost = Number(p.priceApi || p.price_api || 0);
            const price = Number(p.priceUser || p.price_user || 0);
-           if (cost > 0 && price > 0) {
+           if (cost > 0 && price > 0 && cost < price) {
              const ratio = cost / price;
              if (ratio < bestRatio) {
                bestRatio = ratio;
@@ -376,15 +376,22 @@ router.get('/finance/analytics', async (req, res) => {
       
       Object.values(airtimeNetworks).forEach(net => {
          const discount = Number(net.discount || 0);
-         const ratio = (100 - discount) / 100;
-         if (ratio < bestRatio) {
-           bestRatio = ratio;
-           bestRatioSource = `airtime:${net.name || 'network'} (${discount}%)`;
+         if (discount > 0) {
+           const ratio = (100 - discount) / 100;
+           if (ratio < bestRatio) {
+             bestRatio = ratio;
+             bestRatioSource = `airtime:${net.name || 'network'} (${discount}%)`;
+           }
          }
        });
       
     } catch (err) {
       console.error("Error calculating best case ratio:", err);
+    }
+    
+    // Safety check: ensure bestRatio is always less than 1.0 if possible
+    if (bestRatio >= 1.0) {
+      bestRatio = 0.95; // Default fallback for capacity visualization
     }
     
     // User Rule: provider_required = user_wallet_balance * best_ratio
