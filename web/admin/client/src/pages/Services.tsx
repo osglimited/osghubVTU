@@ -18,6 +18,8 @@ export default function ServicesPage() {
   const [plans, setPlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState<boolean>(true);
   const [openNew, setOpenNew] = useState(false);
+  const [openNewCable, setOpenNewCable] = useState(false);
+  const [openNewPower, setOpenNewPower] = useState(false);
   const [airtimeNetworks, setAirtimeNetworks] = useState<Record<string, { enabled: boolean; discount: number }>>({
     MTN: { enabled: true, discount: 2 },
     Airtel: { enabled: true, discount: 2 },
@@ -174,9 +176,9 @@ export default function ServicesPage() {
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
-                    {plans.map((p) => (
-                      <TableRow key={p.id}>
+                      <TableBody>
+                        {plans.filter(p => !p.type || p.type === 'data').map((p) => (
+                          <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.network}</TableCell>
                         <TableCell>{p.name}</TableCell>
                         <TableCell>₦{Number(p.priceUser || 0).toLocaleString()}</TableCell>
@@ -239,26 +241,212 @@ export default function ServicesPage() {
 
         {/* Cable Content */}
         <TabsContent value="cable" className="space-y-4">
-           <Card className="border-none shadow-sm">
+          <div className="flex justify-end">
+            <Dialog open={openNewCable} onOpenChange={setOpenNewCable}>
+              <DialogTrigger asChild>
+                <Button className="shadow-lg shadow-primary/20">
+                  <Plus className="mr-2 h-4 w-4" /> Add Cable Plan
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[520px]">
+                <DialogHeader>
+                  <DialogTitle>Create Cable Plan</DialogTitle>
+                </DialogHeader>
+                <NewPlanForm
+                  type="cable"
+                  onCreated={(plan) => {
+                    setPlans((prev) => [plan, ...prev]);
+                    setOpenNewCable(false);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+          <Card className="border-none shadow-sm">
             <CardHeader>
               <CardTitle>Cable TV Packages</CardTitle>
               <CardDescription>Manage DSTV, GOTV, and Startimes packages.</CardDescription>
             </CardHeader>
             <CardContent>
-               <p className="text-sm text-muted-foreground">Cable TV package management UI would go here similar to Data Plans.</p>
+              {loadingPlans ? (
+                <div className="p-6 text-sm text-muted-foreground">Loading plans...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Provider</TableHead>
+                      <TableHead>Package Name</TableHead>
+                      <TableHead>Price (User)</TableHead>
+                      <TableHead>Price (API)</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {plans.filter(p => p.type === 'cable').map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.network}</TableCell>
+                        <TableCell>{p.name}</TableCell>
+                        <TableCell>₦{Number(p.priceUser || 0).toLocaleString()}</TableCell>
+                        <TableCell>₦{Number(p.priceApi || 0).toLocaleString()}</TableCell>
+                        <TableCell>
+                          {p.active ? (
+                            <Badge className="bg-emerald-500">Active</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactive</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              const priceUser = Number(prompt("New user price (₦)", String(p.priceUser)) || "");
+                              const priceApi = Number(prompt("New API price (₦)", String(p.priceApi)) || "");
+                              try {
+                                const updated = await updatePlan(p.id, {
+                                  priceUser: isNaN(priceUser) ? undefined : priceUser,
+                                  priceApi: isNaN(priceApi) ? undefined : priceApi,
+                                });
+                                setPlans((prev) => prev.map((x) => (x.id === p.id ? updated : x)));
+                                toast({ title: "Plan updated", description: `${updated.network} ${updated.name}` });
+                              } catch (e: any) {
+                                toast({ title: "Update failed", description: e.message || "Unable to update", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={async () => {
+                              const confirmDelete = confirm(`Delete plan ${p.network} ${p.name}?`);
+                              if (!confirmDelete) return;
+                              try {
+                                await deletePlan(p.id);
+                                setPlans((prev) => prev.filter((x) => x.id !== p.id));
+                                toast({ title: "Plan deleted", description: `${p.network} ${p.name}` });
+                              } catch (e: any) {
+                                toast({ title: "Delete failed", description: e.message || "Unable to delete", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Electricity Content */}
         <TabsContent value="electricity" className="space-y-4">
-           <Card className="border-none shadow-sm">
+          <div className="flex justify-end">
+            <Dialog open={openNewPower} onOpenChange={setOpenNewPower}>
+              <DialogTrigger asChild>
+                <Button className="shadow-lg shadow-primary/20">
+                  <Plus className="mr-2 h-4 w-4" /> Add Electricity Disco
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[520px]">
+                <DialogHeader>
+                  <DialogTitle>Create Electricity Disco</DialogTitle>
+                </DialogHeader>
+                <NewPlanForm
+                  type="electricity"
+                  onCreated={(plan) => {
+                    setPlans((prev) => [plan, ...prev]);
+                    setOpenNewPower(false);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+          <Card className="border-none shadow-sm">
             <CardHeader>
               <CardTitle>Electricity Discos</CardTitle>
               <CardDescription>Manage supported electricity distribution companies.</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Electricity provider management UI would go here.</p>
+              {loadingPlans ? (
+                <div className="p-6 text-sm text-muted-foreground">Loading plans...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Disco</TableHead>
+                      <TableHead>Plan Name</TableHead>
+                      <TableHead>Price (User)</TableHead>
+                      <TableHead>Price (API)</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {plans.filter(p => p.type === 'electricity').map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.network}</TableCell>
+                        <TableCell>{p.name}</TableCell>
+                        <TableCell>₦{Number(p.priceUser || 0).toLocaleString()}</TableCell>
+                        <TableCell>₦{Number(p.priceApi || 0).toLocaleString()}</TableCell>
+                        <TableCell>
+                          {p.active ? (
+                            <Badge className="bg-emerald-500">Active</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactive</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              const priceUser = Number(prompt("New user price (₦)", String(p.priceUser)) || "");
+                              const priceApi = Number(prompt("New API price (₦)", String(p.priceApi)) || "");
+                              try {
+                                const updated = await updatePlan(p.id, {
+                                  priceUser: isNaN(priceUser) ? undefined : priceUser,
+                                  priceApi: isNaN(priceApi) ? undefined : priceApi,
+                                });
+                                setPlans((prev) => prev.map((x) => (x.id === p.id ? updated : x)));
+                                toast({ title: "Plan updated", description: `${updated.network} ${updated.name}` });
+                              } catch (e: any) {
+                                toast({ title: "Update failed", description: e.message || "Unable to update", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={async () => {
+                              const confirmDelete = confirm(`Delete plan ${p.network} ${p.name}?`);
+                              if (!confirmDelete) return;
+                              try {
+                                await deletePlan(p.id);
+                                setPlans((prev) => prev.filter((x) => x.id !== p.id));
+                                toast({ title: "Plan deleted", description: `${p.network} ${p.name}` });
+                              } catch (e: any) {
+                                toast({ title: "Delete failed", description: e.message || "Unable to delete", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -267,7 +455,7 @@ export default function ServicesPage() {
   );
 }
 
-function NewPlanForm({ onCreated }: { onCreated: (plan: any) => void }) {
+function NewPlanForm({ onCreated, type = 'data' }: { onCreated: (plan: any) => void, type?: string }) {
   const { toast } = useToast();
   const [network, setNetwork] = useState("");
   const [name, setName] = useState("");
@@ -279,10 +467,10 @@ function NewPlanForm({ onCreated }: { onCreated: (plan: any) => void }) {
   const [saving, setSaving] = useState(false);
   return (
     <div className="space-y-4">
-      <Label>Network</Label>
-      <Input placeholder="MTN / Glo / Airtel / 9mobile" value={network} onChange={e => setNetwork(e.target.value)} />
-      <Label>Plan Name</Label>
-      <Input placeholder="1GB SME" value={name} onChange={e => setName(e.target.value)} />
+      <Label>{type === 'electricity' ? 'Disco' : type === 'cable' ? 'Provider' : 'Network'}</Label>
+      <Input placeholder={type === 'electricity' ? 'IKEDC / EKEDC' : type === 'cable' ? 'DSTV / GOTV' : 'MTN / Glo / Airtel / 9mobile'} value={network} onChange={e => setNetwork(e.target.value)} />
+      <Label>{type === 'cable' ? 'Package Name' : 'Plan Name'}</Label>
+      <Input placeholder={type === 'cable' ? 'DSTV Compact' : '1GB SME'} value={name} onChange={e => setName(e.target.value)} />
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Price (User)</Label>
@@ -299,8 +487,8 @@ function NewPlanForm({ onCreated }: { onCreated: (plan: any) => void }) {
           <Input placeholder="e.g. 349" value={variationId} onChange={e => setVariationId(e.target.value)} />
         </div>
         <div>
-          <Label>Network ID</Label>
-          <Input type="number" placeholder="1=MTN,2=Glo,4=Airtel,3=9mobile" value={networkId} onChange={e => setNetworkId(e.target.value)} />
+          <Label>{type === 'electricity' ? 'Disco ID' : type === 'cable' ? 'Provider ID' : 'Network ID'}</Label>
+          <Input type="number" placeholder={type === 'electricity' ? 'e.g. 1' : type === 'cable' ? 'e.g. 1' : '1=MTN,2=Glo,4=Airtel,3=9mobile'} value={networkId} onChange={e => setNetworkId(e.target.value)} />
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -317,7 +505,18 @@ function NewPlanForm({ onCreated }: { onCreated: (plan: any) => void }) {
             }
             setSaving(true);
             try {
-              const plan = await createPlan({ network, name, priceUser: Number(priceUser), priceApi: Number(priceApi), active, metadata: { variation_id: variationId, networkId: Number(networkId) } });
+              const plan = await createPlan({ 
+                network, 
+                name, 
+                priceUser: Number(priceUser), 
+                priceApi: Number(priceApi), 
+                active, 
+                metadata: { 
+                  variation_id: variationId, 
+                  networkId: Number(networkId),
+                  type: type
+                } 
+              });
               toast({ title: "Plan created", description: `${plan.network} ${plan.name}` });
               onCreated(plan);
             } catch (e: any) {
@@ -327,7 +526,7 @@ function NewPlanForm({ onCreated }: { onCreated: (plan: any) => void }) {
             }
           }}
         >
-          Create Plan
+          Create {type === 'electricity' ? 'Disco' : type === 'cable' ? 'Package' : 'Plan'}
         </Button>
       </div>
     </div>
