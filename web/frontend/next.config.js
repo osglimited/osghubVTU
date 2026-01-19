@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  allowedDevOrigins: ['replit.dev', 'replit.app', 'localhost', '127.0.0.1', 'kirk.replit.dev'],
+  allowedDevOrigins: ['*.replit.dev', '*.replit.app', 'localhost', '127.0.0.1', '*.picard.replit.dev'],
   turbopack: {},
   productionBrowserSourceMaps: false,
   images: {
