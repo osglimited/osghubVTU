@@ -1,16 +1,15 @@
 import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MessageSquare, Megaphone, Trash2, Send, Plus, History, CheckCheck, Check, User, ShieldCheck } from "lucide-react";
+import { MessageSquare, Megaphone, Trash2, Send, History, CheckCheck, Check, User, ShieldCheck, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getAnnouncements, createAnnouncement, deleteAnnouncement, db } from "@/lib/backend";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function SupportPage() {
   const { toast } = useToast();
@@ -35,7 +34,7 @@ export default function SupportPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [anns] = await Promise.all([getAnnouncements()]);
+      const anns = await getAnnouncements();
       setAnnouncements(anns || []);
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -44,9 +43,9 @@ export default function SupportPage() {
     }
   };
 
-  // Real-time tickets listener for admin
   useEffect(() => {
-    const unsubscribe = db.collection('support_tickets')
+    const ticketsRef = db.collection('support_tickets');
+    const unsubscribe = ticketsRef
       .orderBy('lastMessageAt', 'desc')
       .onSnapshot((snap: any) => {
         const ticketList = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
@@ -56,12 +55,13 @@ export default function SupportPage() {
           const updated = ticketList.find((t: any) => t.id === selectedTicket.id);
           if (updated) setSelectedTicket(updated);
         }
+      }, (err: any) => {
+        console.error("Tickets listener error:", err);
       });
 
     return () => unsubscribe();
   }, [selectedTicket?.id]);
 
-  // Real-time replies listener for selected ticket
   useEffect(() => {
     if (!selectedTicket) {
       setReplies([]);
@@ -73,13 +73,15 @@ export default function SupportPage() {
       .collection('replies')
       .orderBy('createdAt', 'asc')
       .onSnapshot((snap: any) => {
-        setReplies(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
+        const replyList = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+        setReplies(replyList);
         
-        // Mark as read when admin views them
         const unreadReplies = snap.docs.filter((d: any) => d.data().senderRole === 'user' && !d.data().read);
         unreadReplies.forEach((d: any) => {
-          d.ref.update({ read: true });
+          d.ref.update({ read: true }).catch(console.error);
         });
+      }, (err: any) => {
+        console.error("Replies listener error:", err);
       });
 
     return () => unsubscribe();
@@ -88,7 +90,7 @@ export default function SupportPage() {
   useEffect(() => { loadData(); }, []);
 
   const handleReply = async (id: string) => {
-    if (!replyMsg) return;
+    if (!replyMsg.trim()) return;
     try {
       const reply = {
         message: replyMsg,
@@ -104,7 +106,7 @@ export default function SupportPage() {
         lastMessageAt: Date.now()
       });
 
-      toast({ title: "Success", description: "Reply sent to user" });
+      toast({ title: "Success", description: "Reply sent" });
       setReplyMsg('');
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -148,64 +150,84 @@ export default function SupportPage() {
     }
   };
 
+  if (loading && announcements.length === 0) {
+    return <div className="flex items-center justify-center h-full">Loading...</div>;
+  }
+
   return (
-    <div className="space-y-6 h-[calc(100vh-100px)] flex flex-col">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 h-[calc(100vh-120px)] flex flex-col p-4 md:p-6 bg-gray-50/30">
+      <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground">Support & Communications</h2>
-          <p className="text-muted-foreground">Manage user support tickets and system-wide announcements.</p>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900">Support Center</h2>
+          <p className="text-sm text-gray-500">Real-time user inquiries and announcements</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Badge variant="outline" className="px-3 py-1 text-xs bg-blue-50 text-blue-600 border-blue-200">
+            {tickets.filter(t => t.status === 'open').length} Open Tickets
+          </Badge>
         </div>
       </div>
 
       <Tabs defaultValue="tickets" className="flex-grow flex flex-col space-y-4 overflow-hidden">
-        <TabsList className="w-fit">
-          <TabsTrigger value="tickets"><MessageSquare className="mr-2 h-4 w-4" /> Support Tickets</TabsTrigger>
-          <TabsTrigger value="announcements"><Megaphone className="mr-2 h-4 w-4" /> Announcements</TabsTrigger>
+        <TabsList className="w-fit bg-white border shadow-sm p-1 rounded-lg">
+          <TabsTrigger value="tickets" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
+            <MessageSquare className="mr-2 h-4 w-4" /> Tickets
+          </TabsTrigger>
+          <TabsTrigger value="announcements" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
+            <Megaphone className="mr-2 h-4 w-4" /> Announcements
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="tickets" className="flex-grow flex flex-col overflow-hidden data-[state=inactive]:hidden">
-          <div className="flex-grow flex gap-6 overflow-hidden">
-            {/* Ticket List Area */}
-            <div className="w-1/3 flex flex-col gap-4 overflow-hidden">
-              <Card className="flex-grow flex flex-col overflow-hidden">
-                <CardHeader className="py-4">
+          <div className="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
+            {/* Sidebar */}
+            <div className="w-full md:w-[350px] flex flex-col gap-4 overflow-hidden h-full">
+              <Card className="flex-grow flex flex-col overflow-hidden border shadow-sm rounded-xl">
+                <CardHeader className="py-4 border-b bg-gray-50/50">
                   <div className="flex justify-between items-center">
-                    <CardTitle className="text-sm font-bold flex items-center gap-2">
-                      <History className="h-4 w-4 text-primary" /> Active Conversations
+                    <CardTitle className="text-sm font-bold flex items-center gap-2 text-gray-700">
+                      <History className="h-4 w-4 text-blue-600" /> Inbox
                     </CardTitle>
-                    <Badge variant="secondary">{tickets.length}</Badge>
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-600">{tickets.length}</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-grow overflow-y-auto px-2 space-y-2 pb-4">
+                <CardContent className="flex-grow overflow-y-auto p-2 space-y-2 pb-4 bg-white scrollbar-hide">
                   {tickets.map((t) => (
                     <div 
                       key={t.id} 
                       onClick={() => setSelectedTicket(t)}
-                      className={`p-3 rounded-lg cursor-pointer transition-all border ${
+                      className={`p-3 rounded-xl cursor-pointer transition-all border ${
                         selectedTicket?.id === t.id 
-                          ? 'bg-primary/10 border-primary ring-1 ring-primary/20' 
-                          : 'bg-card hover:bg-muted/50 border-transparent hover:border-muted-foreground/20'
+                          ? 'bg-blue-50 border-blue-400 shadow-sm' 
+                          : 'bg-white hover:bg-gray-50 border-gray-100'
                       }`}
                     >
                       <div className="flex justify-between items-start mb-1">
-                        <span className="text-[10px] font-bold text-muted-foreground truncate max-w-[150px]">{t.userEmail}</span>
-                        <Badge variant={t.status === 'open' ? 'destructive' : t.status === 'replied' ? 'default' : 'secondary'} className="text-[9px] h-4">
+                        <span className="text-[10px] font-semibold text-gray-500 truncate max-w-[150px]">{t.userEmail}</span>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-[9px] h-4 uppercase px-1.5 ${
+                            t.status === 'open' ? 'bg-red-50 text-red-600 border-red-200' : 
+                            t.status === 'replied' ? 'bg-blue-50 text-blue-600 border-blue-200' : 
+                            'bg-gray-100 text-gray-600 border-gray-200'
+                          }`}
+                        >
                           {t.status}
                         </Badge>
                       </div>
-                      <h4 className="text-sm font-bold truncate">{t.subject}</h4>
-                      <p className="text-xs text-muted-foreground line-clamp-1 mt-1">{t.message}</p>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-[10px] text-muted-foreground">
+                      <h4 className="text-sm font-bold text-gray-900 truncate">{t.subject || "No Subject"}</h4>
+                      <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{t.message}</p>
+                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+                        <span className="text-[9px] text-gray-400 font-medium">
                           {new Date(t.lastMessageAt || t.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
                   ))}
                   {tickets.length === 0 && (
-                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
-                      <MessageSquare className="h-12 w-12 mb-2 opacity-20" />
-                      <p className="text-sm">No active tickets found</p>
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8 text-center">
+                      <MessageSquare className="h-12 w-12 mb-3 opacity-10" />
+                      <p className="text-sm font-medium">No messages yet</p>
                     </div>
                   )}
                 </CardContent>
@@ -213,67 +235,72 @@ export default function SupportPage() {
             </div>
 
             {/* Chat Area */}
-            <div className="flex-grow flex flex-col overflow-hidden">
-              <Card className="flex-grow flex flex-col overflow-hidden">
+            <div className="flex-grow flex flex-col overflow-hidden h-full">
+              <Card className="flex-grow flex flex-col overflow-hidden border shadow-sm rounded-xl">
                 {selectedTicket ? (
                   <>
-                    <CardHeader className="py-4 border-b">
+                    <CardHeader className="py-4 border-b bg-white shadow-sm z-10">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <User className="h-5 w-5 text-primary" />
+                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center border-2 border-white shadow-sm">
+                            <User className="h-5 w-5 text-blue-600" />
                           </div>
                           <div>
-                            <CardTitle className="text-base">{selectedTicket.subject}</CardTitle>
-                            <CardDescription className="text-xs">{selectedTicket.userEmail}</CardDescription>
+                            <CardTitle className="text-base font-bold text-gray-900">{selectedTicket.subject}</CardTitle>
+                            <CardDescription className="text-xs text-gray-500 font-medium">{selectedTicket.userEmail}</CardDescription>
                           </div>
                         </div>
-                        <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider">
-                          Ticket ID: {selectedTicket.id.slice(0, 8)}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                           {selectedTicket.status !== 'solved' && (
+                            <Button variant="outline" size="sm" onClick={() => markAsSolved(selectedTicket.id)} className="text-green-600 border-green-200 hover:bg-green-50 h-8 text-[11px] font-bold">
+                              RESOLVE
+                            </Button>
+                          )}
+                          <Badge variant="outline" className="text-[10px] uppercase font-bold text-gray-400 bg-gray-50 border-gray-200">
+                            #{selectedTicket.id.slice(0, 6)}
+                          </Badge>
+                        </div>
                       </div>
                     </CardHeader>
                     
-                    <CardContent className="flex-grow overflow-y-auto p-4 space-y-4 bg-muted/20">
+                    <CardContent className="flex-grow overflow-y-auto p-4 space-y-4 bg-[#f8f9fa] pattern-dots">
                       {/* Initial Message */}
-                      <div className="flex flex-col items-start max-w-[85%]">
-                        <div className="bg-background p-3 rounded-2xl rounded-tl-none border shadow-sm">
-                          <p className="text-sm">{selectedTicket.message}</p>
+                      <div className="flex flex-col items-start max-w-[90%]">
+                        <div className="bg-white p-4 rounded-2xl rounded-tl-none border shadow-sm border-gray-100">
+                          <p className="text-[13px] text-gray-800 leading-relaxed font-medium">{selectedTicket.message}</p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">{new Date(selectedTicket.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                          </div>
                         </div>
-                        <span className="text-[10px] text-muted-foreground mt-1 px-1">User • {new Date(selectedTicket.createdAt).toLocaleString()}</span>
                       </div>
 
                       {replies.map((r, i) => (
-                        <div key={r.id || i} className={`flex flex-col ${r.senderRole === 'admin' ? 'items-end ml-auto' : 'items-start'} max-w-[85%]`}>
-                          <div className={`p-3 rounded-2xl shadow-sm ${
+                        <div key={r.id || i} className={`flex flex-col ${r.senderRole === 'admin' ? 'items-end ml-auto' : 'items-start'} max-w-[90%]`}>
+                          <div className={`p-4 rounded-2xl shadow-sm ${
                             r.senderRole === 'admin' 
-                              ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                              : 'bg-background border rounded-tl-none'
+                              ? 'bg-blue-600 text-white rounded-tr-none shadow-blue-100' 
+                              : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
                           }`}>
-                            <p className="text-sm">{r.message}</p>
-                            {r.senderRole === 'admin' && (
-                              <div className="flex justify-end mt-1">
-                                {r.read ? <CheckCheck className="h-3 w-3 opacity-70" /> : <Check className="h-3 w-3 opacity-70" />}
-                              </div>
-                            )}
+                            <p className="text-[13px] leading-relaxed font-medium">{r.message}</p>
+                            <div className="flex justify-end items-center gap-1.5 mt-1.5 opacity-80">
+                              <span className="text-[9px] font-bold uppercase tracking-wider">{new Date(r.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                              {r.senderRole === 'admin' && (
+                                r.read ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
+                              )}
+                            </div>
                           </div>
-                          <span className="text-[10px] text-muted-foreground mt-1 px-1">
-                            {r.senderRole === 'admin' ? (
-                              <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> You (Admin)</span>
-                            ) : 'User'} • {new Date(r.createdAt).toLocaleString()}
-                          </span>
                         </div>
                       ))}
                       <div ref={chatEndRef} />
                     </CardContent>
 
-                    <div className="p-4 border-t bg-background space-y-4">
-                      <div className="space-y-2">
+                    <div className="p-4 border-t bg-white space-y-3">
+                      <div className="relative group">
                         <Textarea 
-                          placeholder="Type your reply to the user..." 
+                          placeholder="Type your response..." 
                           value={replyMsg}
                           onChange={(e) => setReplyMsg(e.target.value)}
-                          className="min-h-[80px] bg-muted/30 focus-visible:ring-primary"
+                          className="min-h-[90px] bg-gray-50/50 border-gray-200 focus:border-blue-400 focus:ring-blue-100 rounded-xl text-[13px] pr-12 transition-all resize-none font-medium"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
@@ -281,26 +308,25 @@ export default function SupportPage() {
                             }
                           }}
                         />
-                        <div className="flex justify-end gap-2">
-                          {selectedTicket.status !== 'solved' && (
-                            <Button variant="outline" size="sm" onClick={() => markAsSolved(selectedTicket.id)} className="border-green-600 text-green-600 hover:bg-green-50 h-9">
-                              Mark as Solved
-                            </Button>
-                          )}
-                          <Button size="sm" onClick={() => handleReply(selectedTicket.id)} disabled={!replyMsg} className="h-9 px-6">
-                            <Send className="mr-2 h-4 w-4" /> Send Reply
-                          </Button>
-                        </div>
+                        <Button 
+                          size="icon" 
+                          onClick={() => handleReply(selectedTicket.id)} 
+                          disabled={!replyMsg.trim()} 
+                          className="absolute bottom-2.5 right-2.5 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-100 disabled:opacity-30 disabled:shadow-none transition-all"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
                       </div>
+                      <p className="text-[10px] text-gray-400 font-bold text-center uppercase tracking-widest">Shift + Enter for new line</p>
                     </div>
                   </>
                 ) : (
-                  <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground p-8 text-center bg-muted/10">
-                    <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
-                      <MessageSquare className="h-10 w-10 opacity-20" />
+                  <div className="flex-grow flex flex-col items-center justify-center text-gray-400 p-12 text-center bg-gray-50/30">
+                    <div className="h-24 w-24 rounded-3xl bg-white border border-gray-100 flex items-center justify-center mb-6 shadow-xl shadow-gray-100 rotate-3">
+                      <MessageSquare className="h-10 w-10 text-blue-500 opacity-20 -rotate-3" />
                     </div>
-                    <h3 className="text-lg font-bold">Admin Support Chat</h3>
-                    <p className="text-sm max-w-[300px] mt-1 opacity-60">Select a user conversation from the left to start responding and resolving inquiries.</p>
+                    <h3 className="text-xl font-black text-gray-900 mb-2">Select a Conversation</h3>
+                    <p className="text-xs max-w-[280px] leading-relaxed text-gray-500 font-medium">Respond to user inquiries instantly with our real-time support system.</p>
                   </div>
                 )}
               </Card>
@@ -308,48 +334,54 @@ export default function SupportPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="announcements">
+        <TabsContent value="announcements" className="data-[state=inactive]:hidden h-full flex flex-col">
           <div className="flex justify-end mb-4">
             <Dialog open={openAnnouncement} onOpenChange={setOpenAnnouncement}>
               <DialogTrigger asChild>
-                <Button><Plus className="mr-2 h-4 w-4" /> Post Announcement</Button>
+                <Button className="bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-100 rounded-xl px-6 h-10 font-bold text-xs"><Plus className="mr-2 h-4 w-4" /> NEW ANNOUNCEMENT</Button>
               </DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>New Announcement</DialogTitle></DialogHeader>
+              <DialogContent className="rounded-2xl border-none shadow-2xl">
+                <DialogHeader><DialogTitle className="text-xl font-black">Post Announcement</DialogTitle></DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label>Title</Label>
-                    <Input value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} />
+                    <Label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Title</Label>
+                    <Input className="rounded-xl border-gray-200 h-11 text-sm font-bold" value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} placeholder="e.g. System Maintenance" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Content</Label>
-                    <Textarea value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} />
+                    <Label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Content</Label>
+                    <Textarea className="rounded-xl border-gray-200 min-h-[120px] text-sm font-medium resize-none" value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} placeholder="Describe the announcement in detail..." />
                   </div>
-                  <Button className="w-full" onClick={handleCreateAnn}>Post to Users</Button>
+                  <Button className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 font-black shadow-lg shadow-blue-100 mt-2" onClick={handleCreateAnn}>PUBLISH ANNOUNCEMENT</Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          <Card className="border-none shadow-sm">
-            <CardHeader>
-              <CardTitle>Active Announcements</CardTitle>
-              <CardDescription>Messages currently visible to users upon login.</CardDescription>
+          <Card className="border shadow-sm rounded-xl flex-grow overflow-hidden flex flex-col">
+            <CardHeader className="bg-gray-50/50 border-b">
+              <CardTitle className="text-sm font-black text-gray-900 uppercase tracking-widest">Active Broadcasts</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {announcements.map((a) => (
-                  <div key={a.id} className="flex items-center justify-between p-4 border rounded-lg group">
-                    <div>
-                      <h4 className="font-bold">{a.title}</h4>
-                      <p className="text-sm text-muted-foreground">{a.content}</p>
+            <CardContent className="p-4 flex-grow overflow-y-auto space-y-3 bg-white">
+              {announcements.map((a) => (
+                <div key={a.id} className="flex items-start justify-between p-4 border rounded-2xl bg-white hover:border-blue-200 transition-all group shadow-sm">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-gray-900 text-sm">{a.title}</h4>
+                      <Badge variant="outline" className="text-[9px] h-4 bg-blue-50 text-blue-600 border-blue-100 uppercase font-black">Active</Badge>
                     </div>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteAnn(a.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <p className="text-[13px] text-gray-600 font-medium leading-relaxed">{a.content}</p>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest pt-1">{new Date(a.createdAt).toLocaleString()}</p>
                   </div>
-                ))}
-                {announcements.length === 0 && <p className="text-center text-muted-foreground py-8">No active announcements</p>}
-              </div>
+                  <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={() => handleDeleteAnn(a.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              {announcements.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center text-gray-400 py-20 bg-gray-50/30 rounded-2xl border border-dashed">
+                   <Megaphone className="h-10 w-10 mb-4 opacity-10" />
+                   <p className="text-sm font-bold uppercase tracking-widest">No Active Announcements</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
