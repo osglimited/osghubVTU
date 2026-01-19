@@ -979,15 +979,18 @@ export async function registerRoutes(
             break;
           }
         }
-        const validTx = transactions.filter(t => 
-          String(t.status || "").toLowerCase() === "success" && 
-          Number(t.providerCost || 0) > 0 && 
-          Number(t.userPrice || 0) > 0
-        );
-        const rateDen = validTx.reduce((s, t) => s + Number(t.userPrice || 0), 0);
-        const rateNum = validTx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
-        const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
-        providerBalanceRequired = walletBalance * providerRate;
+        const getWorstRatio = () => {
+          // Default to 0.97 as per requirement to guarantee provider solvency
+          const validTx = transactions.filter(t => 
+            String(t.status || "").toLowerCase() === "success" && 
+            Number(t.providerCost || 0) > 0 && 
+            Number(t.userPrice || 0) > 0
+          );
+          if (validTx.length === 0) return 0.97;
+          const ratios = validTx.map(t => Number(t.providerCost || 0) / Number(t.userPrice || 0));
+          return Math.max(...ratios, 0.97);
+        };
+        providerBalanceRequired = walletBalance * getWorstRatio();
       } else {
         const allWallets: Array<{ main: number }> = [];
         for (const n of ["wallets", "user_wallets"]) {
@@ -1002,15 +1005,17 @@ export async function registerRoutes(
           }
         }
         const totalMain = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
-        const validTx = transactions.filter(t => 
-          String(t.status || "").toLowerCase() === "success" && 
-          Number(t.providerCost || 0) > 0 && 
-          Number(t.userPrice || 0) > 0
-        );
-        const rateDen = validTx.reduce((s, t) => s + Number(t.userPrice || 0), 0);
-        const rateNum = validTx.reduce((s, t) => s + Number(t.providerCost || 0), 0);
-        const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
-        providerBalanceRequired = totalMain * providerRate;
+        const getWorstRatio = () => {
+          const validTx = transactions.filter(t => 
+            String(t.status || "").toLowerCase() === "success" && 
+            Number(t.providerCost || 0) > 0 && 
+            Number(t.userPrice || 0) > 0
+          );
+          if (validTx.length === 0) return 0.97;
+          const ratios = validTx.map(t => Number(t.providerCost || 0) / Number(t.userPrice || 0));
+          return Math.max(...ratios, 0.97);
+        };
+        providerBalanceRequired = totalMain * getWorstRatio();
       }
 
       const computeBucket = (bucketStart: number) => {
@@ -1019,15 +1024,7 @@ export async function registerRoutes(
           .reduce((s, d) => s + Number(d.amount || 0), 0);
         const tx = transactions.filter(t => Number(t.createdAt || 0) >= bucketStart);
         const txSuccess = tx.filter(t => String(t.status || "").toLowerCase() === "success");
-        const provider = txSuccess.reduce((s, t) => {
-          let c = Number(t.providerCost || 0);
-          const txSuccess = tx.filter(t => String(t.status || "").toLowerCase() === "success");
-          const rateDen = txSuccess.reduce((s, t) => s + Number(t.userPrice || 0), 0);
-          const rateNum = txSuccess.reduce((s, t) => s + Number(t.providerCost || 0), 0);
-          const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
-          if (c <= 0) c = Number(t.userPrice || 0) * providerRate;
-          return s + c;
-        }, 0);
+        const provider = txSuccess.reduce((s, t) => s + Number(t.providerCost || 0), 0);
         const sms = txSuccess.reduce((s, t) => s + Number(t.smsCost || 0), 0);
         const revenue = txSuccess.reduce((s, t) => s + Number(t.userPrice || 0), 0);
         const net = revenue - provider - sms;
@@ -1040,15 +1037,7 @@ export async function registerRoutes(
 
       const depositsTotal = depositsFiltered.reduce((s, d) => s + Number(d.amount || 0), 0);
       const successTxAll = transactions.filter(t => String(t.status || "").toLowerCase() === "success");
-      const providerCostTotal = successTxAll.reduce((s, t) => {
-        let c = Number(t.providerCost || 0);
-        const txSuccess = transactions.filter(t => String(t.status || "").toLowerCase() === "success");
-        const rateDen = txSuccess.reduce((s, t) => s + Number(t.userPrice || 0), 0);
-        const rateNum = txSuccess.reduce((s, t) => s + Number(t.providerCost || 0), 0);
-        const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
-        if (c <= 0) c = Number(t.userPrice || 0) * providerRate;
-        return s + c;
-      }, 0);
+      const providerCostTotal = successTxAll.reduce((s, t) => s + Number(t.providerCost || 0), 0);
       const smsCostTotal = successTxAll.reduce((s, t) => s + Number(t.smsCost || 0), 0);
       const revenueTotal = successTxAll.reduce((s, t) => s + Number(t.userPrice || 0), 0);
       const netProfitTotal = revenueTotal - providerCostTotal - smsCostTotal;
@@ -1057,6 +1046,7 @@ export async function registerRoutes(
         scope,
         providerBalanceRequired,
         walletBalance: scope === "user" ? walletBalance : 0,
+        totalWalletBalance: scope === "system" ? totalMain : 0,
         daily,
         weekly,
         monthly,

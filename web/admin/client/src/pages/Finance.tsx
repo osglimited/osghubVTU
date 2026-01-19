@@ -79,32 +79,53 @@ export default function FinancePage() {
       {isError && <div className="p-6 text-sm text-destructive">Failed to load analytics</div>}
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-none shadow-sm md:col-span-1">
+        <Card className="border-none shadow-sm md:col-span-1 bg-primary/5">
           <CardHeader>
-            <CardTitle>Provider Balance Required</CardTitle>
+            <CardTitle className="text-primary">Provider Balance Required</CardTitle>
             <CardDescription>
-              {selectedScope ? "Estimated provider funds needed for this user’s balance" : "Estimated provider funds needed for all users"}
+              Future obligation: Minimum funds needed in provider accounts to cover user balances (User Balance × Worst Ratio).
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">₦{requiredProviderBalance.toLocaleString()}</div>
+            <div className="text-3xl font-bold text-primary">₦{requiredProviderBalance.toLocaleString()}</div>
           </CardContent>
         </Card>
-        {selectedScope && (
+        {selectedScope ? (
           <Card className="border-none shadow-sm md:col-span-1">
             <CardHeader>
-              <CardTitle>User Balance</CardTitle>
-              <CardDescription>Main wallet balance of selected user</CardDescription>
+              <CardTitle>User Wallet Balance</CardTitle>
+              <CardDescription>The exact amount this user currently owns in their wallet.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">₦{walletBalance.toLocaleString()}</div>
             </CardContent>
           </Card>
+        ) : (
+          <Card className="border-none shadow-sm md:col-span-1">
+            <CardHeader>
+              <CardTitle>Total User Balances</CardTitle>
+              <CardDescription>Sum of all main wallet balances across all users.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">₦{Number(data?.totalWalletBalance || 0).toLocaleString()}</div>
+            </CardContent>
+          </Card>
         )}
-        <Card className="border-none shadow-sm md:col-span-2">
+        <Card className="border-none shadow-sm md:col-span-1">
           <CardHeader>
-            <CardTitle>Summary</CardTitle>
-            <CardDescription>Daily, weekly, monthly</CardDescription>
+            <CardTitle>Profit Logic</CardTitle>
+            <CardDescription>Profit = User Price - Provider Cost - SMS Cost. Deposits are not profit.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-muted-foreground italic">Determininstic accounting applied.</div>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="grid gap-6">
+        <Card className="border-none shadow-sm">
+          <CardHeader>
+            <CardTitle>Service Performance (Historical)</CardTitle>
+            <CardDescription>Historical performance based only on service transactions (Deposits excluded from profit).</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
