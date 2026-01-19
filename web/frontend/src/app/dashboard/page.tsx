@@ -9,6 +9,7 @@ import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { getWalletHistory } from '@/lib/services';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -19,6 +20,20 @@ export default function Dashboard() {
   const [processingWithdrawal, setProcessingWithdrawal] = useState(false);
   const { addNotification } = useNotifications();
   const [recent, setRecent] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadAnnouncements = async () => {
+      try {
+        const q = query(collection(db, 'announcements'), where('active', '==', true), orderBy('createdAt', 'desc'), limit(3));
+        const snap = await getDocs(q);
+        setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        console.error('Announcements load failed', e);
+      }
+    };
+    if (user) loadAnnouncements();
+  }, [user]);
 
   useEffect(() => {
     if (loading) return;
@@ -111,6 +126,19 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+        {announcements.length > 0 && (
+          <div className="space-y-4">
+            {announcements.map((ann) => (
+              <div key={ann.id} className="bg-[#F97316]/10 border-l-4 border-[#F97316] p-4 rounded-r-xl">
+                <div className="flex justify-between items-start">
+                  <h4 className="font-bold text-[#0A1F44]">{ann.title}</h4>
+                  <span className="text-[10px] text-gray-500">{new Date(ann.createdAt).toLocaleDateString()}</span>
+                </div>
+                <p className="text-sm text-gray-700 mt-1">{ann.content}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-gradient-to-r from-[#0A1F44] to-[#020617] text-white rounded-2xl p-8 shadow-lg">
