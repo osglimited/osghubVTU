@@ -99,6 +99,7 @@ export default function ServicesPage() {
                             setAirtimeNetworks(updated);
                             try {
                               await updateAdminSettings({ airtimeNetworks: updated as any });
+                              toast({ title: "Status updated", description: `${network} is now ${val ? 'enabled' : 'disabled'}` });
                             } catch (e: any) {
                               toast({ title: "Update failed", description: e.message || "Unable to save settings", variant: "destructive" });
                             }
