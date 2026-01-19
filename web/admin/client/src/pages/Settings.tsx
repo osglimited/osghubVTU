@@ -107,7 +107,10 @@ export default function ApiSettingsPage() {
               <Label>Webhook URL</Label>
               <div className="flex gap-2">
                 <Input readOnly value="https://osghub.com/api/webhook" className="bg-muted" />
-                <Button variant="outline">Copy</Button>
+                <Button variant="outline" onClick={() => {
+                  navigator.clipboard.writeText("https://osghub.com/api/webhook");
+                  toast({ title: "Copied", description: "Webhook URL copied to clipboard" });
+                }}>Copy</Button>
               </div>
               <p className="text-xs text-muted-foreground">
                 This URL receives transaction status updates from your provider.

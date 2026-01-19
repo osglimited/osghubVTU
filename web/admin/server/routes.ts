@@ -713,6 +713,39 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/wallet/requests", adminAuth, async (_req: Request, res: Response) => {
+    try {
+      const db = getFirestore();
+      const snap = await db.collection("funding_requests").orderBy("createdAt", "desc").limit(100).get();
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      return res.json(rows);
+    } catch {
+      return res.json([]);
+    }
+  });
+
+  app.post("/api/admin/wallet/requests/:id/approve", adminAuth, async (req: Request, res: Response) => {
+    const id = req.params.id;
+    try {
+      const db = getFirestore();
+      await db.collection("funding_requests").doc(id).update({ status: "approved", approvedAt: Date.now() });
+      return res.json({ success: true });
+    } catch (e: any) {
+      return res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/admin/wallet/requests/:id/reject", adminAuth, async (req: Request, res: Response) => {
+    const id = req.params.id;
+    try {
+      const db = getFirestore();
+      await db.collection("funding_requests").doc(id).update({ status: "rejected", rejectedAt: Date.now() });
+      return res.json({ success: true });
+    } catch (e: any) {
+      return res.status(400).json({ message: e.message });
+    }
+  });
+
   app.get("/api/ping", (_req: Request, res: Response) => {
     res.json({ ok: true });
   });

@@ -14,7 +14,7 @@ import { Check, X, Wallet as WalletIcon, RefreshCw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { creditWallet, debitWallet, getWalletLogs, getWalletDeposits } from "@/lib/backend";
+import { creditWallet, debitWallet, getWalletLogs, getWalletRequests, approveWalletRequest, rejectWalletRequest } from "@/lib/backend";
 
 export default function WalletPage() {
   const { toast } = useToast();
@@ -23,21 +23,23 @@ export default function WalletPage() {
   const [processing, setProcessing] = useState<'credit'|'debit'|null>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+
+  const load = async () => {
+    setLoadingRequests(true);
+    try {
+      const [wl, dp] = await Promise.all([getWalletLogs(), getWalletRequests()]);
+      setLogs(wl || []);
+      setDeposits(dp || []);
+    } catch {
+      setLogs([]);
+      setDeposits([]);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
 
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      try {
-        const [wl, dp] = await Promise.all([getWalletLogs(), getWalletDeposits()]);
-        if (!mounted) return;
-        setLogs(wl || []);
-        setDeposits(dp || []);
-      } catch {
-        if (!mounted) return;
-        setLogs([]);
-        setDeposits([]);
-      }
-    };
     load();
     try {
       const params = new URLSearchParams(window.location.search);
@@ -47,8 +49,27 @@ export default function WalletPage() {
         setDebitForm(prev => ({ ...prev, userId: prefill }));
       }
     } catch {}
-    return () => { mounted = false; };
   }, []);
+
+  const handleApprove = async (id: string) => {
+    try {
+      await approveWalletRequest(id);
+      toast({ title: "Approved", description: "Funding request approved" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    try {
+      await rejectWalletRequest(id);
+      toast({ title: "Rejected", description: "Funding request rejected" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -57,8 +78,8 @@ export default function WalletPage() {
           <h2 className="text-3xl font-bold tracking-tight text-foreground">Wallet Management</h2>
           <p className="text-muted-foreground">Manage funding requests and manual adjustments.</p>
         </div>
-        <Button variant="outline">
-          <RefreshCw className="mr-2 h-4 w-4" />
+        <Button variant="outline" onClick={load} disabled={loadingRequests}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${loadingRequests ? 'animate-spin' : ''}`} />
           Refresh Requests
         </Button>
       </div>
@@ -134,11 +155,40 @@ export default function WalletPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                      No funding requests yet
-                    </TableCell>
-                  </TableRow>
+                  {deposits.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                        No funding requests yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    deposits.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell className="font-mono text-xs">{d.id}</TableCell>
+                        <TableCell>{d.userEmail || d.user || "System"}</TableCell>
+                        <TableCell>₦{Number(d.amount || 0).toLocaleString()}</TableCell>
+                        <TableCell className="capitalize">{d.method || "manual"}</TableCell>
+                        <TableCell>{new Date(d.createdAt ? (d.createdAt._seconds ? d.createdAt._seconds * 1000 : d.createdAt) : Date.now()).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Badge variant={d.status === 'approved' ? 'default' : d.status === 'pending' ? 'secondary' : 'destructive'} className={d.status === 'approved' ? 'bg-emerald-500' : ''}>
+                            {d.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          {d.status === 'pending' && (
+                            <>
+                              <Button variant="ghost" size="sm" onClick={() => handleApprove(d.id)} className="text-emerald-600">
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleReject(d.id)} className="text-destructive">
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

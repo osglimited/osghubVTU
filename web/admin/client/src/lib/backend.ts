@@ -132,6 +132,18 @@ export async function changeAdminPassword(payload: {
   return await request<{ success: boolean; message: string }>("POST", "/api/admin/profile/password", payload);
 }
 
+export async function getWalletRequests(): Promise<any[]> {
+  return await request<any[]>("GET", "/api/admin/wallet/requests");
+}
+
+export async function approveWalletRequest(id: string): Promise<any> {
+  return await request<any>("POST", `/api/admin/wallet/requests/${encodeURIComponent(id)}/approve`);
+}
+
+export async function rejectWalletRequest(id: string): Promise<any> {
+  return await request<any>("POST", `/api/admin/wallet/requests/${encodeURIComponent(id)}/reject`);
+}
+
 export async function getAdminProfile(): Promise<any> {
   return await request<any>("GET", "/api/admin/profile");
 }
