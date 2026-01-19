@@ -1,4 +1,4 @@
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
 
 function getBaseUrl(): string {
   const prodUrlRaw = import.meta.env.VITE_VTU_BACKEND_URL as string | undefined;
@@ -248,3 +248,5 @@ export async function getFinanceUser(input: { uid?: string; email?: string }): P
   const qs = new URLSearchParams({ uid: String(input.uid || ""), email: String(input.email || "") }).toString();
   return await request("GET", `/api/admin/finance/user?${qs}`);
 }
+
+export { db };

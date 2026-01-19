@@ -398,12 +398,22 @@ const replyTicket = async (req, res) => {
   try {
     const { id } = req.params;
     const { message } = req.body;
+    
+    // Add to replies subcollection for the conversation view
     await db.collection('support_tickets').doc(id).collection('replies').add({
       message,
-      adminId: req.user.uid,
-      createdAt: new Date()
+      senderId: req.user.uid,
+      senderRole: 'admin',
+      createdAt: Date.now()
     });
-    await db.collection('support_tickets').doc(id).update({ status: 'replied', updatedAt: new Date() });
+    
+    // Also update the legacy field for backwards compatibility and status
+    await db.collection('support_tickets').doc(id).update({ 
+      status: 'replied', 
+      adminReply: message,
+      updatedAt: Date.now() 
+    });
+    
     res.json({ success: true, message: 'Reply sent' });
   } catch (error) {
     res.status(500).json({ error: error.message });

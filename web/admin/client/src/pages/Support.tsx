@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MessageSquare, Megaphone, Trash2, Send, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getTickets, replyTicket, getAnnouncements, createAnnouncement, deleteAnnouncement } from "@/lib/backend";
+import { getTickets, replyTicket, getAnnouncements, createAnnouncement, deleteAnnouncement, db } from "@/lib/backend";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function SupportPage() {
@@ -35,13 +35,23 @@ export default function SupportPage() {
 
   useEffect(() => { loadData(); }, []);
 
+  const [replies, setReplies] = useState<any[]>([]);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [replyMsg, setReplyMsg] = useState('');
+
   const handleReply = async (id: string) => {
-    const msg = prompt("Enter your reply to the user:");
-    if (!msg) return;
+    if (!replyMsg) return;
     try {
-      await replyTicket(id, msg);
+      await replyTicket(id, replyMsg);
       toast({ title: "Success", description: "Reply sent to user" });
+      setReplyMsg('');
       loadData();
+      // Refresh replies if the same ticket is selected
+      if (selectedTicket?.id === id) {
+        const tks = await getTickets();
+        const updated = tks.find((t: any) => t.id === id);
+        if (updated) setSelectedTicket(updated);
+      }
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
@@ -103,24 +113,82 @@ export default function SupportPage() {
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {tickets.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center">No tickets found</TableCell></TableRow>
-                  ) : tickets.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-medium">{t.userEmail || t.userId}</TableCell>
-                      <TableCell>{t.subject}</TableCell>
-                      <TableCell>
-                        <Badge variant={t.status === 'open' ? 'destructive' : 'default'}>{t.status}</Badge>
-                      </TableCell>
-                      <TableCell>{new Date(t.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => handleReply(t.id)}><Send className="h-4 w-4" /></Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  <TableBody>
+                    {tickets.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center">No tickets found</TableCell></TableRow>
+                    ) : tickets.map((t) => (
+                      <TableRow 
+                        key={t.id} 
+                        className={`cursor-pointer hover:bg-muted/50 ${selectedTicket?.id === t.id ? 'bg-muted' : ''}`}
+                        onClick={async () => {
+                          setSelectedTicket(t);
+                          // Fetch replies for this ticket
+                          try {
+                            const snap = await db.collection('support_tickets').doc(t.id).collection('replies').orderBy('createdAt', 'asc').get();
+                            setReplies(snap.docs.map((d: any) => d.data()));
+                          } catch (e) {
+                            console.error("Error fetching replies:", e);
+                            setReplies([]);
+                          }
+                        }}
+                      >
+                        <TableCell className="font-medium">{t.userEmail || t.userId}</TableCell>
+                        <TableCell>{t.subject}</TableCell>
+                        <TableCell>
+                          <Badge variant={t.status === 'open' ? 'destructive' : 'default'}>{t.status}</Badge>
+                        </TableCell>
+                        <TableCell>{new Date(t.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm"><MessageSquare className="h-4 w-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                {selectedTicket && (
+                  <div className="mt-8 border-t pt-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-bold">Conversation: {selectedTicket.subject}</h3>
+                      <Badge variant="outline">{selectedTicket.id}</Badge>
+                    </div>
+                    
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-4 max-h-[400px] overflow-y-auto">
+                      <div className="flex flex-col items-start max-w-[80%]">
+                        <div className="bg-background p-3 rounded-lg border shadow-sm">
+                          <p className="text-sm">{selectedTicket.message}</p>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground mt-1">User • {new Date(selectedTicket.createdAt).toLocaleString()}</span>
+                      </div>
+
+                      {replies.map((r, i) => (
+                        <div key={i} className={`flex flex-col ${r.senderRole === 'admin' ? 'items-end ml-auto' : 'items-start'} max-w-[80%]`}>
+                          <div className={`p-3 rounded-lg border shadow-sm ${r.senderRole === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>
+                            <p className="text-sm">{r.message}</p>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground mt-1">
+                            {r.senderRole === 'admin' ? 'You (Admin)' : 'User'} • {new Date(r.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Your Reply</Label>
+                      <Textarea 
+                        placeholder="Type your reply to the user..." 
+                        value={replyMsg}
+                        onChange={(e) => setReplyMsg(e.target.value)}
+                        className="min-h-[100px]"
+                      />
+                      <div className="flex justify-end">
+                        <Button onClick={() => handleReply(selectedTicket.id)} disabled={!replyMsg}>
+                          <Send className="mr-2 h-4 w-4" /> Send Reply
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
             </CardContent>
           </Card>
         </TabsContent>
