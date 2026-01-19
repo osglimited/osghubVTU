@@ -260,9 +260,9 @@ router.get('/finance/analytics', async (req, res) => {
           // User Rule: "Use ONLY service transactions: airtime, data, electricity, exam"
           const validServiceTypes = ['airtime', 'data', 'electricity', 'exam', 'cable', 'bill'];
           
-          // Check if it's a known service type
-          // Or if it's a generic debit with a serviceType field that matches
-          const isService = (
+          // Check if it's a known service type AND explicitly NOT a credit/refund
+          const isCredit = type === 'credit' || type === 'refund' || type === 'deposit';
+          const isService = !isCredit && (
             validServiceTypes.includes(type) ||
             (type === 'debit' && validServiceTypes.includes(serviceType)) ||
             (validServiceTypes.includes(serviceType))
@@ -349,7 +349,8 @@ router.get('/finance/analytics', async (req, res) => {
     // "Provider Balance Required < User Wallet Balance"
     
     let worstRatio = 0; // Start low, find max
-    
+    let worstRatioSource = 'default';
+
     try {
       // A. Fetch Data Plans (Active Only)
       const plansSnap = await db.collection('service_plans').where('active', '==', true).get();
@@ -362,7 +363,10 @@ router.get('/finance/analytics', async (req, res) => {
            // e.g. Cost 80, Price 100 -> Ratio 0.8
            if (cost > 0 && price > 0) {
              const ratio = cost / price;
-             if (ratio > worstRatio) worstRatio = ratio;
+             if (ratio > worstRatio) {
+               worstRatio = ratio;
+               worstRatioSource = `plan:${d.id} (${cost}/${price})`;
+             }
            }
         });
       }
@@ -378,8 +382,11 @@ router.get('/finance/analytics', async (req, res) => {
          // If discount is 2%, we pay 98%. Ratio = 0.98
          // If discount is 0%, Ratio = 1.0 (Risk!)
          const ratio = (100 - discount) / 100;
-         if (ratio > worstRatio) worstRatio = ratio;
-      });
+         if (ratio > worstRatio) {
+           worstRatio = ratio;
+           worstRatioSource = `airtime:${net.name || 'network'} (${discount}%)`;
+         }
+       });
       
     } catch (err) {
       console.error("Error calculating worst case ratio:", err);
@@ -387,7 +394,10 @@ router.get('/finance/analytics', async (req, res) => {
 
     // Safety Fallback: If no plans/settings found, assume worst case 1.0 (we pay what we sell for)
     // This implies 0% profit margin, but ensures we have enough funds.
-    if (worstRatio <= 0) worstRatio = 1.0;
+    if (worstRatio <= 0) {
+      worstRatio = 1.0;
+      worstRatioSource = 'fallback_safety';
+    }
     
     // User Rule: "provider_required_user = user_wallet_balance * worst_ratio"
     const providerBalanceRequired = walletBalance * worstRatio;
@@ -461,6 +471,16 @@ router.get('/finance/analytics', async (req, res) => {
 
     // Audit log (non-blocking)
     try {
+      // Security Check: Ensure NO deposits made it into the service calculation
+      const serviceTxs = rangeFilteredTxs.filter(t => t.isService && t.status === 'success');
+      const depositTxs = rangeFilteredTxs.filter(isDeposit);
+      const depositIds = new Set(depositTxs.map(t => t.id));
+      const leakedDeposits = serviceTxs.filter(t => depositIds.has(t.id));
+      
+      if (leakedDeposits.length > 0) {
+        console.error("CRITICAL AUDIT FAILURE: Deposits detected in profit calculation!", leakedDeposits.map(t => t.id));
+      }
+
       const logDoc = {
         id: `al_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         type: 'finance_analytics',
@@ -473,7 +493,14 @@ router.get('/finance/analytics', async (req, res) => {
         walletBalance,
         costRatio,
         worstRatio,
+        worstRatioSource,
         totals,
+        audit: {
+          leakedDepositsCount: leakedDeposits.length,
+          leakedIds: leakedDeposits.map(t => t.id),
+          serviceTxCount: serviceTxs.length,
+          depositTxCount: depositTxs.length
+        },
         txCount: rangeFilteredTxs.length,
         createdAt: Date.now(),
       };
