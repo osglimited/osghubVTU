@@ -18,10 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Filter, Download, RotateCcw } from "lucide-react";
+import { Search, Filter, Download, RotateCcw, Receipt } from "lucide-react";
 import { getAllTransactions, getUserTransactions } from "@/lib/backend";
 import { Link } from "wouter";
 import { useEffectOnce } from "@/lib/useEffectOnce";
+import TransactionReceiptModal from "@/components/TransactionReceiptModal";
 
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState("all");
@@ -29,6 +30,8 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [context, setContext] = useState<{ uid?: string; email?: string } | null>(null);
+  const [selectedTx, setSelectedTx] = useState<any | null>(null);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -176,6 +179,18 @@ export default function TransactionsPage() {
                         <RotateCcw className="h-4 w-4 text-primary" />
                       </Button>
                     )}
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-8 w-8 p-0 mr-1" 
+                      title="View Receipt"
+                      onClick={() => {
+                        setSelectedTx(t);
+                        setIsReceiptOpen(true);
+                      }}
+                    >
+                      <Receipt className="h-4 w-4 text-emerald-600" />
+                    </Button>
                     <Link href={`/transactions/${encodeURIComponent(t.id)}`}>
                       <Button size="sm" variant="outline">View</Button>
                     </Link>
@@ -187,6 +202,11 @@ export default function TransactionsPage() {
           )}
         </CardContent>
       </Card>
+      <TransactionReceiptModal 
+        isOpen={isReceiptOpen}
+        onClose={() => setIsReceiptOpen(false)}
+        transaction={selectedTx}
+      />
     </div>
   );
 }

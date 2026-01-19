@@ -427,6 +427,7 @@ const createAnnouncement = async (req, res) => {
       title,
       content,
       type: type || 'info',
+      active: true,
       createdAt: new Date()
     });
     res.json({ success: true, id: docRef.id });
