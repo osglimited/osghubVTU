@@ -25,9 +25,11 @@ export default function Dashboard() {
   useEffect(() => {
     const loadAnnouncements = async () => {
       try {
-        const q = query(collection(db, 'announcements'), where('active', '==', true), orderBy('createdAt', 'desc'), limit(3));
+        const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(3));
         const snap = await getDocs(q);
-        setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Filter active announcements manually if flag is missing on old ones, or just show all for now to debug
+        setAnnouncements(data.filter((a: any) => a.active !== false));
       } catch (e) {
         console.error('Announcements load failed', e);
       }
