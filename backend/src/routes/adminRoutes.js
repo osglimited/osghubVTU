@@ -346,34 +346,37 @@ router.get('/finance/analytics', async (req, res) => {
 
     // 4. Calculate Provider Balance Required (CAPACITY / BEST CASE)
     // The user wants to see the minimum funds needed to fulfill services.
-    // We look for the BEST (lowest) ratio to show how much more service they can get.
+    // We look for the BEST (lowest) ratio across all service types (Data, Airtime, Power, Exam).
     
-    let bestRatio = 0.95; // Default to a realistic 5% margin if no plans found
+    let bestRatio = 0.95; // Default fallback (5% margin)
     let bestRatioSource = 'default';
 
     try {
-      // A. Fetch Data Plans (Active Only)
+      // A. Fetch Service Plans (Data, Power, Exam)
+      // These are often stored in 'service_plans' or similar collections
       const plansSnap = await db.collection('service_plans').get();
       if (!plansSnap.empty) {
         plansSnap.docs.forEach(d => {
            const p = d.data();
            const cost = Number(p.priceApi || p.price_api || 0);
            const price = Number(p.priceUser || p.price_user || 0);
+           // We look for the absolute lowest cost ratio available on the platform
            if (cost > 0 && price > 0 && cost < price) {
              const ratio = cost / price;
              if (ratio < bestRatio) {
                bestRatio = ratio;
-               bestRatioSource = `plan:${d.id} (${cost}/${price})`;
+               bestRatioSource = `plan:${p.type || 'service'}:${d.id} (${cost}/${price})`;
              }
            }
         });
       }
       
-      // B. Fetch Airtime Discounts
+      // B. Fetch Airtime Discounts/Settings
       const settingsDoc = await db.collection('admin_settings').doc('settings').get();
       const st = settingsDoc.exists ? settingsDoc.data() || {} : {};
-      const airtimeNetworks = st.airtimeNetworks || {};
       
+      // Airtime Networks
+      const airtimeNetworks = st.airtimeNetworks || {};
       Object.values(airtimeNetworks).forEach(net => {
          const discount = Number(net.discount || 0);
          if (discount > 0) {
@@ -384,14 +387,37 @@ router.get('/finance/analytics', async (req, res) => {
            }
          }
        });
+
+      // Power/Electricity Profit Margin
+      // If power is handled via a fixed percentage commission (e.g. 2% profit)
+      const powerConfig = st.powerConfig || st.electricity || {};
+      const powerDiscount = Number(powerConfig.discount || powerConfig.commission || 0);
+      if (powerDiscount > 0) {
+        const ratio = (100 - powerDiscount) / 100;
+        if (ratio < bestRatio) {
+          bestRatio = ratio;
+          bestRatioSource = `power (${powerDiscount}%)`;
+        }
+      }
+
+      // Exam Pin Profit Margin
+      const examConfig = st.examConfig || st.exam || {};
+      const examDiscount = Number(examConfig.discount || examConfig.commission || 0);
+      if (examDiscount > 0) {
+        const ratio = (100 - examDiscount) / 100;
+        if (ratio < bestRatio) {
+          bestRatio = ratio;
+          bestRatioSource = `exam (${examDiscount}%)`;
+        }
+      }
       
     } catch (err) {
       console.error("Error calculating best case ratio:", err);
     }
     
-    // Safety check: ensure bestRatio is always less than 1.0 if possible
+    // Safety check: ensure bestRatio is always less than 1.0
     if (bestRatio >= 1.0) {
-      bestRatio = 0.95; // Default fallback for capacity visualization
+      bestRatio = 0.95; 
     }
     
     // User Rule: provider_required = user_wallet_balance * best_ratio
