@@ -237,162 +237,96 @@ router.get('/finance/analytics', async (req, res) => {
     if (v.seconds) return Number(v.seconds) * 1000;
     return 0;
   };
-  try {
-    // Deposits
-    const depSnap = await db.collection('wallet_deposits').orderBy('createdAt', 'desc').limit(5000).get();
-    const depositsAll = depSnap.docs.map(d => {
-      const x = d.data() || {};
-      return { ...x, createdAt: getCreatedMs(x.createdAt) };
-    });
-    const deposits = scope === 'user'
-      ? depositsAll.filter(d => {
-          const u = String((d.user || d.user_email || d.userId || '')).toLowerCase();
-          return (email && u === email) || (uid && u === uid);
-        })
-      : depositsAll;
-    const depositsFiltered = deposits.filter(d => {
-      const t = Number(d.createdAt || 0);
-      if (startTs !== undefined && t < startTs) return false;
-      if (endTs !== undefined && t > endTs) return false;
-      return true;
-    });
 
-    // Transactions
+  try {
+    // 1. Fetch All Relevant Transactions (Service & Wallet)
+    // We fetch a large batch to ensure we have enough history for Ratio calculation and Reporting
     const txNames = ['transactions', 'admin_transactions', 'wallet_transactions'];
-    let transactions = [];
+    let allTransactions = [];
+    
+    // Helper to fetch and normalize
     for (const n of txNames) {
       const snap = await db.collection(n).orderBy('createdAt', 'desc').limit(5000).get();
       if (!snap.empty) {
         const rows = snap.docs.map(d => {
           const x = d.data() || {};
-          const status = String(x.status || '');
+          const status = String(x.status || 'success').toLowerCase(); // Default to success if missing? No, safer to assume status field exists.
           const type = String(x.type || '').toLowerCase();
           const serviceType = String(x.serviceType || x.type || '');
+          const walletType = String(x.walletType || '').toLowerCase();
+          const description = String(x.description || '').toLowerCase();
+          
+          // Identify Service Transactions
+          // Must NOT be funding/wallet/credit/debit types
+          // OR must have explicit provider cost
           const isService = (
             (!!serviceType && !['credit', 'debit', 'transfer', 'wallet', 'funding'].includes(type))
             || (pickNumber(x, ['providerCost','priceApi','price_api']) > 0)
           );
-          const userPrice = pickNumber(x, ['userPrice','priceUser','price_user','amount','user_amount','paid','userPaid','selling_price','sellPrice']);
-          let providerCost = pickNumber(x, [
-            'providerCost','priceApi','price_api','apiPrice','provider_price','providerPrice','cost','serviceCost',
-            'provider_amount','providerAmount','api_amount','apiAmount','buy_price','buyPrice','cost_price','costPrice',
-            'wholesale_price','wholesalePrice','amount_api','amountApi','unit_price_api','unitPriceApi','purchase_cost'
-          ]);
-          if (providerCost <= 0) {
-            const profit = pickNumber(x, ['profit','adminProfit','admin_profit','commission','gain']);
-            if (profit > 0 && userPrice > 0) {
-              providerCost = Number(userPrice) - Number(profit);
-            }
+
+          const userPrice = pickNumber(x, ['userPrice','priceUser','price_user','amount','user_amount','paid','userPaid']);
+          let providerCost = pickNumber(x, ['providerCost','priceApi','price_api','apiPrice','provider_price','providerPrice','cost','serviceCost']);
+          
+          // Fallback: if isService but no providerCost, we KEEP it as 0 for now.
+          // We will calculate the Ratio based only on valid transactions, 
+          // and then impute the missing costs using that global ratio.
+          // This prevents "0 cost" data from skewing the ratio to 1.0 (0% margin) or 0.0 (100% margin).
+          if (isService && providerCost <= 0) {
+             // Do not overwrite with userPrice yet. Leave as 0.
+             // providerCost = 0; 
           }
+
           const smsCost = Number(x.sms_cost ?? x.smsCost ?? 0);
+
           return {
             id: d.id,
-            userId: x.userId || '',
-            user: x.user || x.user_email || x.userEmail || x.email || x.userId || '',
+            userId: String(x.userId || x.uid || '').toLowerCase(),
+            user: String(x.user || x.user_email || x.userEmail || x.email || '').toLowerCase(),
             userPrice,
             providerCost,
             smsCost,
             serviceType,
             status,
+            type,
+            walletType,
+            description,
             createdAt: getCreatedMs(x.createdAt),
             isService,
             raw: x,
           };
         });
-        const filteredBase = rows.filter(r => r.isService);
-        const filtered = scope === 'user'
-          ? filteredBase.filter(r => {
-              const uId = String(r.userId || '').toLowerCase();
-              const uEmail = String(r.user || '').toLowerCase();
-              return (email && (uEmail === email)) || (uid && (uId === uid));
-            })
-          : filteredBase;
-        const timeFiltered = filtered.filter(t => {
-          const tt = Number(t.createdAt || 0);
-          if (startTs !== undefined && tt < startTs) return false;
-          if (endTs !== undefined && tt > endTs) return false;
-          return true;
-        });
-        transactions = transactions.concat(
-          timeFiltered.map(t => {
-            const x = t.raw || {};
-            const s = String(t.status || '').toLowerCase();
-            const ps = String(x.providerStatus || x.provider_status || '');
-            const pe = String(x.providerErrorCode || x.provider_error_code || '');
-            const pm = String(x.providerErrorMessage || x.provider_error_message || '');
-            const se = String(x.error || x.errorMessage || '');
-            const failureSource = s === 'success'
-              ? ''
-              : (pe || ps || pm) ? 'provider' : (se ? 'system' : 'unknown');
-            const failureReason = s === 'success' ? '' : (pm || pe || ps || se || '');
-            return { ...t, failureSource, failureReason };
-          })
-        );
+        allTransactions = allTransactions.concat(rows);
       }
     }
-    transactions.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 
-    // Provider balance required
-    let providerBalanceRequired = 0;
-    let walletBalance = 0;
-    let providerRate = 1;
-    const validTxForRate = transactions.filter(t =>
-      String(t.status || '').toLowerCase() === 'success' &&
-      Number(t.providerCost || 0) > 0 &&
-      Number(t.userPrice || 0) > 0
-    );
-    const rateDen = validTxForRate.reduce((s, t) => s + Number(t.userPrice || 0), 0);
-    const rateNum = validTxForRate.reduce((s, t) => s + Number(t.providerCost || 0), 0);
-    if (rateDen > 0) {
-      providerRate = rateNum / rateDen;
-    } else {
-      // Fallback: compute a provider/user price ratio from service_plans and airtime network discounts
-      try {
-        let planDen = 0;
-        let planNum = 0;
-        // Data/electricity/exam plans
-        const planSnap = await db.collection('service_plans').limit(5000).get();
-        if (!planSnap.empty) {
-          for (const d of planSnap.docs) {
-            const p = d.data() || {};
-            const pu = Number(p.priceUser || p.price_user || 0);
-            const pa = Number(p.priceApi || p.price_api || 0);
-            if (pu > 0 && pa > 0) {
-              planDen += pu;
-              planNum += pa;
-            }
-          }
-        }
-        // Airtime discounts in admin_settings.settings.airtimeNetworks
-        try {
-          const settingsDoc = await db.collection('admin_settings').doc('settings').get();
-          if (settingsDoc.exists) {
-            const st = settingsDoc.data() || {};
-            const airtimeNetworks = st.airtimeNetworks || {};
-            const keys = Object.keys(airtimeNetworks);
-            for (const k of keys) {
-              const discount = Number((airtimeNetworks[k] && airtimeNetworks[k].discount) || 0);
-              const ratio = (100 - discount) / 100;
-              // Add a normalized sample to the ratio pool
-              const sampleUser = 100;
-              planDen += sampleUser;
-              planNum += sampleUser * ratio;
-            }
-          }
-        } catch {}
-        providerRate = planDen > 0 ? (planNum / planDen) : 1;
-      } catch {
-        providerRate = 1;
+    // Deduplicate by ID (in case of overlaps between collections)
+    const seenIds = new Set();
+    const uniqueTransactions = [];
+    for (const t of allTransactions) {
+      if (!seenIds.has(t.id)) {
+        seenIds.add(t.id);
+        uniqueTransactions.push(t);
       }
     }
+    // Sort by Date Descending
+    uniqueTransactions.sort((a, b) => b.createdAt - a.createdAt);
+
+    // 2. Filter by Scope (User vs System)
+    const scopedTransactions = scope === 'user'
+      ? uniqueTransactions.filter(r => {
+          return (email && (r.user === email)) || (uid && (r.userId === uid));
+        })
+      : uniqueTransactions;
+
+    // 3. Calculate Wallet Balance (Current)
+    let walletBalance = 0;
     if (scope === 'user') {
       walletBalance = await readMainBalanceBest(rawUid, rawEmail);
-      providerBalanceRequired = walletBalance * providerRate;
     } else {
       const sources = ['wallets', 'user_wallets'];
       const seen = new Map();
       for (const src of sources) {
-        const snap = await db.collection(src).limit(5000).get();
+        const snap = await db.collection(src).limit(5000).get(); // Limit might be an issue for system-wide
         if (!snap.empty) {
           for (const d of snap.docs) {
             const x = d.data() || {};
@@ -403,43 +337,92 @@ router.get('/finance/analytics', async (req, res) => {
           }
         }
       }
-      const totalMain = Array.from(seen.values()).reduce((s, v) => s + Number(v || 0), 0);
-      providerBalanceRequired = totalMain * providerRate;
+      walletBalance = Array.from(seen.values()).reduce((s, v) => s + Number(v || 0), 0);
     }
 
-    const computeBucket = (bucketStart) => {
-      const dep = depositsFiltered
-        .filter(d => Number(d.createdAt || 0) >= bucketStart)
-        .reduce((s, d) => s + Number(d.amount || 0), 0);
-      const tx = transactions.filter(t => Number(t.createdAt || 0) >= bucketStart);
-      const txSuccess = tx.filter(t => String(t.status || '').toLowerCase() === 'success');
-      const provider = txSuccess.reduce((s, t) => {
-        let c = Number(t.providerCost || 0);
-        if (c <= 0) c = Number(t.userPrice || 0) * providerRate;
-        return s + c;
-      }, 0);
-      const sms = txSuccess.reduce((s, t) => s + Number(t.smsCost || 0), 0);
-      const revenue = tx
-        .filter(t => String(t.status || '').toLowerCase() === 'success')
-        .reduce((s, t) => s + Number(t.userPrice || 0), 0);
-      const net = revenue - provider - sms;
-      return { deposits: dep, providerCost: provider, smsCost: sms, netProfit: net };
+    // 4. Calculate Provider Balance Required & Ratio
+    // Formula: WalletBalance * (TotalProviderCost / TotalUserPrice)
+    // Based on RECENT SUCCESSFUL SERVICE transactions
+    const successfulServiceTxs = scopedTransactions.filter(t => t.isService && t.status === 'success');
+    
+    // Filter for Ratio Calculation: Only use transactions with VALID cost > 0
+    // This avoids skewing the ratio with "0 cost" data (which implies 100% margin if raw, or 0% if forced to price)
+    const validCostTxs = successfulServiceTxs.filter(t => t.providerCost > 0);
+    
+    let costRatio = 1.0; // Default conservative (100% of balance needed)
+    if (validCostTxs.length > 0) {
+      const totalValidCost = validCostTxs.reduce((s, t) => s + t.providerCost, 0);
+      const totalValidPrice = validCostTxs.reduce((s, t) => s + t.userPrice, 0);
+      if (totalValidPrice > 0) {
+        costRatio = totalValidCost / totalValidPrice;
+      }
+    }
+
+    // Now, IMPUTE missing provider costs in the dataset using this ratio
+    // This ensures Net Profit calculations are reasonable even for missing data
+    // We update the objects in place (references in scopedTransactions/allTransactions)
+    for (const t of successfulServiceTxs) {
+      if (t.providerCost <= 0) {
+        t.providerCost = t.userPrice * costRatio;
+        t.imputed = true;
+      }
+    }
+    
+    // "Provider Balance Required ... Must be LOWER than total user balances."
+    // "Exclude profit margins." -> Handled by Ratio < 1.0
+    const providerBalanceRequired = walletBalance * costRatio;
+
+    // 5. Compute Financials (Deposits, Cost, Profit) for Date Ranges
+    // Helper to filter by date
+    const filterByDate = (txs, start, end) => {
+      return txs.filter(t => {
+        if (start !== undefined && t.createdAt < start) return false;
+        if (end !== undefined && t.createdAt > end) return false;
+        return true;
+      });
     };
 
-    const daily = computeBucket(makePeriod(1));
-    const weekly = computeBucket(makePeriod(7));
-    const monthly = computeBucket(makePeriod(30));
+    // Identify Deposits
+    // Criteria: Type=credit, Wallet=main, Not internal (transfer/refund/etc)
+    const isDeposit = (t) => {
+      if (t.type !== 'credit') return false;
+      // If walletType is present, must be main. If missing, assume main?
+      if (t.walletType && t.walletType !== 'main') return false; 
+      
+      const d = t.description;
+      if (d.includes('transfer') || d.includes('cashback') || d.includes('referral') || d.includes('refund') || d.includes('bonus') || d.includes('reversal')) {
+        return false;
+      }
+      return true;
+    };
 
-    const depositsTotal = depositsFiltered.reduce((s, d) => s + Number(d.amount || 0), 0);
-    const successTx = transactions.filter(t => String(t.status || '').toLowerCase() === 'success');
-    const providerCostTotal = successTx.reduce((s, t) => {
-      let c = Number(t.providerCost || 0);
-      if (c <= 0) c = Number(t.userPrice || 0) * providerRate;
-      return s + c;
-    }, 0);
-    const smsCostTotal = successTx.reduce((s, t) => s + Number(t.smsCost || 0), 0);
-    const revenueTotal = successTx.reduce((s, t) => s + Number(t.userPrice || 0), 0);
-    const netProfitTotal = revenueTotal - providerCostTotal - smsCostTotal;
+    const computeBucket = (txs) => {
+      const deposits = txs.filter(isDeposit).reduce((s, t) => s + pickNumber(t.raw, ['amount']), 0);
+      
+      const services = txs.filter(t => t.isService && t.status === 'success');
+      const providerCost = services.reduce((s, t) => s + t.providerCost, 0);
+      const smsCost = services.reduce((s, t) => s + t.smsCost, 0);
+      const revenue = services.reduce((s, t) => s + t.userPrice, 0);
+      
+      const netProfit = revenue - providerCost - smsCost;
+      
+      return { deposits, providerCost, smsCost, netProfit };
+    };
+
+    const daily = computeBucket(filterByDate(scopedTransactions, makePeriod(1)));
+    const weekly = computeBucket(filterByDate(scopedTransactions, makePeriod(7)));
+    const monthly = computeBucket(filterByDate(scopedTransactions, makePeriod(30)));
+
+    // Totals (Filtered by User Selected Range)
+    const rangeFilteredTxs = filterByDate(scopedTransactions, startTs, endTs);
+    const totalsBucket = computeBucket(rangeFilteredTxs);
+
+    const totals = {
+      depositsTotal: totalsBucket.deposits,
+      providerCostTotal: totalsBucket.providerCost,
+      smsCostTotal: totalsBucket.smsCost,
+      netProfitTotal: totalsBucket.netProfit
+    };
 
     // Audit log (non-blocking)
     try {
@@ -453,14 +436,28 @@ router.get('/finance/analytics', async (req, res) => {
         end: endTs || null,
         providerBalanceRequired,
         walletBalance,
-        totals: { depositsTotal, providerCostTotal, smsCostTotal, netProfitTotal },
-        txCount: transactions.length,
+        costRatio,
+        validCostTxCount: validCostTxs ? validCostTxs.length : 0,
+        totals,
+        txCount: rangeFilteredTxs.length,
         createdAt: Date.now(),
       };
       await db.collection('admin_logs').doc(logDoc.id).set(logDoc, { merge: true });
     } catch {}
-    return res.json({ scope, providerBalanceRequired, walletBalance, daily, weekly, monthly, totals: { depositsTotal, providerCostTotal, smsCostTotal, netProfitTotal }, transactions });
+
+    return res.json({ 
+      scope, 
+      providerBalanceRequired, 
+      walletBalance, 
+      daily, 
+      weekly, 
+      monthly, 
+      totals, 
+      transactions: rangeFilteredTxs 
+    });
+
   } catch (e) {
+    console.error('Finance Error:', e);
     return res.json({ scope: (rawEmail || rawUid) ? 'user' : 'system', providerBalanceRequired: 0, walletBalance: 0, daily: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, weekly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, monthly: { deposits: 0, providerCost: 0, smsCost: 0, netProfit: 0 }, totals: { depositsTotal: 0, providerCostTotal: 0, smsCostTotal: 0, netProfitTotal: 0 }, transactions: [] });
   }
 });

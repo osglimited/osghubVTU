@@ -1021,6 +1021,10 @@ export async function registerRoutes(
         const txSuccess = tx.filter(t => String(t.status || "").toLowerCase() === "success");
         const provider = txSuccess.reduce((s, t) => {
           let c = Number(t.providerCost || 0);
+          const txSuccess = tx.filter(t => String(t.status || "").toLowerCase() === "success");
+          const rateDen = txSuccess.reduce((s, t) => s + Number(t.userPrice || 0), 0);
+          const rateNum = txSuccess.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+          const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
           if (c <= 0) c = Number(t.userPrice || 0) * providerRate;
           return s + c;
         }, 0);
@@ -1038,6 +1042,10 @@ export async function registerRoutes(
       const successTxAll = transactions.filter(t => String(t.status || "").toLowerCase() === "success");
       const providerCostTotal = successTxAll.reduce((s, t) => {
         let c = Number(t.providerCost || 0);
+        const txSuccess = transactions.filter(t => String(t.status || "").toLowerCase() === "success");
+        const rateDen = txSuccess.reduce((s, t) => s + Number(t.userPrice || 0), 0);
+        const rateNum = txSuccess.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+        const providerRate = rateDen > 0 ? rateNum / rateDen : 1;
         if (c <= 0) c = Number(t.userPrice || 0) * providerRate;
         return s + c;
       }, 0);
