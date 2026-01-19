@@ -411,7 +411,8 @@ const replyTicket = async (req, res) => {
     await db.collection('support_tickets').doc(id).update({ 
       status: 'replied', 
       adminReply: message,
-      updatedAt: Date.now() 
+      updatedAt: Date.now(),
+      lastMessageAt: Date.now()
     });
     
     res.json({ success: true, message: 'Reply sent' });

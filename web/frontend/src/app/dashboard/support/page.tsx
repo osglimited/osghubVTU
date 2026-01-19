@@ -23,7 +23,7 @@ export default function SupportPage() {
       const q = query(
         collection(db, 'support_tickets'),
         where('userId', '==', auth.currentUser.uid),
-        orderBy('createdAt', 'desc')
+        orderBy('lastMessageAt', 'desc')
       );
       const snap = await getDocs(q);
       const ticketList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -59,7 +59,8 @@ export default function SupportPage() {
         const ticketRef = doc(db, 'support_tickets', selectedTicket.id);
         transaction.update(ticketRef, { 
           status: 'open',
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
+          lastMessageAt: Date.now()
         });
       });
 
@@ -111,6 +112,8 @@ export default function SupportPage() {
         message,
         status: 'open',
         createdAt: Date.now(),
+        updatedAt: Date.now(),
+        lastMessageAt: Date.now()
       });
       toast({ title: "Ticket Submitted", description: "We'll get back to you soon." });
       setSubject('');
