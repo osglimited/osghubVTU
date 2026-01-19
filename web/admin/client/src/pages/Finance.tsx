@@ -143,11 +143,11 @@ export default function FinancePage() {
               </div>
               <div className="flex justify-between items-center text-sm px-2 pb-2 border-b border-green-100">
                 <span className="text-muted-foreground">SMS Cost</span>
-                <span className="font-bold text-red-400">₦{Number(totals.smsCostTotal).toLocaleString()}</span>
+                <span className="font-bold text-red-400">₦{Number(totals.smsCostTotal || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center pt-1 px-2">
                 <span className="font-bold text-sm text-green-800">Actual Profit</span>
-                <span className="text-xl font-black text-primary animate-pulse-slow">₦{Number(totals.netProfitTotal).toLocaleString()}</span>
+                <span className="text-xl font-black text-primary animate-pulse-slow">₦{Number(totals.netProfitTotal || 0).toLocaleString()}</span>
               </div>
             </div>
           </CardContent>

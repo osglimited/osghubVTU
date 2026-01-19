@@ -476,11 +476,15 @@ router.get('/finance/analytics', async (req, res) => {
       return { deposits, providerCost, smsCost, netProfit };
     };
 
-    // Today starts at 00:00:00 of the current day
     const dailyStart = makePeriod(0);
-    const daily = computeBucket(filterByDate(scopedTransactions, dailyStart));
-    const weekly = computeBucket(filterByDate(scopedTransactions, makePeriod(7)));
-    const monthly = computeBucket(filterByDate(scopedTransactions, makePeriod(30)));
+    const dailyEnd = dailyStart + 86399999;
+    const daily = computeBucket(filterByDate(scopedTransactions, dailyStart, dailyEnd));
+    
+    const weeklyStart = makePeriod(7);
+    const weekly = computeBucket(filterByDate(scopedTransactions, weeklyStart));
+    
+    const monthlyStart = makePeriod(30);
+    const monthly = computeBucket(filterByDate(scopedTransactions, monthlyStart));
 
     // Totals (Filtered by User Selected Range)
     const rangeFilteredTxs = filterByDate(scopedTransactions, startTs, endTs);
