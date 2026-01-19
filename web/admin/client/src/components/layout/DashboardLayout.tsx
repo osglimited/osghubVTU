@@ -41,7 +41,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     );
   }
 
-  // If on login page, render without layout
+  // If on login page or forgot password, render without layout
   if (location === "/login" || location === "/forgot-password") {
     return <main className="min-h-screen bg-background">{children}</main>;
   }
