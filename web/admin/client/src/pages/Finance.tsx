@@ -114,7 +114,7 @@ export default function FinancePage() {
         <Card className="border-none shadow-sm md:col-span-1">
           <CardHeader>
             <CardTitle>Profit Logic</CardTitle>
-            <CardDescription>Profit = User Price - Provider Cost - SMS Cost. Deposits are not profit.</CardDescription>
+            <CardDescription>Profit = Revenue - Provider Cost - SMS Cost.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -123,11 +123,15 @@ export default function FinancePage() {
                 <span className="font-bold text-green-600">₦{Number(totals.netProfitTotal + totals.providerCostTotal + totals.smsCostTotal).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Provider/SMS Costs</span>
-                <span className="font-bold text-red-600">₦{Number(totals.providerCostTotal + totals.smsCostTotal).toLocaleString()}</span>
+                <span className="text-muted-foreground">Provider Cost</span>
+                <span className="font-bold text-red-600">₦{Number(totals.providerCostTotal).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">SMS Cost</span>
+                <span className="font-bold text-red-400">₦{Number(totals.smsCostTotal).toLocaleString()}</span>
               </div>
               <div className="pt-2 border-t flex justify-between">
-                <span className="font-semibold">Calculated Profit</span>
+                <span className="font-semibold">Actual Profit</span>
                 <span className="font-bold text-primary">₦{Number(totals.netProfitTotal).toLocaleString()}</span>
               </div>
             </div>

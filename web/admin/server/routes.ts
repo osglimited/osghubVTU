@@ -983,18 +983,18 @@ export async function registerRoutes(
             break;
           }
         }
-        const getWorstRatio = () => {
-          // Safety margin: 1.05 (105%) ensures provider funds exceed user balances
+        const getAvgRatio = () => {
           const validTx = transactions.filter(t => 
             String(t.status || "").toLowerCase() === "success" && 
             Number(t.providerCost || 0) > 0 && 
             Number(t.userPrice || 0) > 0
           );
-          if (validTx.length === 0) return 1.05;
-          const ratios = validTx.map(t => Number(t.providerCost || 0) / Number(t.userPrice || 0));
-          return Math.max(...ratios, 1.05);
+          if (validTx.length === 0) return 0.92;
+          const sumUser = validTx.reduce((s, t) => s + Number(t.userPrice), 0);
+          const sumProv = validTx.reduce((s, t) => s + Number(t.providerCost), 0);
+          return sumProv / sumUser;
         };
-        providerBalanceRequired = walletBalance * getWorstRatio();
+        providerBalanceRequired = walletBalance * getAvgRatio();
       } else {
         const allWallets: Array<{ main: number }> = [];
         for (const n of ["wallets", "user_wallets"]) {
@@ -1009,17 +1009,20 @@ export async function registerRoutes(
           }
         }
         totalWalletBalance = allWallets.reduce((s, w) => s + Number(w.main || 0), 0);
-        const getWorstRatio = () => {
+        const getAvgRatio = () => {
+          // Find the average provider_cost / selling_price ratio
+          // This ensures provider balance required is less than user balance
           const validTx = transactions.filter(t => 
             String(t.status || "").toLowerCase() === "success" && 
             Number(t.providerCost || 0) > 0 && 
             Number(t.userPrice || 0) > 0
           );
-          if (validTx.length === 0) return 1.05; // 5% safety margin default
-          const ratios = validTx.map(t => Number(t.providerCost || 0) / Number(t.userPrice || 0));
-          return Math.max(...ratios, 1.05);
+          if (validTx.length === 0) return 0.92; // 92% default ratio
+          const sumUser = validTx.reduce((s, t) => s + Number(t.userPrice), 0);
+          const sumProv = validTx.reduce((s, t) => s + Number(t.providerCost), 0);
+          return sumProv / sumUser;
         };
-        providerBalanceRequired = totalWalletBalance * getWorstRatio();
+        providerBalanceRequired = totalWalletBalance * getAvgRatio();
       }
 
       const computeBucket = (bucketStart: number) => {
