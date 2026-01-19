@@ -72,6 +72,14 @@ export default function SupportPage() {
 
     const unsubscribe = onSnapshot(q, (snap) => {
       setReplies(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      
+      // Mark as read when user views admin replies
+      const unreadAdminReplies = snap.docs.filter(d => d.data().senderRole === 'admin' && !d.data().read);
+      unreadAdminReplies.forEach(d => {
+        runTransaction(db, async (transaction) => {
+          transaction.update(d.ref, { read: true });
+        });
+      });
     });
 
     return () => unsubscribe();
@@ -132,6 +140,7 @@ export default function SupportPage() {
         senderEmail: auth.currentUser.email,
         senderRole: 'user',
         createdAt: Date.now(),
+        read: false
       };
 
       await addDoc(collection(db, 'support_tickets', selectedTicket.id, 'replies'), reply);
@@ -341,6 +350,11 @@ export default function SupportPage() {
                           <a href={r.attachmentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 bg-black/10 rounded-lg text-xs hover:bg-black/20 transition-colors">
                             <ImageIcon size={14} /> View Attachment
                           </a>
+                        </div>
+                      )}
+                      {r.senderRole === 'user' && (
+                        <div className="flex justify-end mt-1">
+                          {r.read ? <CheckCheck size={12} className="opacity-80" /> : <Check size={12} className="opacity-80" />}
                         </div>
                       )}
                     </div>
