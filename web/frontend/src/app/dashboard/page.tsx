@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Smartphone, Wifi, Tv, Zap, CreditCard, GraduationCap, Eye, EyeOff, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
+import { Smartphone, Wifi, Tv, Zap, CreditCard, GraduationCap, Eye, EyeOff, ChevronLeft, ChevronRight, Pause, Play, Megaphone } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, runTransaction } from 'firebase/firestore';
@@ -154,46 +154,85 @@ export default function Dashboard() {
     <div className="space-y-8">
         {announcements.length > 0 && (
           <div 
-            className="relative bg-[#F97316]/10 border-l-4 border-[#F97316] p-4 rounded-r-xl group transition-all duration-500"
+            className="relative bg-white border border-gray-100 p-6 rounded-2xl shadow-sm group transition-all duration-500 overflow-hidden"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
           >
-            <div className="flex justify-between items-start">
-              <h4 className="font-bold text-[#0A1F44]">{announcements[currentAnnIndex].title}</h4>
+            {/* Background Accent */}
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-[#F97316]" />
+            
+            <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-gray-500">
+                <div className="p-2 bg-[#F97316]/10 rounded-lg text-[#F97316]">
+                  <Megaphone size={18} />
+                </div>
+                <h4 className="font-bold text-[#0A1F44] text-lg uppercase tracking-tight">Announcement</h4>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex gap-1">
+                  {announcements.map((_, i) => (
+                    <div 
+                      key={i} 
+                      className={`h-1 rounded-full transition-all duration-300 ${i === currentAnnIndex ? 'w-6 bg-[#F97316]' : 'w-2 bg-gray-200'}`} 
+                    />
+                  ))}
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
                   {currentAnnIndex + 1} / {announcements.length}
-                </span>
-                <span className="text-[10px] text-gray-500">
-                  {new Date(announcements[currentAnnIndex].createdAt).toLocaleDateString()}
                 </span>
               </div>
             </div>
-            <p className="text-sm text-gray-700 mt-1 min-h-[40px]">{announcements[currentAnnIndex].content}</p>
+
+            <div className="relative h-[80px]">
+              {announcements.map((ann, index) => (
+                <div 
+                  key={ann.id}
+                  className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+                    index === currentAnnIndex 
+                      ? 'opacity-100 translate-x-0' 
+                      : index < currentAnnIndex 
+                        ? 'opacity-0 -translate-x-full' 
+                        : 'opacity-0 translate-x-full'
+                  }`}
+                >
+                  <h5 className="font-bold text-[#0A1F44] mb-1">{ann.title}</h5>
+                  <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{ann.content}</p>
+                </div>
+              ))}
+            </div>
             
-            {announcements.length > 1 && (
-              <div className="absolute right-2 bottom-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                  onClick={() => setIsPaused(!isPaused)}
-                  className="p-1 hover:bg-[#F97316]/20 rounded-full text-[#F97316]"
-                  title={isPaused ? "Play" : "Pause"}
-                >
-                  {isPaused ? <Play size={14} /> : <Pause size={14} />}
-                </button>
-                <button 
-                  onClick={prevAnnouncement}
-                  className="p-1 hover:bg-[#F97316]/20 rounded-full text-[#F97316]"
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                <button 
-                  onClick={nextAnnouncement}
-                  className="p-1 hover:bg-[#F97316]/20 rounded-full text-[#F97316]"
-                >
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            )}
+            <div className="mt-4 flex justify-between items-center">
+               <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  Published {new Date(announcements[currentAnnIndex].createdAt).toLocaleDateString()}
+                </span>
+
+              {announcements.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setIsPaused(!isPaused)}
+                    className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#0A1F44] transition-colors"
+                    title={isPaused ? "Play" : "Pause"}
+                  >
+                    {isPaused ? <Play size={16} fill="currentColor" /> : <Pause size={16} fill="currentColor" />}
+                  </button>
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={prevAnnouncement}
+                      className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#0A1F44] transition-colors border border-gray-100"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button 
+                      onClick={nextAnnouncement}
+                      className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#0A1F44] transition-colors border border-gray-100"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
