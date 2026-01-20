@@ -37,18 +37,16 @@ export default function SupportPage() {
   useEffect(() => {
     let unsubscribe = () => {};
     
-    const initListener = () => {
-      if (!auth.currentUser) return;
-      
+    const initListener = (user: any) => {
       try {
         const q = query(
           collection(db, 'tickets'),
-          where('userId', '==', auth.currentUser.uid),
+          where('userId', '==', user.uid),
           orderBy('lastMessageAt', 'desc')
         );
 
         unsubscribe = onSnapshot(q, (snap) => {
-          const ticketList = snap.docs.filter(d => !d.data().deleted).map(d => ({ id: d.id, ...d.data() }));
+          const ticketList = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((t: any) => t.deleted !== true);
           setTickets(ticketList);
           
           if (selectedTicket) {
@@ -68,23 +66,24 @@ export default function SupportPage() {
       }
     };
 
-    // Wait for auth to be initialized
-    const checkAuth = setInterval(() => {
-      if (auth.currentUser) {
-        initListener();
-        clearInterval(checkAuth);
+    const unsubAuth = auth.onAuthStateChanged((user) => {
+      if (user) {
+        initListener(user);
+      } else {
+        setTickets([]);
+        unsubscribe();
       }
-    }, 500);
+    });
 
     return () => {
-      clearInterval(checkAuth);
+      unsubAuth();
       unsubscribe();
     };
-  }, [auth.currentUser?.uid]);
+  }, []);
 
   // Real-time replies listener
   useEffect(() => {
-    if (!selectedTicket) {
+    if (!selectedTicket || !selectedTicket.id) {
       setReplies([]);
       return;
     }
@@ -95,7 +94,8 @@ export default function SupportPage() {
     );
 
     const unsubscribe = onSnapshot(q, (snap) => {
-      setReplies(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setReplies(messages);
       
       // Mark as read when user views admin replies
       const unreadAdminReplies = snap.docs.filter(d => d.data().sender === 'admin' && !d.data().read);
