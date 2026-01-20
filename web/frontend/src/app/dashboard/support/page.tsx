@@ -46,41 +46,53 @@ export default function SupportPage() {
   useEffect(() => {
     let unsubscribe = () => {};
     
+    const initListener = (user: any) => {
+      console.log("Initializing listener for user:", user.uid);
+      const ticketsRef = collection(db, 'tickets');
+      const q = query(
+        ticketsRef, 
+        where('userId', '==', user.uid),
+        orderBy('lastMessageAt', 'desc')
+      );
+
+      unsubscribe = onSnapshot(q, (snap) => {
+        const ticketList = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter((t: any) => !t.deleted);
+        
+        console.log("Fetched tickets for user:", user.uid, "Count:", ticketList.length);
+        setTickets(ticketList);
+        
+        // Keep selected ticket updated
+        if (selectedTicket) {
+          const updated = ticketList.find(t => t.id === selectedTicket.id);
+          if (updated) setSelectedTicket(updated);
+        }
+      }, (error) => {
+        console.error("Tickets snapshot error:", error);
+        toast({ 
+          title: "Connection Error", 
+          description: "Please check your internet connection or refresh.", 
+          type: "destructive" 
+        });
+      });
+    };
+
     const unsubAuth = auth.onAuthStateChanged((user) => {
       if (user) {
-        const ticketsRef = collection(db, 'tickets');
-        const q = query(
-          ticketsRef, 
-          where('userId', '==', user.uid),
-          orderBy('lastMessageAt', 'desc')
-        );
-
-        unsubscribe = onSnapshot(q, (snap) => {
-          const ticketList = snap.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .filter((t: any) => !t.deleted);
-          
-          setTickets(ticketList);
-          
-          // Keep selected ticket updated
-          if (selectedTicket) {
-            const updated = ticketList.find(t => t.id === selectedTicket.id);
-            if (updated) setSelectedTicket(updated);
-          }
-        }, (error) => {
-          console.error("Tickets snapshot error:", error);
-        });
+        initListener(user);
       } else {
+        console.log("No authenticated user, clearing tickets");
         setTickets([]);
-        unsubscribe();
+        if (unsubscribe) unsubscribe();
       }
     });
 
     return () => {
       unsubAuth();
-      unsubscribe();
+      if (unsubscribe) unsubscribe();
     };
-  }, [selectedTicket?.id]);
+  }, []);
 
   // Real-time replies listener
   useEffect(() => {
