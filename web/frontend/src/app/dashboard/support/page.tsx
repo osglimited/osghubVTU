@@ -311,38 +311,38 @@ export default function SupportPage() {
         {/* Content Area */}
         <div className="flex-grow flex flex-col bg-[#F8FAFC] overflow-hidden">
           {showNewTicket ? (
-            <div className="flex-grow flex items-center justify-center p-6">
-              <div className="w-full max-w-md bg-white p-8 rounded-[2.5rem] shadow-2xl border border-gray-100 animate-in fade-in slide-in-from-bottom-8">
-                <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-orange-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
-                    <Plus className="w-8 h-8 text-[#F97316]" />
+            <div className="flex-grow flex items-center justify-center p-4 overflow-y-auto">
+              <div className="w-full max-w-md bg-white p-6 md:p-8 rounded-[2rem] shadow-2xl border border-gray-100 animate-in fade-in slide-in-from-bottom-4 my-auto">
+                <div className="text-center mb-6">
+                  <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <Plus className="w-6 h-6 text-[#F97316]" />
                   </div>
-                  <h2 className="text-2xl font-black text-[#0A1F44] tracking-tight">OPEN NEW TICKET</h2>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">We're here to help</p>
+                  <h2 className="text-xl font-black text-[#0A1F44] tracking-tight uppercase">New Ticket</h2>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">We're here to help</p>
                 </div>
-                <div className="space-y-6">
-                  <div className="space-y-2">
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
                     <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Subject</Label>
                     <Input 
-                      className="h-14 rounded-2xl border-2 border-gray-100 focus:border-[#F97316] font-bold" 
+                      className="h-12 rounded-xl border-2 border-gray-100 focus:border-[#F97316] font-bold text-sm" 
                       value={newTicketData.subject} 
                       onChange={e => setNewTicketData({...newTicketData, subject: e.target.value})} 
                       placeholder="What's the issue?"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Message</Label>
                     <textarea 
-                      className="w-full min-h-[120px] rounded-2xl border-2 border-gray-100 focus:border-[#F97316] p-4 font-medium text-sm resize-none" 
+                      className="w-full min-h-[100px] rounded-xl border-2 border-gray-100 focus:border-[#F97316] p-3 font-medium text-sm resize-none" 
                       value={newTicketData.message} 
                       onChange={e => setNewTicketData({...newTicketData, message: e.target.value})} 
-                      placeholder="Describe your problem in detail..."
+                      placeholder="Describe your problem..."
                     />
                   </div>
-                  <div className="flex gap-3">
-                    <Button variant="outline" className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest border-2" onClick={() => setShowNewTicket(false)}>Cancel</Button>
+                  <div className="flex gap-2 pt-2">
+                    <Button variant="outline" className="flex-1 h-12 rounded-xl font-black uppercase text-[9px] tracking-widest border-2" onClick={() => setShowNewTicket(false)}>Cancel</Button>
                     <Button 
-                      className="flex-2 h-14 bg-[#0A1F44] hover:bg-[#0A1F44]/90 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-blue-100" 
+                      className="flex-[2] h-12 bg-[#0A1F44] hover:bg-[#0A1F44]/90 text-white rounded-xl font-black uppercase text-[9px] tracking-widest shadow-lg" 
                       disabled={submitting || !newTicketData.subject || !newTicketData.message}
                       onClick={handleCreateTicket}
                     >
