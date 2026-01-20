@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useState, useEffect, useRef } from 'react';
-import { Smartphone, Wifi, Tv, Zap, CreditCard, GraduationCap, Eye, EyeOff, ChevronLeft, ChevronRight, Pause, Play, Megaphone, Send, Image as ImageIcon, Paperclip, CheckCircle2, History, MessageCircle } from 'lucide-react';
+import { Smartphone, Wifi, Tv, Zap, CreditCard, GraduationCap, Eye, EyeOff, ChevronLeft, ChevronRight, Pause, Play, Megaphone, Send, Image as ImageIcon, Paperclip, CheckCircle2, History, MessageCircle, Check, CheckCheck } from 'lucide-react';
 import { db, auth, storage } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, orderBy, doc, runTransaction, onSnapshot, limit, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, orderBy, doc, runTransaction, onSnapshot, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/components/ui/toast';
 
@@ -365,6 +365,7 @@ export default function SupportPage() {
               {/* Messages Area */}
               <div className="flex-grow overflow-y-auto p-4 space-y-4 bg-[#F8FAFC]">
                 {/* User's Original Message */}
+                <div className="flex flex-col items-start">
                   <div className="bg-white border border-gray-200 p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%]">
                     <p className="text-sm text-gray-800">{selectedTicket.message}</p>
                   </div>
