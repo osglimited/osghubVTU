@@ -42,12 +42,12 @@ export default function SupportPage() {
     scrollToBottom();
   }, [replies]);
 
-  // Real-time tickets listener
+  // Real-time tickets listener (ADMIN LOGIC STYLE)
   useEffect(() => {
-    let unsubscribe = () => {};
+    if (!db) return;
     
+    let unsubscribe = () => {};
     const unsubAuth = auth.onAuthStateChanged((user) => {
-      // Clean up previous listener first
       if (unsubscribe) unsubscribe();
 
       if (user) {
@@ -61,10 +61,10 @@ export default function SupportPage() {
 
         unsubscribe = onSnapshot(q, (snap) => {
           const ticketList = snap.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .filter((t: any) => !t.deleted);
+            .filter(d => !d.data().deleted)
+            .map(d => ({ id: d.id, ...d.data() }));
           
-          console.log("Real-time tickets update:", ticketList.length);
+          console.log("Tickets update:", ticketList.length);
           setTickets(ticketList);
           
           if (selectedTicket) {
@@ -72,10 +72,7 @@ export default function SupportPage() {
             if (updated) setSelectedTicket(updated);
           }
         }, (error) => {
-          console.error("Tickets snapshot error:", error);
-          if (error.code === 'failed-precondition') {
-            console.warn("Index might be building...");
-          }
+          console.error("Tickets listener error:", error);
         });
       } else {
         setTickets([]);
@@ -86,11 +83,11 @@ export default function SupportPage() {
       unsubAuth();
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [selectedTicket?.id]); // Matches admin dependency for stability
 
-  // Real-time replies listener
+  // Real-time replies listener (ADMIN LOGIC STYLE)
   useEffect(() => {
-    if (!selectedTicket || !selectedTicket.id) {
+    if (!selectedTicket || !db) {
       setReplies([]);
       return;
     }
@@ -102,13 +99,12 @@ export default function SupportPage() {
       const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setReplies(messages);
       
-      // Mark admin messages as read
       const unreadAdminMessages = snap.docs.filter(d => d.data().sender === 'admin' && !d.data().read);
       unreadAdminMessages.forEach(d => {
-        updateDoc(d.ref, { read: true }).catch(err => console.error("Error marking read:", err));
+        updateDoc(d.ref, { read: true }).catch(err => console.error("Update read error:", err));
       });
     }, (error) => {
-      console.error("Replies snapshot error:", error);
+      console.error("Replies listener error:", error);
     });
 
     return () => unsubscribe();
@@ -117,11 +113,6 @@ export default function SupportPage() {
   const handleReply = async () => {
     if (!replyMessage.trim() || !selectedTicket || !auth.currentUser) return;
     
-    if (selectedTicket.status === 'solved') {
-      toast({ title: "Ticket Resolved", description: "This ticket is closed. Please reopen or create a new one.", type: "destructive" });
-      return;
-    }
-
     setSendingReply(true);
     try {
       const ticketRef = doc(db, 'tickets', selectedTicket.id);
@@ -168,8 +159,6 @@ export default function SupportPage() {
       };
       
       const docRef = await addDoc(collection(db, 'tickets'), ticketData);
-      
-      // Add first message
       await addDoc(collection(db, 'tickets', docRef.id, 'messages'), {
         text: newTicketData.message,
         sender: 'user',
@@ -194,18 +183,13 @@ export default function SupportPage() {
     const file = e.target.files?.[0];
     if (!file || !selectedTicket || !auth.currentUser) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Max size is 5MB", type: "destructive" });
-      return;
-    }
-
     setIsUploading(true);
     try {
       const storageRef = ref(storage, `support/${selectedTicket.id}/${Date.now()}-${file.name}`);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
 
-      const messageObj = {
+      await addDoc(collection(db, 'tickets', selectedTicket.id, 'messages'), {
         text: "Sent an attachment",
         attachmentUrl: url,
         attachmentName: file.name,
@@ -214,9 +198,7 @@ export default function SupportPage() {
         senderEmail: auth.currentUser.email,
         createdAt: serverTimestamp(),
         read: false
-      };
-
-      await addDoc(collection(db, 'tickets', selectedTicket.id, 'messages'), messageObj);
+      });
       await updateDoc(doc(db, 'tickets', selectedTicket.id), { 
         lastMessageAt: serverTimestamp(),
         lastMessage: "Sent an attachment",
@@ -229,22 +211,8 @@ export default function SupportPage() {
     }
   };
 
-  const handleReopen = async () => {
-    if (!selectedTicket) return;
-    try {
-      await updateDoc(doc(db, 'tickets', selectedTicket.id), { 
-        status: 'open',
-        lastMessageAt: serverTimestamp()
-      });
-      toast({ title: "Ticket Reopened" });
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, type: "destructive" });
-    }
-  };
-
   return (
     <div className="flex flex-col h-[calc(100vh-120px)] bg-gray-50 overflow-hidden rounded-2xl border shadow-sm">
-      {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 bg-white border-b z-20">
         <div>
           <h1 className="text-xl font-black text-[#0A1F44] flex items-center gap-2">
@@ -262,7 +230,6 @@ export default function SupportPage() {
       </div>
 
       <div className="flex flex-grow overflow-hidden relative">
-        {/* Sidebar */}
         <div className={`w-full md:w-[350px] flex flex-col bg-white border-r transition-all duration-300 ${selectedTicket || showNewTicket ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-4 border-b bg-gray-50/50">
             <div className="relative">
@@ -314,44 +281,25 @@ export default function SupportPage() {
           </div>
         </div>
 
-        {/* Content Area */}
         <div className="flex-grow flex flex-col bg-[#F8FAFC] overflow-hidden">
           {showNewTicket ? (
-            <div className="flex-grow flex items-center justify-center p-4 overflow-y-auto">
-              <div className="w-full max-w-md bg-white p-6 md:p-8 rounded-[2rem] shadow-2xl border border-gray-100 animate-in fade-in slide-in-from-bottom-4 my-auto">
+            <div className="flex-grow flex items-center justify-center p-4">
+              <div className="w-full max-w-md bg-white p-8 rounded-[2rem] shadow-2xl border border-gray-100">
                 <div className="text-center mb-6">
-                  <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                    <Plus className="w-6 h-6 text-[#F97316]" />
-                  </div>
                   <h2 className="text-xl font-black text-[#0A1F44] tracking-tight uppercase">New Ticket</h2>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">We're here to help</p>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Subject</Label>
-                    <Input 
-                      className="h-12 rounded-xl border-2 border-gray-100 focus:border-[#F97316] font-bold text-sm" 
-                      value={newTicketData.subject} 
-                      onChange={e => setNewTicketData({...newTicketData, subject: e.target.value})} 
-                      placeholder="What's the issue?"
-                    />
+                    <Label className="text-[10px] font-black text-gray-400 uppercase">Subject</Label>
+                    <Input className="h-12 rounded-xl" value={newTicketData.subject} onChange={e => setNewTicketData({...newTicketData, subject: e.target.value})} placeholder="What's the issue?" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Message</Label>
-                    <textarea 
-                      className="w-full min-h-[100px] rounded-xl border-2 border-gray-100 focus:border-[#F97316] p-3 font-medium text-sm resize-none" 
-                      value={newTicketData.message} 
-                      onChange={e => setNewTicketData({...newTicketData, message: e.target.value})} 
-                      placeholder="Describe your problem..."
-                    />
+                    <Label className="text-[10px] font-black text-gray-400 uppercase">Message</Label>
+                    <textarea className="w-full min-h-[100px] rounded-xl border p-3 text-sm resize-none" value={newTicketData.message} onChange={e => setNewTicketData({...newTicketData, message: e.target.value})} placeholder="Describe your problem..." />
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" className="flex-1 h-12 rounded-xl font-black uppercase text-[9px] tracking-widest border-2" onClick={() => setShowNewTicket(false)}>Cancel</Button>
-                    <Button 
-                      className="flex-[2] h-12 bg-[#0A1F44] hover:bg-[#0A1F44]/90 text-white rounded-xl font-black uppercase text-[9px] tracking-widest shadow-lg" 
-                      disabled={submitting || !newTicketData.subject || !newTicketData.message}
-                      onClick={handleCreateTicket}
-                    >
+                    <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setShowNewTicket(false)}>Cancel</Button>
+                    <Button className="flex-[2] bg-[#0A1F44] text-white rounded-xl" disabled={submitting} onClick={handleCreateTicket}>
                       {submitting ? 'Creating...' : 'Launch Ticket'}
                     </Button>
                   </div>
@@ -360,60 +308,34 @@ export default function SupportPage() {
             </div>
           ) : selectedTicket ? (
             <>
-              {/* Chat Header */}
               <div className="bg-white border-b px-6 py-4 flex items-center justify-between z-10 shadow-sm">
                 <div className="flex items-center gap-4">
-                  <Button variant="ghost" size="icon" className="md:hidden rounded-full" onClick={() => setSelectedTicket(null)}>
-                    <ChevronLeft className="w-5 h-5 text-gray-500" />
-                  </Button>
-                  <div className="h-10 w-10 rounded-2xl bg-[#0A1F44] flex items-center justify-center text-[#F97316]">
-                    <User className="w-5 h-5" />
-                  </div>
+                  <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedTicket(null)}><ChevronLeft /></Button>
+                  <div className="h-10 w-10 rounded-2xl bg-[#0A1F44] flex items-center justify-center text-[#F97316]"><User /></div>
                   <div>
-                    <h3 className="text-sm font-black text-[#0A1F44] leading-tight uppercase tracking-tight">{selectedTicket.subject}</h3>
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Ticket ID: {selectedTicket.id.slice(0,8)}</p>
+                    <h3 className="text-sm font-black text-[#0A1F44] uppercase">{selectedTicket.subject}</h3>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">ID: {selectedTicket.id.slice(0,8)}</p>
                   </div>
                 </div>
-                {selectedTicket.status === 'solved' && (
-                  <Button variant="outline" size="sm" onClick={handleReopen} className="h-8 border-2 border-orange-500 text-orange-600 hover:bg-orange-50 rounded-xl font-black text-[9px] px-4 uppercase tracking-wider">
-                    Reopen Case
-                  </Button>
-                )}
               </div>
 
-              {/* Messages Area */}
-              <div className="flex-grow overflow-y-auto p-6 space-y-4 bg-[#E5DDD5] relative scroll-smooth">
+              <div className="flex-grow overflow-y-auto p-6 space-y-4 bg-[#E5DDD5] relative">
                 <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat" />
-                
                 {replies.map((r, i) => (
                   <div key={r.id || i} className={`flex flex-col relative z-10 ${r.sender === 'user' ? 'items-end' : 'items-start'}`}>
-                    <div className={`p-4 rounded-2xl shadow-sm max-w-[85%] md:max-w-[75%] relative ${
-                      r.sender === 'user' 
-                        ? 'bg-[#DCF8C6] text-gray-800 rounded-tr-none' 
-                        : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'
-                    }`}>
-                      <div className={`absolute top-0 w-3 h-3 ${
-                        r.sender === 'user' 
-                          ? 'right-[-8px] bg-[#DCF8C6] [clip-path:polygon(0_0,0_100%,100%_0)]' 
-                          : 'left-[-8px] bg-white [clip-path:polygon(100%_0,0_0,100%_100%)]'
-                      }`} />
-
-                      <p className="text-sm font-medium leading-relaxed">{r.text}</p>
-                      
+                    <div className={`p-4 rounded-2xl shadow-sm max-w-[85%] relative ${r.sender === 'user' ? 'bg-[#DCF8C6]' : 'bg-white'}`}>
+                      <div className={`absolute top-0 w-3 h-3 ${r.sender === 'user' ? 'right-[-8px] bg-[#DCF8C6] [clip-path:polygon(0_0,0_100%,100%_0)]' : 'left-[-8px] bg-white [clip-path:polygon(100%_0,0_0,100%_100%)]'}`} />
+                      <p className="text-sm font-medium">{r.text}</p>
                       {r.attachmentUrl && (
-                        <a href={r.attachmentUrl} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-2 p-2 bg-black/5 rounded-lg text-[10px] font-bold hover:bg-black/10 transition-colors">
-                          <ImageIcon size={14} className="text-gray-500" />
-                          <span className="truncate max-w-[150px]">{r.attachmentName || 'Attachment'}</span>
+                        <a href={r.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 block p-2 bg-black/5 rounded text-[10px] font-bold">
+                          📎 {r.attachmentName || 'File'}
                         </a>
                       )}
-                      
                       <div className="flex justify-end items-center gap-1.5 mt-2">
-                        <span className="text-[9px] font-black uppercase tracking-tighter opacity-40">
-                          {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                        <span className="text-[9px] font-black opacity-40">
+                          {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
                         </span>
-                        {r.sender === 'user' && (
-                          r.read ? <CheckCheck size={12} className="text-blue-500" /> : <Check size={12} className="text-gray-400" />
-                        )}
+                        {r.sender === 'user' && (r.read ? <CheckCheck size={12} className="text-blue-500" /> : <Check size={12} className="text-gray-400" />)}
                       </div>
                     </div>
                   </div>
@@ -421,57 +343,28 @@ export default function SupportPage() {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* Input Area */}
               <div className="p-4 bg-white border-t">
-                {selectedTicket.status === 'solved' ? (
-                  <div className="text-center py-2 px-4 bg-green-50 rounded-xl border border-green-100">
-                    <p className="text-[10px] text-green-700 font-black uppercase tracking-widest">This ticket is resolved. Reopen to send a message.</p>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 max-w-4xl mx-auto">
-                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx" />
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="h-10 w-10 rounded-full text-gray-400 hover:text-[#F97316] hover:bg-gray-50"
-                    >
-                      <Paperclip size={20} />
-                    </Button>
-                    <div className="flex-grow relative">
-                      <textarea
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F97316]/20 focus:bg-white resize-none h-11 transition-all"
-                        placeholder="Type your message..."
-                        rows={1}
-                        value={replyMessage}
-                        onChange={(e) => setReplyMessage(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleReply();
-                          }
-                        }}
-                      />
-                    </div>
-                    <Button 
-                      onClick={handleReply}
-                      disabled={!replyMessage.trim() || sendingReply}
-                      className="bg-[#0A1F44] hover:bg-[#0A1F44]/90 h-11 w-11 p-0 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-100"
-                    >
-                      <Send size={18} className="text-[#F97316]" />
-                    </Button>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 max-w-4xl mx-auto">
+                  <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+                  <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Paperclip size={20} /></Button>
+                  <textarea
+                    className="flex-grow bg-gray-50 border rounded-2xl py-3 px-4 text-sm h-11 resize-none"
+                    placeholder="Type your message..."
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(); } }}
+                  />
+                  <Button onClick={handleReply} disabled={!replyMessage.trim() || sendingReply} className="bg-[#0A1F44] rounded-full h-11 w-11 p-0 flex items-center justify-center">
+                    <Send size={18} className="text-[#F97316]" />
+                  </Button>
+                </div>
               </div>
             </>
           ) : (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-12">
-              <div className="w-24 h-24 bg-white rounded-[2.5rem] shadow-xl flex items-center justify-center mb-6 border border-gray-50">
-                <MessageSquare className="w-10 h-10 text-gray-200" />
-              </div>
-              <h3 className="text-xl font-black text-[#0A1F44] uppercase tracking-tighter">SELECT A CONVERSATION</h3>
-              <p className="text-xs max-w-[280px] text-gray-400 font-bold uppercase tracking-widest mt-2 leading-relaxed opacity-60">Choose a ticket from the sidebar or open a new one to start chatting with our support team.</p>
+              <div className="w-24 h-24 bg-white rounded-[2.5rem] shadow-xl flex items-center justify-center mb-6"><MessageSquare className="w-10 h-10 text-gray-200" /></div>
+              <h3 className="text-xl font-black text-[#0A1F44] uppercase">Select a Conversation</h3>
+              <p className="text-xs text-gray-400 font-bold uppercase mt-2">Pick a ticket from the left to start chatting.</p>
             </div>
           )}
         </div>
