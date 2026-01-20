@@ -215,6 +215,17 @@ export default function SupportPage() {
         lastMessageAt: Date.now()
       };
       const docRef = await addDoc(collection(db, 'support_tickets'), ticketData);
+      
+      // Also add the first message as a reply to maintain history structure
+      await addDoc(collection(db, 'support_tickets', docRef.id, 'replies'), {
+        message: message,
+        senderRole: 'user',
+        senderId: auth.currentUser.uid,
+        senderEmail: auth.currentUser.email,
+        createdAt: Date.now(),
+        read: true
+      });
+
       toast({ title: "Ticket Submitted", description: "We'll get back to you soon.", type: "default" });
       setSubject('');
       setMessage('');
@@ -283,9 +294,9 @@ export default function SupportPage() {
                 <p className={`text-xs line-clamp-1 ${selectedTicket?.id === t.id ? 'text-blue-100' : 'text-gray-400'}`}>
                   {t.message}
                 </p>
-                <div className="flex justify-between items-center mt-2">
+                  <div className="flex justify-between items-center mt-2">
                   <span className={`text-[10px] ${selectedTicket?.id === t.id ? 'text-blue-200' : 'text-gray-400'}`}>
-                    {new Date(t.lastMessageAt || t.createdAt).toLocaleDateString()}
+                    {new Date(t.lastMessageAt || t.createdAt || Date.now()).toLocaleDateString()}
                   </span>
                 </div>
               </div>
@@ -354,11 +365,12 @@ export default function SupportPage() {
               {/* Messages Area */}
               <div className="flex-grow overflow-y-auto p-4 space-y-4 bg-[#F8FAFC]">
                 {/* User's Original Message */}
-                <div className="flex flex-col items-start">
                   <div className="bg-white border border-gray-200 p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%]">
                     <p className="text-sm text-gray-800">{selectedTicket.message}</p>
                   </div>
-                  <span className="text-[9px] text-gray-400 mt-1 px-1">{new Date(selectedTicket.createdAt).toLocaleString()}</span>
+                  <span className="text-[9px] text-gray-400 mt-1 px-1">
+                    {selectedTicket.createdAt ? new Date(selectedTicket.createdAt).toLocaleString() : 'Just now'}
+                  </span>
                 </div>
 
                 {replies.map((r, i) => (
@@ -383,7 +395,8 @@ export default function SupportPage() {
                       )}
                     </div>
                     <span className="text-[9px] text-gray-400 mt-1 px-1">
-                      {r.senderRole === 'admin' ? 'Support Team • ' : ''}{new Date(r.createdAt).toLocaleString()}
+                      {r.senderRole === 'admin' ? 'Support Team • ' : ''}
+                      {r.createdAt ? new Date(r.createdAt).toLocaleString() : 'Just now'}
                     </span>
                   </div>
                 ))}
