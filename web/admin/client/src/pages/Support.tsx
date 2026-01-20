@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Megaphone, Trash2, Send, History, CheckCheck, Check, User, ShieldCheck, Plus } from "lucide-react";
+import { MessageSquare, Megaphone, Trash2, Send, History, CheckCheck, Check, User, ShieldCheck, Plus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getAnnouncements, createAnnouncement, deleteAnnouncement, db } from "@/lib/backend";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -37,13 +37,17 @@ export default function SupportPage() {
       const anns = await getAnnouncements();
       setAnnouncements(anns || []);
     } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      console.error("Load announcements error:", e);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (!db) {
+      console.error("Firebase DB is not initialized");
+      return;
+    }
     const ticketsRef = db.collection('support_tickets');
     const unsubscribe = ticketsRef
       .orderBy('lastMessageAt', 'desc')
@@ -63,7 +67,7 @@ export default function SupportPage() {
   }, [selectedTicket?.id]);
 
   useEffect(() => {
-    if (!selectedTicket) {
+    if (!selectedTicket || !db) {
       setReplies([]);
       return;
     }
@@ -78,7 +82,7 @@ export default function SupportPage() {
         
         const unreadReplies = snap.docs.filter((d: any) => d.data().senderRole === 'user' && !d.data().read);
         unreadReplies.forEach((d: any) => {
-          d.ref.update({ read: true }).catch(console.error);
+          d.ref.update({ read: true }).catch((e: any) => console.error("Update read status error:", e));
         });
       }, (err: any) => {
         console.error("Replies listener error:", err);
@@ -150,242 +154,235 @@ export default function SupportPage() {
     }
   };
 
-  if (loading && announcements.length === 0) {
-    return <div className="flex items-center justify-center h-full">Loading...</div>;
-  }
-
   return (
-    <div className="space-y-6 h-[calc(100vh-120px)] flex flex-col p-4 md:p-6 bg-gray-50/30">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
+    <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50 overflow-hidden">
+      {/* Header Bar */}
+      <div className="flex items-center justify-between px-6 py-4 bg-white border-b shadow-sm z-20">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">Support Center</h2>
-          <p className="text-sm text-gray-500">Real-time user inquiries and announcements</p>
+          <h1 className="text-xl font-black text-gray-900 flex items-center gap-2">
+             <ShieldCheck className="w-6 h-6 text-blue-600" />
+             ADMIN SUPPORT
+          </h1>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Real-time Customer Relations</p>
         </div>
-        <div className="flex items-center gap-4">
-          <Badge variant="outline" className="px-3 py-1 text-xs bg-blue-50 text-blue-600 border-blue-200">
-            {tickets.filter(t => t.status === 'open').length} Open Tickets
+        <div className="flex items-center gap-3">
+          <Badge className="bg-blue-600 hover:bg-blue-700 text-white border-none px-3 py-1 font-bold text-[10px]">
+            {tickets.filter(t => t.status === 'open').length} ACTIVE TICKETS
           </Badge>
         </div>
       </div>
 
-      <Tabs defaultValue="tickets" className="flex-grow flex flex-col space-y-4 overflow-hidden">
-        <TabsList className="w-fit bg-white border shadow-sm p-1 rounded-lg">
-          <TabsTrigger value="tickets" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
-            <MessageSquare className="mr-2 h-4 w-4" /> Tickets
-          </TabsTrigger>
-          <TabsTrigger value="announcements" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
-            <Megaphone className="mr-2 h-4 w-4" /> Announcements
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="tickets" className="flex-grow flex flex-col overflow-hidden data-[state=inactive]:hidden">
-          <div className="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
-            {/* Sidebar */}
-            <div className="w-full md:w-[350px] flex flex-col gap-4 overflow-hidden h-full">
-              <Card className="flex-grow flex flex-col overflow-hidden border shadow-sm rounded-xl">
-                <CardHeader className="py-4 border-b bg-gray-50/50">
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-sm font-bold flex items-center gap-2 text-gray-700">
-                      <History className="h-4 w-4 text-blue-600" /> Inbox
-                    </CardTitle>
-                    <Badge variant="secondary" className="bg-gray-100 text-gray-600">{tickets.length}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-grow overflow-y-auto p-2 space-y-2 pb-4 bg-white scrollbar-hide">
-                  {tickets.map((t) => (
-                    <div 
-                      key={t.id} 
-                      onClick={() => setSelectedTicket(t)}
-                      className={`p-3 rounded-xl cursor-pointer transition-all border ${
-                        selectedTicket?.id === t.id 
-                          ? 'bg-blue-50 border-blue-400 shadow-sm' 
-                          : 'bg-white hover:bg-gray-50 border-gray-100'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="text-[10px] font-semibold text-gray-500 truncate max-w-[150px]">{t.userEmail}</span>
-                        <Badge 
-                          variant="outline" 
-                          className={`text-[9px] h-4 uppercase px-1.5 ${
-                            t.status === 'open' ? 'bg-red-50 text-red-600 border-red-200' : 
-                            t.status === 'replied' ? 'bg-blue-50 text-blue-600 border-blue-200' : 
-                            'bg-gray-100 text-gray-600 border-gray-200'
-                          }`}
-                        >
-                          {t.status}
-                        </Badge>
-                      </div>
-                      <h4 className="text-sm font-bold text-gray-900 truncate">{t.subject || "No Subject"}</h4>
-                      <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{t.message}</p>
-                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
-                        <span className="text-[9px] text-gray-400 font-medium">
-                          {new Date(t.lastMessageAt || t.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {tickets.length === 0 && (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8 text-center">
-                      <MessageSquare className="h-12 w-12 mb-3 opacity-10" />
-                      <p className="text-sm font-medium">No messages yet</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Chat Area */}
-            <div className="flex-grow flex flex-col overflow-hidden h-full">
-              <Card className="flex-grow flex flex-col overflow-hidden border shadow-sm rounded-xl">
-                {selectedTicket ? (
-                  <>
-                    <CardHeader className="py-4 border-b bg-white shadow-sm z-10">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center border-2 border-white shadow-sm">
-                            <User className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-base font-bold text-gray-900">{selectedTicket.subject}</CardTitle>
-                            <CardDescription className="text-xs text-gray-500 font-medium">{selectedTicket.userEmail}</CardDescription>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                           {selectedTicket.status !== 'solved' && (
-                            <Button variant="outline" size="sm" onClick={() => markAsSolved(selectedTicket.id)} className="text-green-600 border-green-200 hover:bg-green-50 h-8 text-[11px] font-bold">
-                              RESOLVE
-                            </Button>
-                          )}
-                          <Badge variant="outline" className="text-[10px] uppercase font-bold text-gray-400 bg-gray-50 border-gray-200">
-                            #{selectedTicket.id.slice(0, 6)}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    
-                    <CardContent className="flex-grow overflow-y-auto p-4 space-y-4 bg-[#f8f9fa] pattern-dots">
-                      {/* Initial Message */}
-                      <div className="flex flex-col items-start max-w-[90%]">
-                        <div className="bg-white p-4 rounded-2xl rounded-tl-none border shadow-sm border-gray-100">
-                          <p className="text-[13px] text-gray-800 leading-relaxed font-medium">{selectedTicket.message}</p>
-                          <div className="mt-2 flex items-center gap-2">
-                            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">{new Date(selectedTicket.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {replies.map((r, i) => (
-                        <div key={r.id || i} className={`flex flex-col ${r.senderRole === 'admin' ? 'items-end ml-auto' : 'items-start'} max-w-[90%]`}>
-                          <div className={`p-4 rounded-2xl shadow-sm ${
-                            r.senderRole === 'admin' 
-                              ? 'bg-blue-600 text-white rounded-tr-none shadow-blue-100' 
-                              : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
-                          }`}>
-                            <p className="text-[13px] leading-relaxed font-medium">{r.message}</p>
-                            <div className="flex justify-end items-center gap-1.5 mt-1.5 opacity-80">
-                              <span className="text-[9px] font-bold uppercase tracking-wider">{new Date(r.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                              {r.senderRole === 'admin' && (
-                                r.read ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      <div ref={chatEndRef} />
-                    </CardContent>
-
-                    <div className="p-4 border-t bg-white space-y-3">
-                      <div className="relative group">
-                        <Textarea 
-                          placeholder="Type your response..." 
-                          value={replyMsg}
-                          onChange={(e) => setReplyMsg(e.target.value)}
-                          className="min-h-[90px] bg-gray-50/50 border-gray-200 focus:border-blue-400 focus:ring-blue-100 rounded-xl text-[13px] pr-12 transition-all resize-none font-medium"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleReply(selectedTicket.id);
-                            }
-                          }}
-                        />
-                        <Button 
-                          size="icon" 
-                          onClick={() => handleReply(selectedTicket.id)} 
-                          disabled={!replyMsg.trim()} 
-                          className="absolute bottom-2.5 right-2.5 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-100 disabled:opacity-30 disabled:shadow-none transition-all"
-                        >
-                          <Send className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <p className="text-[10px] text-gray-400 font-bold text-center uppercase tracking-widest">Shift + Enter for new line</p>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex-grow flex flex-col items-center justify-center text-gray-400 p-12 text-center bg-gray-50/30">
-                    <div className="h-24 w-24 rounded-3xl bg-white border border-gray-100 flex items-center justify-center mb-6 shadow-xl shadow-gray-100 rotate-3">
-                      <MessageSquare className="h-10 w-10 text-blue-500 opacity-20 -rotate-3" />
-                    </div>
-                    <h3 className="text-xl font-black text-gray-900 mb-2">Select a Conversation</h3>
-                    <p className="text-xs max-w-[280px] leading-relaxed text-gray-500 font-medium">Respond to user inquiries instantly with our real-time support system.</p>
-                  </div>
-                )}
-              </Card>
+      <div className="flex flex-grow overflow-hidden relative">
+        {/* Left Sidebar - Ticket List */}
+        <div className={`w-full md:w-[380px] flex flex-col bg-white border-r z-10 transition-all duration-300 ${selectedTicket ? 'hidden md:flex' : 'flex'}`}>
+          <div className="p-4 border-b bg-gray-50/50">
+            <div className="relative">
+              <History className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <div className="pl-9 pr-4 py-2 bg-white border rounded-xl text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Conversation History
+              </div>
             </div>
           </div>
-        </TabsContent>
+          
+          <div className="flex-grow overflow-y-auto scrollbar-hide p-2 space-y-1">
+            {tickets.map((t) => (
+              <div 
+                key={t.id} 
+                onClick={() => setSelectedTicket(t)}
+                className={`group p-4 rounded-2xl cursor-pointer transition-all border-2 ${
+                  selectedTicket?.id === t.id 
+                    ? 'bg-blue-50 border-blue-600 shadow-md shadow-blue-100' 
+                    : 'bg-white border-transparent hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-tighter truncate max-w-[140px]">{t.userEmail}</span>
+                  <Badge className={`text-[9px] font-black h-5 uppercase px-2 border-none ${
+                    t.status === 'open' ? 'bg-red-500 text-white' : 
+                    t.status === 'replied' ? 'bg-blue-500 text-white' : 
+                    'bg-gray-400 text-white'
+                  }`}>
+                    {t.status}
+                  </Badge>
+                </div>
+                <h4 className="text-sm font-bold text-gray-900 truncate mb-1">{t.subject || "Untitled Query"}</h4>
+                <p className="text-xs text-gray-400 line-clamp-1 font-medium">{t.message}</p>
+                <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
+                  <span className="text-[9px] font-bold text-gray-400 uppercase">{new Date(t.lastMessageAt || t.createdAt).toLocaleDateString()}</span>
+                  {t.lastMessageAt && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />}
+                </div>
+              </div>
+            ))}
+            {tickets.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-gray-300">
+                <MessageSquare className="w-12 h-12 mb-4 opacity-20" />
+                <p className="text-xs font-black uppercase tracking-widest">No Active Conversations</p>
+              </div>
+            )}
+          </div>
 
-        <TabsContent value="announcements" className="data-[state=inactive]:hidden h-full flex flex-col">
-          <div className="flex justify-end mb-4">
+          <div className="p-4 border-t bg-gray-50/50">
             <Dialog open={openAnnouncement} onOpenChange={setOpenAnnouncement}>
               <DialogTrigger asChild>
-                <Button className="bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-100 rounded-xl px-6 h-10 font-bold text-xs"><Plus className="mr-2 h-4 w-4" /> NEW ANNOUNCEMENT</Button>
+                <Button className="w-full h-12 bg-gray-900 hover:bg-black text-white font-black rounded-2xl shadow-xl shadow-gray-200 uppercase tracking-widest text-[11px] gap-2">
+                  <Megaphone className="w-4 h-4" /> Broadcast Update
+                </Button>
               </DialogTrigger>
-              <DialogContent className="rounded-2xl border-none shadow-2xl">
-                <DialogHeader><DialogTitle className="text-xl font-black">Post Announcement</DialogTitle></DialogHeader>
-                <div className="space-y-4 py-4">
+              <DialogContent className="rounded-3xl border-none shadow-2xl p-8">
+                <DialogHeader><DialogTitle className="text-2xl font-black text-gray-900">SYSTEM BROADCAST</DialogTitle></DialogHeader>
+                <div className="space-y-6 py-4">
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Title</Label>
-                    <Input className="rounded-xl border-gray-200 h-11 text-sm font-bold" value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} placeholder="e.g. System Maintenance" />
+                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Announcement Title</Label>
+                    <Input className="h-14 rounded-2xl border-2 border-gray-100 focus:border-blue-600 transition-all font-bold text-gray-900" value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} placeholder="e.g. Maintenance Scheduled" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Content</Label>
-                    <Textarea className="rounded-xl border-gray-200 min-h-[120px] text-sm font-medium resize-none" value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} placeholder="Describe the announcement in detail..." />
+                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Message Body</Label>
+                    <Textarea className="min-h-[160px] rounded-2xl border-2 border-gray-100 focus:border-blue-600 transition-all font-medium text-gray-800 resize-none p-4" value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} placeholder="What's the update?" />
                   </div>
-                  <Button className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 font-black shadow-lg shadow-blue-100 mt-2" onClick={handleCreateAnn}>PUBLISH ANNOUNCEMENT</Button>
+                  <Button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-widest mt-2" onClick={handleCreateAnn}>PUBLISH TO USERS</Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          <Card className="border shadow-sm rounded-xl flex-grow overflow-hidden flex flex-col">
-            <CardHeader className="bg-gray-50/50 border-b">
-              <CardTitle className="text-sm font-black text-gray-900 uppercase tracking-widest">Active Broadcasts</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 flex-grow overflow-y-auto space-y-3 bg-white">
-              {announcements.map((a) => (
-                <div key={a.id} className="flex items-start justify-between p-4 border rounded-2xl bg-white hover:border-blue-200 transition-all group shadow-sm">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-gray-900 text-sm">{a.title}</h4>
-                      <Badge variant="outline" className="text-[9px] h-4 bg-blue-50 text-blue-600 border-blue-100 uppercase font-black">Active</Badge>
-                    </div>
-                    <p className="text-[13px] text-gray-600 font-medium leading-relaxed">{a.content}</p>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest pt-1">{new Date(a.createdAt).toLocaleString()}</p>
+        </div>
+
+        {/* Right Area - Chat Content */}
+        <div className={`flex-grow flex flex-col bg-gray-50 overflow-hidden transition-all duration-300 ${!selectedTicket ? 'hidden md:flex' : 'flex'}`}>
+          {selectedTicket ? (
+            <>
+              {/* Chat Header */}
+              <div className="bg-white border-b px-6 py-4 flex items-center justify-between z-10 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <Button variant="ghost" size="icon" className="md:hidden rounded-full hover:bg-gray-100" onClick={() => setSelectedTicket(null)}>
+                    <X className="w-5 h-5 text-gray-500" />
+                  </Button>
+                  <div className="h-12 w-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-100">
+                    <User className="w-6 h-6" />
                   </div>
-                  <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={() => handleDeleteAnn(a.id)}>
-                    <Trash2 className="h-4 w-4" />
+                  <div>
+                    <h3 className="text-base font-black text-gray-900 leading-tight">{selectedTicket.subject}</h3>
+                    <p className="text-[11px] font-bold text-blue-600 truncate max-w-[200px]">{selectedTicket.userEmail}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {selectedTicket.status !== 'solved' && (
+                    <Button variant="outline" size="sm" onClick={() => markAsSolved(selectedTicket.id)} className="h-9 border-2 border-green-500 text-green-600 hover:bg-green-50 rounded-xl font-black text-[10px] px-4 uppercase tracking-wider">
+                      Mark Resolved
+                    </Button>
+                  )}
+                  <div className="px-3 py-1 bg-gray-100 rounded-lg text-[9px] font-black text-gray-400 uppercase">
+                    ID: {selectedTicket.id.slice(0, 8)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Chat Messages */}
+              <div className="flex-grow overflow-y-auto p-6 space-y-6 bg-[#f0f2f5] pattern-dots relative scroll-smooth">
+                {/* Initial Ticket Message */}
+                <div className="flex flex-col items-start max-w-[85%] md:max-w-[70%]">
+                  <div className="bg-white p-5 rounded-3xl rounded-tl-none shadow-sm border border-gray-100">
+                    <div className="text-[10px] font-black text-blue-600 uppercase mb-2 tracking-widest border-b pb-1">Original Request</div>
+                    <p className="text-sm font-medium text-gray-800 leading-relaxed">{selectedTicket.message}</p>
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase">{new Date(selectedTicket.createdAt).toLocaleTimeString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {replies.map((r, i) => (
+                  <div key={r.id || i} className={`flex flex-col ${r.senderRole === 'admin' ? 'items-end ml-auto' : 'items-start'} max-w-[85%] md:max-w-[70%]`}>
+                    <div className={`p-4 rounded-3xl shadow-md ${
+                      r.senderRole === 'admin' 
+                        ? 'bg-blue-600 text-white rounded-tr-none shadow-blue-100 border-b-4 border-blue-700' 
+                        : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
+                    }`}>
+                      <p className="text-sm font-medium leading-relaxed">{r.message}</p>
+                      <div className="flex justify-end items-center gap-2 mt-2 opacity-70">
+                        <span className="text-[9px] font-bold uppercase tracking-widest">{new Date(r.createdAt).toLocaleTimeString()}</span>
+                        {r.senderRole === 'admin' && (
+                          r.read ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
+                        )}
+                      </div>
+                    </div>
+                    <div className={`mt-1 text-[8px] font-black uppercase tracking-tighter ${r.senderRole === 'admin' ? 'text-blue-400 mr-2' : 'text-gray-400 ml-2'}`}>
+                      {r.senderRole === 'admin' ? 'Support Team' : 'User Response'}
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Chat Input */}
+              <div className="p-6 bg-white border-t z-10">
+                <div className="relative group max-w-4xl mx-auto">
+                  <Textarea 
+                    placeholder="Type a professional response..." 
+                    value={replyMsg}
+                    onChange={(e) => setReplyMsg(e.target.value)}
+                    className="min-h-[100px] bg-gray-50 border-2 border-gray-100 focus:border-blue-600 focus:bg-white rounded-3xl text-sm font-medium p-5 pr-16 transition-all resize-none shadow-inner"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleReply(selectedTicket.id);
+                      }
+                    }}
+                  />
+                  <Button 
+                    size="icon" 
+                    onClick={() => handleReply(selectedTicket.id)} 
+                    disabled={!replyMsg.trim()} 
+                    className="absolute bottom-4 right-4 h-12 w-12 rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100 disabled:opacity-30 disabled:shadow-none transition-all flex items-center justify-center group-hover:scale-105"
+                  >
+                    <Send className="h-5 w-5 text-white" />
                   </Button>
                 </div>
-              ))}
-              {announcements.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 py-20 bg-gray-50/30 rounded-2xl border border-dashed">
-                   <Megaphone className="h-10 w-10 mb-4 opacity-10" />
-                   <p className="text-sm font-bold uppercase tracking-widest">No Active Announcements</p>
+                <div className="mt-3 flex items-center justify-center gap-4">
+                   <div className="flex items-center gap-1.5">
+                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                     <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Shift + Enter for New Line</span>
+                   </div>
+                   <div className="flex items-center gap-1.5">
+                     <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                     <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Automatic Read Tracking</span>
+                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </div>
+            </>
+          ) : (
+            <div className="flex-grow flex flex-col items-center justify-center text-center p-12 bg-[#f8f9fa]">
+              <div className="relative mb-8">
+                 <div className="absolute inset-0 bg-blue-500 blur-3xl opacity-10 animate-pulse" />
+                 <div className="relative h-32 w-32 rounded-[40px] bg-white border-4 border-white shadow-2xl flex items-center justify-center rotate-6 hover:rotate-0 transition-transform duration-500">
+                    <MessageSquare className="h-14 w-14 text-blue-600 opacity-20" />
+                 </div>
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 mb-3 uppercase tracking-tighter">Support Terminal Active</h3>
+              <p className="text-xs max-w-[320px] leading-relaxed text-gray-500 font-bold uppercase tracking-widest opacity-60">Select a conversation from the sidebar to begin secure communication with the customer.</p>
+              
+              <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl w-full">
+                 <div className="p-6 bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center mb-4">
+                       <History className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Instant History</span>
+                 </div>
+                 <div className="p-6 bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
+                       <CheckCheck className="w-5 h-5 text-green-600" />
+                    </div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Read Receipts</span>
+                 </div>
+                 <div className="p-6 bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-2xl bg-orange-50 flex items-center justify-center mb-4">
+                       <Megaphone className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">System Broadcast</span>
+                 </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
