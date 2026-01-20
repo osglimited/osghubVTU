@@ -53,18 +53,25 @@ export default function SupportPage() {
       if (user) {
         console.log("Setting up ticket listener for user:", user.uid);
         const ticketsRef = collection(db, 'tickets');
+        
+        // Use a simpler query first to ensure we get data
+        // If ordering by lastMessageAt fails (e.g. index building), we at least get the tickets
         const q = query(
           ticketsRef, 
-          where('userId', '==', user.uid),
-          orderBy('lastMessageAt', 'desc')
+          where('userId', '==', user.uid)
         );
 
         unsubscribe = onSnapshot(q, (snap) => {
           const ticketList = snap.docs
             .filter(d => !d.data().deleted)
-            .map(d => ({ id: d.id, ...d.data() }));
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a: any, b: any) => {
+              const timeA = a.lastMessageAt?.seconds || 0;
+              const timeB = b.lastMessageAt?.seconds || 0;
+              return timeB - timeA;
+            });
           
-          console.log("Tickets update:", ticketList.length);
+          console.log("Tickets update (Manual Sort):", ticketList.length);
           setTickets(ticketList);
           
           if (selectedTicket) {
@@ -83,7 +90,7 @@ export default function SupportPage() {
       unsubAuth();
       if (unsubscribe) unsubscribe();
     };
-  }, [selectedTicket?.id]); // Matches admin dependency for stability
+  }, []); // Remove dependency on selectedTicket.id to prevent unnecessary re-runs
 
   // Real-time replies listener (ADMIN LOGIC STYLE)
   useEffect(() => {
