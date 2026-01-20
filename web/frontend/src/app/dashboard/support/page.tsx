@@ -4,23 +4,32 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useState, useEffect, useRef } from 'react';
-import { Smartphone, Wifi, Tv, Zap, CreditCard, GraduationCap, Eye, EyeOff, ChevronLeft, ChevronRight, Pause, Play, Megaphone, Send, Image as ImageIcon, Paperclip, CheckCircle2, History, MessageCircle, Check, CheckCheck } from 'lucide-react';
+import { 
+  MessageCircle, History, Send, Paperclip, 
+  Image as ImageIcon, CheckCircle2, Check, CheckCheck,
+  ChevronLeft, Plus, X, User, MessageSquare
+} from 'lucide-react';
 import { db, auth, storage } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, orderBy, doc, runTransaction, onSnapshot, limit, serverTimestamp } from 'firebase/firestore';
+import { 
+  collection, addDoc, query, where, getDocs, 
+  orderBy, doc, runTransaction, onSnapshot, 
+  serverTimestamp, updateDoc
+} from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/components/ui/toast';
+import { Badge } from '@/components/ui/badge';
 
 export default function SupportPage() {
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [tickets, setTickets] = useState<any[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
-  const [replyMessage, setReplyMessage] = useState('');
-  const [sendingReply, setSendingReply] = useState(false);
   const [replies, setReplies] = useState<any[]>([]);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [sendingReply, setSendingReply] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showNewTicket, setShowNewTicket] = useState(false);
+  const [newTicketData, setNewTicketData] = useState({ subject: '', message: '' });
+  
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -37,38 +46,30 @@ export default function SupportPage() {
   useEffect(() => {
     let unsubscribe = () => {};
     
-    const initListener = (user: any) => {
-      try {
+    const unsubAuth = auth.onAuthStateChanged((user) => {
+      if (user) {
+        const ticketsRef = collection(db, 'tickets');
         const q = query(
-          collection(db, 'tickets'),
+          ticketsRef, 
           where('userId', '==', user.uid),
           orderBy('lastMessageAt', 'desc')
         );
 
         unsubscribe = onSnapshot(q, (snap) => {
-          const ticketList = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((t: any) => t.deleted !== true);
+          const ticketList = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter((t: any) => !t.deleted);
+          
           setTickets(ticketList);
           
+          // Keep selected ticket updated
           if (selectedTicket) {
             const updated = ticketList.find(t => t.id === selectedTicket.id);
             if (updated) setSelectedTicket(updated);
-          } else if (ticketList.length > 0 && !showNewTicket) {
-            setSelectedTicket(ticketList[0]);
           }
         }, (error) => {
           console.error("Tickets snapshot error:", error);
-          if (error.code !== 'permission-denied') {
-            toast({ title: "Sync Error", description: "Could not load tickets.", type: "destructive" });
-          }
         });
-      } catch (error: any) {
-        console.error("Tickets listener error:", error);
-      }
-    };
-
-    const unsubAuth = auth.onAuthStateChanged((user) => {
-      if (user) {
-        initListener(user);
       } else {
         setTickets([]);
         unsubscribe();
@@ -79,7 +80,7 @@ export default function SupportPage() {
       unsubAuth();
       unsubscribe();
     };
-  }, []);
+  }, [selectedTicket?.id]);
 
   // Real-time replies listener
   useEffect(() => {
@@ -88,26 +89,100 @@ export default function SupportPage() {
       return;
     }
 
-    const q = query(
-      collection(db, 'tickets', selectedTicket.id, 'messages'),
-      orderBy('createdAt', 'asc')
-    );
+    const repliesRef = collection(db, 'tickets', selectedTicket.id, 'messages');
+    const q = query(repliesRef, orderBy('createdAt', 'asc'));
 
     const unsubscribe = onSnapshot(q, (snap) => {
       const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setReplies(messages);
       
-      // Mark as read when user views admin replies
-      const unreadAdminReplies = snap.docs.filter(d => d.data().sender === 'admin' && !d.data().read);
-      unreadAdminReplies.forEach(d => {
-        runTransaction(db, async (transaction) => {
-          transaction.update(d.ref, { read: true });
-        });
+      // Mark admin messages as read
+      const unreadAdminMessages = snap.docs.filter(d => d.data().sender === 'admin' && !d.data().read);
+      unreadAdminMessages.forEach(d => {
+        updateDoc(d.ref, { read: true }).catch(err => console.error("Error marking read:", err));
       });
+    }, (error) => {
+      console.error("Replies snapshot error:", error);
     });
 
     return () => unsubscribe();
   }, [selectedTicket?.id]);
+
+  const handleReply = async () => {
+    if (!replyMessage.trim() || !selectedTicket || !auth.currentUser) return;
+    
+    if (selectedTicket.status === 'solved') {
+      toast({ title: "Ticket Resolved", description: "This ticket is closed. Please reopen or create a new one.", type: "destructive" });
+      return;
+    }
+
+    setSendingReply(true);
+    try {
+      const ticketRef = doc(db, 'tickets', selectedTicket.id);
+      const messagesRef = collection(ticketRef, 'messages');
+      
+      const messageObj = {
+        text: replyMessage,
+        sender: 'user',
+        senderId: auth.currentUser.uid,
+        senderEmail: auth.currentUser.email,
+        createdAt: serverTimestamp(),
+        read: false
+      };
+      
+      await addDoc(messagesRef, messageObj);
+      await updateDoc(ticketRef, { 
+        status: 'open',
+        lastMessage: replyMessage,
+        lastMessageAt: serverTimestamp()
+      });
+
+      setReplyMessage('');
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, type: "destructive" });
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const handleCreateTicket = async () => {
+    if (!newTicketData.subject || !newTicketData.message || !auth.currentUser) return;
+    
+    setSubmitting(true);
+    try {
+      const ticketData = {
+        userId: auth.currentUser.uid,
+        userEmail: auth.currentUser.email,
+        subject: newTicketData.subject,
+        lastMessage: newTicketData.message,
+        status: 'open',
+        createdAt: serverTimestamp(),
+        lastMessageAt: serverTimestamp(),
+        deleted: false
+      };
+      
+      const docRef = await addDoc(collection(db, 'tickets'), ticketData);
+      
+      // Add first message
+      await addDoc(collection(db, 'tickets', docRef.id, 'messages'), {
+        text: newTicketData.message,
+        sender: 'user',
+        senderId: auth.currentUser.uid,
+        senderEmail: auth.currentUser.email,
+        createdAt: serverTimestamp(),
+        read: true
+      });
+
+      toast({ title: "Success", description: "Ticket created successfully" });
+      setNewTicketData({ subject: '', message: '' });
+      setShowNewTicket(false);
+      setSelectedTicket({ id: docRef.id, ...ticketData });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, type: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -124,23 +199,22 @@ export default function SupportPage() {
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
 
-      const reply = {
+      const messageObj = {
         text: "Sent an attachment",
         attachmentUrl: url,
         attachmentName: file.name,
+        sender: 'user',
         senderId: auth.currentUser.uid,
         senderEmail: auth.currentUser.email,
-        sender: 'user',
         createdAt: serverTimestamp(),
+        read: false
       };
 
-      await addDoc(collection(db, 'tickets', selectedTicket.id, 'messages'), reply);
-      await runTransaction(db, async (transaction) => {
-        transaction.update(doc(db, 'tickets', selectedTicket.id), { 
-          lastMessageAt: serverTimestamp(),
-          lastMessage: "Sent an attachment",
-          status: 'open'
-        });
+      await addDoc(collection(db, 'tickets', selectedTicket.id, 'messages'), messageObj);
+      await updateDoc(doc(db, 'tickets', selectedTicket.id), { 
+        lastMessageAt: serverTimestamp(),
+        lastMessage: "Sent an attachment",
+        status: 'open'
       });
     } catch (e: any) {
       toast({ title: "Upload failed", description: e.message, type: "destructive" });
@@ -149,221 +223,160 @@ export default function SupportPage() {
     }
   };
 
-  const handleReply = async () => {
-    if (!auth.currentUser || !replyMessage || !selectedTicket) return;
-    if (selectedTicket.status === 'solved' || selectedTicket.status === 'closed') {
-      toast({ title: "Ticket Locked", description: "Please reopen the ticket to reply.", type: "destructive" });
-      return;
-    }
-
-    setSendingReply(true);
-    try {
-      const reply = {
-        text: replyMessage,
-        senderId: auth.currentUser.uid,
-        senderEmail: auth.currentUser.email,
-        sender: 'user',
-        createdAt: serverTimestamp(),
-        read: false
-      };
-
-      await addDoc(collection(db, 'tickets', selectedTicket.id, 'messages'), reply);
-      await runTransaction(db, async (transaction) => {
-        transaction.update(doc(db, 'tickets', selectedTicket.id), { 
-          status: 'open',
-          lastMessage: replyMessage,
-          lastMessageAt: serverTimestamp()
-        });
-      });
-
-      setReplyMessage('');
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, type: "destructive" });
-    } finally {
-      setSendingReply(false);
-    }
-  };
-
   const handleReopen = async () => {
     if (!selectedTicket) return;
     try {
-      await runTransaction(db, async (transaction) => {
-        transaction.update(doc(db, 'tickets', selectedTicket.id), { 
-          status: 'open',
-          lastMessageAt: serverTimestamp()
-        });
-      });
-      toast({ title: "Ticket Reopened", type: "default" });
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, type: "destructive" });
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!auth.currentUser || !subject || !message) return;
-    setSubmitting(true);
-    try {
-      const ticketData = {
-        userId: auth.currentUser.uid,
-        userEmail: auth.currentUser.email,
-        subject,
-        lastMessage: message,
+      await updateDoc(doc(db, 'tickets', selectedTicket.id), { 
         status: 'open',
-        createdAt: serverTimestamp(),
-        lastMessageAt: serverTimestamp(),
-        deleted: false
-      };
-      const docRef = await addDoc(collection(db, 'tickets'), ticketData);
-      
-      // Also add the first message as a message to maintain history structure
-      await addDoc(collection(db, 'tickets', docRef.id, 'messages'), {
-        text: message,
-        sender: 'user',
-        senderId: auth.currentUser.uid,
-        senderEmail: auth.currentUser.email,
-        createdAt: serverTimestamp(),
-        read: true
+        lastMessageAt: serverTimestamp()
       });
-
-      toast({ title: "Ticket Submitted", description: "We'll get back to you soon.", type: "default" });
-      setSubject('');
-      setMessage('');
-      setShowNewTicket(false);
-      setSelectedTicket({ id: docRef.id, ...ticketData });
+      toast({ title: "Ticket Reopened" });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, type: "destructive" });
-    } finally {
-      setSubmitting(false);
     }
   };
 
   return (
-    <div className="h-[calc(100vh-120px)] flex flex-col space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-[#0A1F44] flex items-center gap-2">
-          <MessageCircle className="text-[#F97316]" /> Support Center
-        </h1>
+    <div className="flex flex-col h-[calc(100vh-120px)] bg-gray-50 overflow-hidden rounded-2xl border shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 bg-white border-b z-20">
+        <div>
+          <h1 className="text-xl font-black text-[#0A1F44] flex items-center gap-2">
+             <MessageSquare className="w-6 h-6 text-[#F97316]" />
+             SUPPORT CENTER
+          </h1>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Real-time Assistance</p>
+        </div>
         <Button 
           onClick={() => { setShowNewTicket(true); setSelectedTicket(null); }}
-          className="bg-[#F97316] hover:bg-[#ea6d0f]"
-          size="sm"
+          className="bg-[#F97316] hover:bg-[#ea6d0f] font-black uppercase text-[10px] tracking-widest px-6 h-10 rounded-xl shadow-lg shadow-orange-100"
         >
-          New Ticket
+          <Plus className="w-4 h-4 mr-2" /> New Ticket
         </Button>
       </div>
 
-      <div className="flex-grow flex gap-4 overflow-hidden">
-        {/* Ticket List / History Sidebar */}
-        <div className="w-full md:w-80 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
-            <span className="font-bold text-xs text-gray-500 uppercase tracking-widest flex items-center gap-2">
-              <History size={14} /> History
-            </span>
-            <span className="text-[10px] bg-[#F97316]/10 text-[#F97316] px-2 py-0.5 rounded-full font-bold">
-              {tickets.length} Total
-            </span>
-          </div>
-          <div className="flex-grow overflow-y-auto p-2 space-y-2">
-            {tickets.length === 0 && !showNewTicket ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-2">
-                  <MessageCircle className="text-gray-300" />
-                </div>
-                <p className="text-xs text-gray-400">No support history yet</p>
+      <div className="flex flex-grow overflow-hidden relative">
+        {/* Sidebar */}
+        <div className={`w-full md:w-[350px] flex flex-col bg-white border-r transition-all duration-300 ${selectedTicket || showNewTicket ? 'hidden md:flex' : 'flex'}`}>
+          <div className="p-4 border-b bg-gray-50/50">
+            <div className="relative">
+              <History className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <div className="pl-9 pr-4 py-2 bg-white border rounded-xl text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Conversation History ({tickets.length})
               </div>
-            ) : tickets.map((t) => (
+            </div>
+          </div>
+          
+          <div className="flex-grow overflow-y-auto p-2 space-y-1">
+            {tickets.map((t) => (
               <div 
                 key={t.id} 
                 onClick={() => { setSelectedTicket(t); setShowNewTicket(false); }}
-                className={`p-4 rounded-2xl cursor-pointer transition-all duration-200 border-2 ${
+                className={`group p-5 rounded-3xl cursor-pointer transition-all duration-300 border-2 relative ${
                   selectedTicket?.id === t.id 
-                    ? 'bg-[#0A1F44] border-[#0A1F44] text-white shadow-lg scale-[1.02]' 
-                    : 'bg-white border-transparent hover:bg-gray-50 hover:border-gray-100 text-gray-700'
+                    ? 'bg-white border-[#0A1F44] shadow-2xl shadow-blue-50 scale-[1.02] z-10' 
+                    : 'bg-white border-transparent hover:border-gray-100'
                 }`}
               >
-                <div className="flex justify-between items-start mb-1">
-                  <h4 className="text-sm font-bold truncate max-w-[140px]">{t.subject}</h4>
-                  <span className={`text-[9px] px-2 py-0.5 rounded-full uppercase font-black tracking-wider ${
+                {t.status === 'open' && selectedTicket?.id !== t.id && (
+                  <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
+                )}
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-[9px] font-black text-gray-400 uppercase">ID: {t.id.slice(0,6)}</span>
+                  <Badge className={`text-[9px] font-black h-5 uppercase px-2 border-none ${
                     t.status === 'open' ? 'bg-orange-500 text-white' : 
                     t.status === 'solved' ? 'bg-green-500 text-white' : 'bg-gray-400 text-white'
                   }`}>
                     {t.status}
-                  </span>
+                  </Badge>
                 </div>
-                <p className={`text-xs line-clamp-1 font-medium ${selectedTicket?.id === t.id ? 'text-blue-100/70' : 'text-gray-400'}`}>
-                  {t.lastMessage}
-                </p>
-                  <div className="flex justify-between items-center mt-3 pt-2 border-t border-white/10">
-                  <span className={`text-[10px] font-bold ${selectedTicket?.id === t.id ? 'text-blue-200/50' : 'text-gray-400'}`}>
+                <h4 className="text-sm font-black text-[#0A1F44] truncate mb-1">{t.subject}</h4>
+                <p className="text-xs text-gray-500 line-clamp-1 font-medium">{t.lastMessage}</p>
+                <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-50">
+                  <span className="text-[10px] font-bold text-gray-300 uppercase">
                     {t.lastMessageAt?.seconds ? new Date(t.lastMessageAt.seconds * 1000).toLocaleDateString() : 'Just now'}
                   </span>
-                  {t.status === 'open' && selectedTicket?.id !== t.id && <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]" />}
                 </div>
               </div>
             ))}
+            {tickets.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-gray-300">
+                <MessageCircle className="w-12 h-12 mb-2 opacity-20" />
+                <p className="text-[10px] font-black uppercase tracking-widest">No History</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Chat / New Ticket Area */}
-        <div className="flex-grow flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative">
+        {/* Content Area */}
+        <div className="flex-grow flex flex-col bg-[#F8FAFC] overflow-hidden">
           {showNewTicket ? (
-            <div className="p-8 max-w-2xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-[#0A1F44]">Open a Support Ticket</h2>
-                <p className="text-sm text-gray-500">We'll respond as soon as possible.</p>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Subject</Label>
-                  <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="What do you need help with?" />
+            <div className="flex-grow flex items-center justify-center p-6">
+              <div className="w-full max-w-md bg-white p-8 rounded-[2.5rem] shadow-2xl border border-gray-100 animate-in fade-in slide-in-from-bottom-8">
+                <div className="text-center mb-8">
+                  <div className="w-16 h-16 bg-orange-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                    <Plus className="w-8 h-8 text-[#F97316]" />
+                  </div>
+                  <h2 className="text-2xl font-black text-[#0A1F44] tracking-tight">OPEN NEW TICKET</h2>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">We're here to help</p>
                 </div>
-                <div className="space-y-2">
-                  <Label>Message</Label>
-                  <textarea 
-                    className="w-full h-40 p-4 border rounded-xl focus:ring-2 focus:ring-[#F97316]/20 focus:border-[#F97316] outline-none transition-all"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Provide details about your issue..."
-                  />
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Subject</Label>
+                    <Input 
+                      className="h-14 rounded-2xl border-2 border-gray-100 focus:border-[#F97316] font-bold" 
+                      value={newTicketData.subject} 
+                      onChange={e => setNewTicketData({...newTicketData, subject: e.target.value})} 
+                      placeholder="What's the issue?"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Message</Label>
+                    <textarea 
+                      className="w-full min-h-[120px] rounded-2xl border-2 border-gray-100 focus:border-[#F97316] p-4 font-medium text-sm resize-none" 
+                      value={newTicketData.message} 
+                      onChange={e => setNewTicketData({...newTicketData, message: e.target.value})} 
+                      placeholder="Describe your problem in detail..."
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest border-2" onClick={() => setShowNewTicket(false)}>Cancel</Button>
+                    <Button 
+                      className="flex-2 h-14 bg-[#0A1F44] hover:bg-[#0A1F44]/90 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-blue-100" 
+                      disabled={submitting || !newTicketData.subject || !newTicketData.message}
+                      onClick={handleCreateTicket}
+                    >
+                      {submitting ? 'Creating...' : 'Launch Ticket'}
+                    </Button>
+                  </div>
                 </div>
-                <Button 
-                  onClick={handleSubmit} 
-                  disabled={submitting || !subject || !message}
-                  className="w-full bg-[#F97316] hover:bg-[#ea6d0f] h-12 rounded-xl text-lg font-bold"
-                >
-                  {submitting ? 'Submitting...' : 'Send Message'}
-                </Button>
               </div>
             </div>
           ) : selectedTicket ? (
             <>
               {/* Chat Header */}
-              <div className="p-4 border-b bg-gray-50/50 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#0A1F44] rounded-full flex items-center justify-center text-[#F97316]">
-                    <MessageCircle size={20} />
+              <div className="bg-white border-b px-6 py-4 flex items-center justify-between z-10 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <Button variant="ghost" size="icon" className="md:hidden rounded-full" onClick={() => setSelectedTicket(null)}>
+                    <ChevronLeft className="w-5 h-5 text-gray-500" />
+                  </Button>
+                  <div className="h-10 w-10 rounded-2xl bg-[#0A1F44] flex items-center justify-center text-[#F97316]">
+                    <User className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-[#0A1F44] leading-tight">{selectedTicket.subject}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-gray-400">ID: {selectedTicket.id.slice(0,8)}</span>
-                      {selectedTicket.status === 'solved' && (
-                        <span className="flex items-center gap-1 text-[10px] text-green-600 font-bold">
-                          <CheckCircle2 size={10} /> Resolved
-                        </span>
-                      )}
-                    </div>
+                    <h3 className="text-sm font-black text-[#0A1F44] leading-tight uppercase tracking-tight">{selectedTicket.subject}</h3>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Ticket ID: {selectedTicket.id.slice(0,8)}</p>
                   </div>
                 </div>
                 {selectedTicket.status === 'solved' && (
-                  <Button variant="outline" size="sm" onClick={handleReopen} className="text-xs border-[#F97316] text-[#F97316] hover:bg-[#F97316]/10">
+                  <Button variant="outline" size="sm" onClick={handleReopen} className="h-8 border-2 border-orange-500 text-orange-600 hover:bg-orange-50 rounded-xl font-black text-[9px] px-4 uppercase tracking-wider">
                     Reopen Case
                   </Button>
                 )}
               </div>
 
-              <div className="flex-grow overflow-y-auto p-6 space-y-6 bg-[#E5DDD5] relative">
-                {/* WhatsApp style background pattern Overlay */}
+              {/* Messages Area */}
+              <div className="flex-grow overflow-y-auto p-6 space-y-4 bg-[#E5DDD5] relative scroll-smooth">
                 <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat" />
                 
                 {replies.map((r, i) => (
@@ -373,76 +386,56 @@ export default function SupportPage() {
                         ? 'bg-[#DCF8C6] text-gray-800 rounded-tr-none' 
                         : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'
                     }`}>
-                      {/* Triangle tail for chat bubbles */}
-                      <div className={`absolute top-0 w-3 h-4 ${
+                      <div className={`absolute top-0 w-3 h-3 ${
                         r.sender === 'user' 
                           ? 'right-[-8px] bg-[#DCF8C6] [clip-path:polygon(0_0,0_100%,100%_0)]' 
-                          : 'left-[-8px] bg-white [clip-path:polygon(100%_0,0_0,100%_100%)] border-l border-gray-100'
+                          : 'left-[-8px] bg-white [clip-path:polygon(100%_0,0_0,100%_100%)]'
                       }`} />
 
                       <p className="text-sm font-medium leading-relaxed">{r.text}</p>
+                      
                       {r.attachmentUrl && (
-                        <div className="mt-3">
-                          <a href={r.attachmentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 bg-black/5 rounded-xl text-xs font-bold hover:bg-black/10 transition-colors border border-black/5">
-                            <ImageIcon size={16} className="text-gray-500" />
-                            <div className="flex flex-col">
-                              <span>View Attachment</span>
-                              <span className="text-[10px] font-normal opacity-50 truncate max-w-[150px]">{r.attachmentName || 'file'}</span>
-                            </div>
-                          </a>
-                        </div>
+                        <a href={r.attachmentUrl} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-2 p-2 bg-black/5 rounded-lg text-[10px] font-bold hover:bg-black/10 transition-colors">
+                          <ImageIcon size={14} className="text-gray-500" />
+                          <span className="truncate max-w-[150px]">{r.attachmentName || 'Attachment'}</span>
+                        </a>
                       )}
                       
-                      <div className="flex items-center justify-end gap-1.5 mt-2">
-                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                      <div className="flex justify-end items-center gap-1.5 mt-2">
+                        <span className="text-[9px] font-black uppercase tracking-tighter opacity-40">
                           {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                         </span>
                         {r.sender === 'user' && (
-                          <div className="flex items-center">
-                            {r.read ? (
-                              <CheckCheck size={14} className="text-blue-500" />
-                            ) : (
-                              <Check size={14} className="text-gray-400" />
-                            )}
-                          </div>
+                          r.read ? <CheckCheck size={12} className="text-blue-500" /> : <Check size={12} className="text-gray-400" />
                         )}
                       </div>
                     </div>
-                    <span className="text-[9px] font-black text-gray-400/80 mt-1 px-2 uppercase tracking-widest">
-                      {r.sender === 'admin' ? 'Support Agent' : 'You'}
-                    </span>
                   </div>
                 ))}
                 <div ref={chatEndRef} />
               </div>
 
-              {/* Chat Input */}
-              <div className="p-4 bg-white border-t space-y-3">
+              {/* Input Area */}
+              <div className="p-4 bg-white border-t">
                 {selectedTicket.status === 'solved' ? (
-                  <div className="text-center p-2 bg-green-50 rounded-lg border border-green-100">
-                    <p className="text-xs text-green-700 font-medium">This ticket has been marked as resolved.</p>
+                  <div className="text-center py-2 px-4 bg-green-50 rounded-xl border border-green-100">
+                    <p className="text-[10px] text-green-700 font-black uppercase tracking-widest">This ticket is resolved. Reopen to send a message.</p>
                   </div>
                 ) : (
-                  <div className="flex items-end gap-2">
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      className="hidden" 
-                      onChange={handleFileUpload}
-                      accept="image/*,.pdf,.doc,.docx"
-                    />
+                  <div className="flex items-center gap-2 max-w-4xl mx-auto">
+                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx" />
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploading}
-                      className="text-gray-400 hover:text-[#F97316] h-10 w-10 rounded-full"
+                      className="h-10 w-10 rounded-full text-gray-400 hover:text-[#F97316] hover:bg-gray-50"
                     >
                       <Paperclip size={20} />
                     </Button>
                     <div className="flex-grow relative">
                       <textarea
-                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-2 px-4 text-sm focus:outline-none focus:ring-1 focus:ring-[#F97316] resize-none h-10 transition-all focus:bg-white"
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F97316]/20 focus:bg-white resize-none h-11 transition-all"
                         placeholder="Type your message..."
                         rows={1}
                         value={replyMessage}
@@ -457,8 +450,8 @@ export default function SupportPage() {
                     </div>
                     <Button 
                       onClick={handleReply}
-                      disabled={!replyMessage || sendingReply}
-                      className="bg-[#0A1F44] hover:bg-[#0A1F44]/90 h-10 w-10 p-0 rounded-full flex items-center justify-center flex-shrink-0"
+                      disabled={!replyMessage.trim() || sendingReply}
+                      className="bg-[#0A1F44] hover:bg-[#0A1F44]/90 h-11 w-11 p-0 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-100"
                     >
                       <Send size={18} className="text-[#F97316]" />
                     </Button>
@@ -467,12 +460,12 @@ export default function SupportPage() {
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 bg-[#F8FAFC]">
-              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <MessageCircle size={40} className="text-gray-300" />
+            <div className="flex-grow flex flex-col items-center justify-center text-center p-12">
+              <div className="w-24 h-24 bg-white rounded-[2.5rem] shadow-xl flex items-center justify-center mb-6 border border-gray-50">
+                <MessageSquare className="w-10 h-10 text-gray-200" />
               </div>
-              <h3 className="text-lg font-bold text-[#0A1F44]">Support Chat</h3>
-              <p className="text-sm max-w-[250px] text-center mt-1">Select a conversation to start chatting with our support team.</p>
+              <h3 className="text-xl font-black text-[#0A1F44] uppercase tracking-tighter">SELECT A CONVERSATION</h3>
+              <p className="text-xs max-w-[280px] text-gray-400 font-bold uppercase tracking-widest mt-2 leading-relaxed opacity-60">Choose a ticket from the sidebar or open a new one to start chatting with our support team.</p>
             </div>
           )}
         </div>
