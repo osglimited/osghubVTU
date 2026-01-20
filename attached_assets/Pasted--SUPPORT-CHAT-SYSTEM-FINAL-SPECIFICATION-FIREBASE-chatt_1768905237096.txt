@@ -1,0 +1,174 @@
+🔴 SUPPORT CHAT SYSTEM — FINAL SPECIFICATION (FIREBASE + chatting STYLE)
+
+We are using Firebase Firestore.
+
+🎯 OBJECTIVE
+
+Rebuild the Support system to behave EXACTLY like chat, including real-time messaging, ticket history, and automatic chat reordering when new messages arrive.
+
+VERY IMPORTANT RULE:
+
+Whenever a message is sent or received in a ticket, that specific ticket MUST move to the TOP of the ticket list immediately.
+
+This must work:
+
+On user support page
+
+On admin support page
+
+In real time
+
+Without refresh
+
+Exactly like WhatsApp when a new message arrives.
+
+📁 FIRESTORE DATA STRUCTURE
+Collection: tickets
+
+Each document = one support ticket
+
+Fields:
+
+userId
+
+subject
+
+status → open | solved
+
+lastMessage
+
+lastMessageAt
+
+createdAt
+
+deleted (boolean)
+
+⚠️ lastMessage and lastMessageAt MUST be updated on EVERY reply (admin or user).
+
+Sub-collection: tickets/{ticketId}/messages
+
+Each document = one chat message
+
+Fields:
+
+sender → user | admin
+
+text
+
+createdAt
+
+read
+
+🔄 REAL-TIME CHAT FLOW (MANDATORY)
+
+When a message is sent:
+
+Save message to
+tickets/{ticketId}/messages
+
+Immediately update parent ticket:
+
+lastMessage
+
+lastMessageAt = serverTimestamp()
+
+Sidebar ticket list must be queried using:
+
+orderBy("lastMessageAt", "desc")
+
+
+Result:
+
+The replied ticket jumps to the TOP
+
+Old chats move down
+
+Works exactly like WhatsApp
+
+🧑 USER SIDE REQUIREMENTS
+
+User can create multiple tickets
+
+All tickets remain listed (history)
+
+Tickets sorted by latest activity
+
+Clicking a ticket opens its own chat
+
+When admin replies, ticket moves to top
+
+User can:
+
+Send messages
+
+Reopen solved tickets
+
+User cannot delete tickets
+
+🛠 ADMIN SIDE REQUIREMENTS
+
+Admin sees all tickets
+
+Same WhatsApp-style sidebar
+
+Real-time updates
+
+Admin can:
+
+Reply
+
+Mark solved
+
+Reopen
+
+Delete tickets (removes from both sides)
+
+⚡ REAL-TIME RULES
+
+Use Firestore onSnapshot
+
+No polling
+
+No refresh
+
+No mock / dummy / placeholder data
+
+Everything must be live and accurate
+
+❗ IMPORTANT CONSTRAINTS
+
+Messages must NEVER mix between tickets
+
+Each ticket is isolated
+
+Deleting a ticket removes it completely
+
+Solved tickets stay readable
+
+Ordering logic must be DATA-DRIVEN, not UI tricks
+
+🔍 FINAL CHECK REQUIREMENT
+
+Before marking complete:
+
+Deep-scan entire support system
+
+Confirm ticket reordering works perfectly
+
+Confirm multi-ticket per user works
+
+Confirm real-time sync is stable
+
+Confirm WhatsApp-style behavior is accurate
+
+✅ END RESULT EXPECTED
+
+A fully functional chatting-style support system where:
+
+Tickets behave like chats
+
+Replies move chats to the top
+
+Admin and users communicate smoothly
+
+Firebase is used correctly
