@@ -213,29 +213,38 @@ export default function SupportPage() {
               <div 
                 key={t.id} 
                 onClick={() => setSelectedTicket(t)}
-                className={`group p-4 rounded-2xl cursor-pointer transition-all border-2 ${
+                className={`group p-5 rounded-3xl cursor-pointer transition-all duration-300 border-2 relative ${
                   selectedTicket?.id === t.id 
-                    ? 'bg-blue-50 border-blue-600 shadow-md shadow-blue-100' 
-                    : 'bg-white border-transparent hover:bg-gray-50'
+                    ? 'bg-white border-blue-600 shadow-2xl shadow-blue-100 scale-[1.02] z-10' 
+                    : 'bg-white border-transparent hover:border-gray-200 hover:shadow-lg'
                 }`}
               >
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-tighter truncate max-w-[140px]">{t.userEmail}</span>
-                  <Badge className={`text-[9px] font-black h-5 uppercase px-2 border-none ${
+                {t.status === 'open' && selectedTicket?.id !== t.id && (
+                  <div className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse shadow-[0_0_10px_rgba(37,99,235,0.5)]" />
+                )}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-black text-blue-600 uppercase tracking-tighter truncate max-w-[180px] mb-0.5">{t.userEmail}</span>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase">Ticket ID: {t.id.slice(0,6)}</span>
+                  </div>
+                  <Badge className={`text-[10px] font-black h-6 uppercase px-3 border-none shadow-sm ${
                     t.status === 'open' ? 'bg-red-500 text-white' : 
                     t.status === 'replied' ? 'bg-blue-500 text-white' : 
-                    'bg-gray-400 text-white'
+                    'bg-green-500 text-white'
                   }`}>
                     {t.status}
                   </Badge>
                 </div>
-                <h4 className="text-sm font-bold text-gray-900 truncate mb-1">{t.subject || "Untitled Query"}</h4>
-                <p className="text-xs text-gray-400 line-clamp-1 font-medium">{t.lastMessage}</p>
-                  <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
-                  <span className="text-[9px] font-bold text-gray-400 uppercase">
-                    {t.lastMessageAt?.seconds ? new Date(t.lastMessageAt.seconds * 1000).toLocaleDateString() : 'Just now'}
+                <h4 className="text-sm font-black text-gray-900 truncate mb-1.5">{t.subject || "No Subject"}</h4>
+                <p className="text-xs text-gray-500 line-clamp-2 font-medium leading-relaxed italic border-l-2 border-gray-100 pl-3">{t.lastMessage}</p>
+                  <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-50">
+                  <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+                    {t.lastMessageAt?.seconds ? new Date(t.lastMessageAt.seconds * 1000).toLocaleDateString() : 'New'}
                   </span>
-                  {t.lastMessageAt && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />}
+                  <div className="flex items-center gap-1">
+                     <div className={`w-1.5 h-1.5 rounded-full ${t.status === 'open' ? 'bg-red-500' : 'bg-gray-200'}`} />
+                     <span className="text-[9px] font-black text-gray-300 uppercase">System Active</span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -307,24 +316,31 @@ export default function SupportPage() {
 
               <div className="flex-grow overflow-y-auto p-6 space-y-6 bg-[#f0f2f5] pattern-dots relative scroll-smooth">
                 {replies.map((r, i) => (
-                  <div key={r.id || i} className={`flex flex-col ${r.sender === 'admin' ? 'items-end ml-auto' : 'items-start'} max-w-[85%] md:max-w-[70%]`}>
-                    <div className={`p-4 rounded-3xl shadow-md ${
+                  <div key={r.id || i} className={`flex flex-col ${r.sender === 'admin' ? 'items-end ml-auto' : 'items-start'} max-w-[85%] md:max-w-[75%]`}>
+                    <div className={`p-5 rounded-[2rem] shadow-sm relative ${
                       r.sender === 'admin' 
-                        ? 'bg-blue-600 text-white rounded-tr-none shadow-blue-100 border-b-4 border-blue-700' 
-                        : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
+                        ? 'bg-blue-600 text-white rounded-tr-none shadow-blue-200/50' 
+                        : 'bg-white border-2 border-gray-100 text-gray-800 rounded-tl-none'
                     }`}>
-                      <p className="text-sm font-medium leading-relaxed">{r.text}</p>
-                      <div className="flex justify-end items-center gap-2 mt-2 opacity-70">
-                        <span className="text-[9px] font-bold uppercase tracking-widest">
-                          {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleTimeString() : 'Just now'}
+                       {/* Tail */}
+                       <div className={`absolute top-0 w-4 h-4 ${
+                        r.sender === 'admin' 
+                          ? 'right-[-10px] bg-blue-600 [clip-path:polygon(0_0,0_100%,100%_0)]' 
+                          : 'left-[-10px] bg-white border-l-2 border-t-2 border-gray-100 [clip-path:polygon(100%_0,0_0,100%_100%)]'
+                      }`} />
+
+                      <p className="text-sm font-bold leading-relaxed">{r.text}</p>
+                      <div className="flex justify-end items-center gap-2 mt-3 pt-2 border-t border-black/5">
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">
+                          {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                         </span>
                         {r.sender === 'admin' && (
-                          r.read ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
+                          r.read ? <CheckCheck className="h-4 w-4 text-blue-200" /> : <Check className="h-4 w-4 text-blue-300" />
                         )}
                       </div>
                     </div>
-                    <div className={`mt-1 text-[8px] font-black uppercase tracking-tighter ${r.sender === 'admin' ? 'text-blue-400 mr-2' : 'text-gray-400 ml-2'}`}>
-                      {r.sender === 'admin' ? 'Support Team' : 'User Response'}
+                    <div className={`mt-2 text-[9px] font-black uppercase tracking-widest ${r.sender === 'admin' ? 'text-blue-500 mr-3' : 'text-gray-400 ml-3'}`}>
+                      {r.sender === 'admin' ? 'Admin Team' : 'User Response'}
                     </div>
                   </div>
                 ))}

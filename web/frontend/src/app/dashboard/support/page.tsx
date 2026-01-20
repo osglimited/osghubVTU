@@ -275,28 +275,29 @@ export default function SupportPage() {
               <div 
                 key={t.id} 
                 onClick={() => { setSelectedTicket(t); setShowNewTicket(false); }}
-                className={`p-3 rounded-xl cursor-pointer transition-all border ${
+                className={`p-4 rounded-2xl cursor-pointer transition-all duration-200 border-2 ${
                   selectedTicket?.id === t.id 
-                    ? 'bg-[#0A1F44] border-[#0A1F44] text-white shadow-md' 
-                    : 'bg-white border-transparent hover:border-gray-200 text-gray-700'
+                    ? 'bg-[#0A1F44] border-[#0A1F44] text-white shadow-lg scale-[1.02]' 
+                    : 'bg-white border-transparent hover:bg-gray-50 hover:border-gray-100 text-gray-700'
                 }`}
               >
                 <div className="flex justify-between items-start mb-1">
                   <h4 className="text-sm font-bold truncate max-w-[140px]">{t.subject}</h4>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md uppercase font-bold ${
+                  <span className={`text-[9px] px-2 py-0.5 rounded-full uppercase font-black tracking-wider ${
                     t.status === 'open' ? 'bg-orange-500 text-white' : 
                     t.status === 'solved' ? 'bg-green-500 text-white' : 'bg-gray-400 text-white'
                   }`}>
                     {t.status}
                   </span>
                 </div>
-                <p className={`text-xs line-clamp-1 ${selectedTicket?.id === t.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                <p className={`text-xs line-clamp-1 font-medium ${selectedTicket?.id === t.id ? 'text-blue-100/70' : 'text-gray-400'}`}>
                   {t.lastMessage}
                 </p>
-                  <div className="flex justify-between items-center mt-2">
-                  <span className={`text-[10px] ${selectedTicket?.id === t.id ? 'text-blue-200' : 'text-gray-400'}`}>
+                  <div className="flex justify-between items-center mt-3 pt-2 border-t border-white/10">
+                  <span className={`text-[10px] font-bold ${selectedTicket?.id === t.id ? 'text-blue-200/50' : 'text-gray-400'}`}>
                     {t.lastMessageAt?.seconds ? new Date(t.lastMessageAt.seconds * 1000).toLocaleDateString() : 'Just now'}
                   </span>
+                  {t.status === 'open' && selectedTicket?.id !== t.id && <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]" />}
                 </div>
               </div>
             ))}
@@ -361,31 +362,54 @@ export default function SupportPage() {
                 )}
               </div>
 
-              <div className="flex-grow overflow-y-auto p-4 space-y-4 bg-[#F8FAFC]">
+              <div className="flex-grow overflow-y-auto p-6 space-y-6 bg-[#E5DDD5] relative">
+                {/* WhatsApp style background pattern Overlay */}
+                <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat" />
+                
                 {replies.map((r, i) => (
-                  <div key={r.id || i} className={`flex flex-col ${r.sender === 'user' ? 'items-end' : 'items-start'}`}>
-                    <div className={`p-3 rounded-2xl shadow-sm max-w-[85%] ${
+                  <div key={r.id || i} className={`flex flex-col relative z-10 ${r.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                    <div className={`p-4 rounded-2xl shadow-sm max-w-[85%] md:max-w-[75%] relative ${
                       r.sender === 'user' 
-                        ? 'bg-[#F97316] text-white rounded-tr-none' 
-                        : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none'
+                        ? 'bg-[#DCF8C6] text-gray-800 rounded-tr-none' 
+                        : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'
                     }`}>
-                      <p className="text-sm">{r.text}</p>
+                      {/* Triangle tail for chat bubbles */}
+                      <div className={`absolute top-0 w-3 h-4 ${
+                        r.sender === 'user' 
+                          ? 'right-[-8px] bg-[#DCF8C6] [clip-path:polygon(0_0,0_100%,100%_0)]' 
+                          : 'left-[-8px] bg-white [clip-path:polygon(100%_0,0_0,100%_100%)] border-l border-gray-100'
+                      }`} />
+
+                      <p className="text-sm font-medium leading-relaxed">{r.text}</p>
                       {r.attachmentUrl && (
-                        <div className="mt-2">
-                          <a href={r.attachmentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 bg-black/10 rounded-lg text-xs hover:bg-black/20 transition-colors">
-                            <ImageIcon size={14} /> View Attachment
+                        <div className="mt-3">
+                          <a href={r.attachmentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 bg-black/5 rounded-xl text-xs font-bold hover:bg-black/10 transition-colors border border-black/5">
+                            <ImageIcon size={16} className="text-gray-500" />
+                            <div className="flex flex-col">
+                              <span>View Attachment</span>
+                              <span className="text-[10px] font-normal opacity-50 truncate max-w-[150px]">{r.attachmentName || 'file'}</span>
+                            </div>
                           </a>
                         </div>
                       )}
-                      {r.sender === 'user' && (
-                        <div className="flex justify-end mt-1">
-                          {r.read ? <CheckCheck size={12} className="opacity-80" /> : <Check size={12} className="opacity-80" />}
-                        </div>
-                      )}
+                      
+                      <div className="flex items-center justify-end gap-1.5 mt-2">
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                          {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                        </span>
+                        {r.sender === 'user' && (
+                          <div className="flex items-center">
+                            {r.read ? (
+                              <CheckCheck size={14} className="text-blue-500" />
+                            ) : (
+                              <Check size={14} className="text-gray-400" />
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-[9px] text-gray-400 mt-1 px-1">
-                      {r.sender === 'admin' ? 'Support Team • ' : ''}
-                      {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleString() : 'Just now'}
+                    <span className="text-[9px] font-black text-gray-400/80 mt-1 px-2 uppercase tracking-widest">
+                      {r.sender === 'admin' ? 'Support Agent' : 'You'}
                     </span>
                   </div>
                 ))}
