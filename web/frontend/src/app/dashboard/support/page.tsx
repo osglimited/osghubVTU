@@ -80,7 +80,31 @@ export default function SupportPage() {
 
     const unsubAuth = auth.onAuthStateChanged((user) => {
       if (user) {
-        initListener(user);
+        console.log("Current User UID:", user.uid, "Email:", user.email);
+        const ticketsRef = collection(db, 'tickets');
+        
+        // Primary query by userId
+        const q = query(
+          ticketsRef, 
+          where('userId', '==', user.uid),
+          orderBy('lastMessageAt', 'desc')
+        );
+
+        unsubscribe = onSnapshot(q, (snap) => {
+          const ticketList = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter((t: any) => !t.deleted);
+          
+          console.log("Fetched tickets for userId:", user.uid, "Count:", ticketList.length);
+          setTickets(ticketList);
+          
+          if (selectedTicket) {
+            const updated = ticketList.find(t => t.id === selectedTicket.id);
+            if (updated) setSelectedTicket(updated);
+          }
+        }, (error) => {
+          console.error("Tickets snapshot error:", error);
+        });
       } else {
         console.log("No authenticated user, clearing tickets");
         setTickets([]);
