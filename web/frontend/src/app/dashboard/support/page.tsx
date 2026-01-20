@@ -51,14 +51,13 @@ export default function SupportPage() {
       if (unsubscribe) unsubscribe();
 
       if (user) {
-        console.log("Setting up ticket listener for user:", user.uid);
+        console.log("Setting up ticket listener for user:", user.uid, user.email);
         const ticketsRef = collection(db, 'tickets');
         
-        // Use a simpler query first to ensure we get data
-        // If ordering by lastMessageAt fails (e.g. index building), we at least get the tickets
+        // Query by userId OR userEmail to ensure we fetch existing records
         const q = query(
           ticketsRef, 
-          where('userId', '==', user.uid)
+          where('userId', 'in', [user.uid, user.email || ''])
         );
 
         unsubscribe = onSnapshot(q, (snap) => {
@@ -80,6 +79,12 @@ export default function SupportPage() {
           }
         }, (error) => {
           console.error("Tickets listener error:", error);
+          // Fallback query if 'in' fails
+          const fallbackQ = query(ticketsRef, where('userId', '==', user.uid));
+          onSnapshot(fallbackQ, (fSnap) => {
+             const fList = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+             setTickets(fList);
+          });
         });
       } else {
         setTickets([]);
@@ -90,7 +95,7 @@ export default function SupportPage() {
       unsubAuth();
       if (unsubscribe) unsubscribe();
     };
-  }, []); // Remove dependency on selectedTicket.id to prevent unnecessary re-runs
+  }, []);
 
   // Real-time replies listener (ADMIN LOGIC STYLE)
   useEffect(() => {
