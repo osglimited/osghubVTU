@@ -46,44 +46,13 @@ export default function SupportPage() {
   useEffect(() => {
     let unsubscribe = () => {};
     
-    const initListener = (user: any) => {
-      console.log("Initializing listener for user:", user.uid);
-      const ticketsRef = collection(db, 'tickets');
-      const q = query(
-        ticketsRef, 
-        where('userId', '==', user.uid),
-        orderBy('lastMessageAt', 'desc')
-      );
-
-      unsubscribe = onSnapshot(q, (snap) => {
-        const ticketList = snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter((t: any) => !t.deleted);
-        
-        console.log("Fetched tickets for user:", user.uid, "Count:", ticketList.length);
-        setTickets(ticketList);
-        
-        // Keep selected ticket updated
-        if (selectedTicket) {
-          const updated = ticketList.find(t => t.id === selectedTicket.id);
-          if (updated) setSelectedTicket(updated);
-        }
-      }, (error) => {
-        console.error("Tickets snapshot error:", error);
-        toast({ 
-          title: "Connection Error", 
-          description: "Please check your internet connection or refresh.", 
-          type: "destructive" 
-        });
-      });
-    };
-
     const unsubAuth = auth.onAuthStateChanged((user) => {
+      // Clean up previous listener first
+      if (unsubscribe) unsubscribe();
+
       if (user) {
-        console.log("Current User UID:", user.uid, "Email:", user.email);
+        console.log("Setting up ticket listener for user:", user.uid);
         const ticketsRef = collection(db, 'tickets');
-        
-        // Primary query by userId
         const q = query(
           ticketsRef, 
           where('userId', '==', user.uid),
@@ -95,7 +64,7 @@ export default function SupportPage() {
             .map(d => ({ id: d.id, ...d.data() }))
             .filter((t: any) => !t.deleted);
           
-          console.log("Fetched tickets for userId:", user.uid, "Count:", ticketList.length);
+          console.log("Real-time tickets update:", ticketList.length);
           setTickets(ticketList);
           
           if (selectedTicket) {
@@ -104,11 +73,12 @@ export default function SupportPage() {
           }
         }, (error) => {
           console.error("Tickets snapshot error:", error);
+          if (error.code === 'failed-precondition') {
+            console.warn("Index might be building...");
+          }
         });
       } else {
-        console.log("No authenticated user, clearing tickets");
         setTickets([]);
-        if (unsubscribe) unsubscribe();
       }
     });
 
