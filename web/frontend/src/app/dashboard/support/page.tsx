@@ -35,37 +35,51 @@ export default function SupportPage() {
 
   // Real-time tickets listener
   useEffect(() => {
-    if (!auth.currentUser) {
-      setTickets([]);
-      return;
-    }
+    let unsubscribe = () => {};
     
-    try {
-      const q = query(
-        collection(db, 'support_tickets'),
-        where('userId', '==', auth.currentUser.uid),
-        orderBy('createdAt', 'desc')
-      );
+    const initListener = () => {
+      if (!auth.currentUser) return;
+      
+      try {
+        const q = query(
+          collection(db, 'support_tickets'),
+          where('userId', '==', auth.currentUser.uid),
+          orderBy('createdAt', 'desc')
+        );
 
-      const unsubscribe = onSnapshot(q, (snap) => {
-        const ticketList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setTickets(ticketList);
-        
-        if (selectedTicket) {
-          const updated = ticketList.find(t => t.id === selectedTicket.id);
-          if (updated) setSelectedTicket(updated);
-        } else if (ticketList.length > 0 && !showNewTicket) {
-          setSelectedTicket(ticketList[0]);
-        }
-      }, (error) => {
-        console.error("Tickets snapshot error:", error);
-        toast({ title: "Sync Error", description: "Could not load tickets.", type: "destructive" });
-      });
+        unsubscribe = onSnapshot(q, (snap) => {
+          const ticketList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          setTickets(ticketList);
+          
+          if (selectedTicket) {
+            const updated = ticketList.find(t => t.id === selectedTicket.id);
+            if (updated) setSelectedTicket(updated);
+          } else if (ticketList.length > 0 && !showNewTicket) {
+            setSelectedTicket(ticketList[0]);
+          }
+        }, (error) => {
+          console.error("Tickets snapshot error:", error);
+          if (error.code !== 'permission-denied') {
+            toast({ title: "Sync Error", description: "Could not load tickets.", type: "destructive" });
+          }
+        });
+      } catch (error: any) {
+        console.error("Tickets listener error:", error);
+      }
+    };
 
-      return () => unsubscribe();
-    } catch (error: any) {
-      console.error("Tickets listener error:", error);
-    }
+    // Wait for auth to be initialized
+    const checkAuth = setInterval(() => {
+      if (auth.currentUser) {
+        initListener();
+        clearInterval(checkAuth);
+      }
+    }, 500);
+
+    return () => {
+      clearInterval(checkAuth);
+      unsubscribe();
+    };
   }, [auth.currentUser?.uid]);
 
   // Real-time replies listener

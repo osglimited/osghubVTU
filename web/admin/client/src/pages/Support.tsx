@@ -1,3 +1,4 @@
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc } from "firebase/firestore";
 import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,10 +49,12 @@ export default function SupportPage() {
       console.error("Firebase DB is not initialized");
       return;
     }
-    const ticketsRef = db.collection('support_tickets');
-    const unsubscribe = ticketsRef
-      .orderBy('lastMessageAt', 'desc')
-      .onSnapshot((snap: any) => {
+    
+    try {
+      const ticketsRef = collection(db, 'support_tickets');
+      const q = query(ticketsRef, orderBy('createdAt', 'desc'));
+      
+      const unsubscribe = onSnapshot(q, (snap: any) => {
         const ticketList = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
         setTickets(ticketList);
         
@@ -63,7 +66,10 @@ export default function SupportPage() {
         console.error("Tickets listener error:", err);
       });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (e) {
+      console.error("Failed to setup tickets listener:", e);
+    }
   }, [selectedTicket?.id]);
 
   useEffect(() => {
