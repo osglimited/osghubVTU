@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useState, useEffect, useRef } from 'react';
 import { Smartphone, Wifi, Tv, Zap, CreditCard, GraduationCap, Eye, EyeOff, ChevronLeft, ChevronRight, Pause, Play, Megaphone, Send, Image as ImageIcon, Paperclip, CheckCircle2, History, MessageCircle, Check, CheckCheck } from 'lucide-react';
 import { db, auth, storage } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, orderBy, doc, runTransaction, onSnapshot, limit } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, orderBy, doc, runTransaction, onSnapshot, limit, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/components/ui/toast';
 
@@ -42,13 +42,13 @@ export default function SupportPage() {
       
       try {
         const q = query(
-          collection(db, 'support_tickets'),
+          collection(db, 'tickets'),
           where('userId', '==', auth.currentUser.uid),
-          orderBy('createdAt', 'desc')
+          orderBy('lastMessageAt', 'desc')
         );
 
         unsubscribe = onSnapshot(q, (snap) => {
-          const ticketList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const ticketList = snap.docs.filter(d => !d.data().deleted).map(d => ({ id: d.id, ...d.data() }));
           setTickets(ticketList);
           
           if (selectedTicket) {
@@ -90,7 +90,7 @@ export default function SupportPage() {
     }
 
     const q = query(
-      collection(db, 'support_tickets', selectedTicket.id, 'replies'),
+      collection(db, 'tickets', selectedTicket.id, 'messages'),
       orderBy('createdAt', 'asc')
     );
 
@@ -98,7 +98,7 @@ export default function SupportPage() {
       setReplies(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       
       // Mark as read when user views admin replies
-      const unreadAdminReplies = snap.docs.filter(d => d.data().senderRole === 'admin' && !d.data().read);
+      const unreadAdminReplies = snap.docs.filter(d => d.data().sender === 'admin' && !d.data().read);
       unreadAdminReplies.forEach(d => {
         runTransaction(db, async (transaction) => {
           transaction.update(d.ref, { read: true });
@@ -125,20 +125,20 @@ export default function SupportPage() {
       const url = await getDownloadURL(storageRef);
 
       const reply = {
-        message: "Sent an attachment",
+        text: "Sent an attachment",
         attachmentUrl: url,
         attachmentName: file.name,
         senderId: auth.currentUser.uid,
         senderEmail: auth.currentUser.email,
-        senderRole: 'user',
-        createdAt: Date.now(),
+        sender: 'user',
+        createdAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, 'support_tickets', selectedTicket.id, 'replies'), reply);
+      await addDoc(collection(db, 'tickets', selectedTicket.id, 'messages'), reply);
       await runTransaction(db, async (transaction) => {
-        transaction.update(doc(db, 'support_tickets', selectedTicket.id), { 
-          lastMessageAt: Date.now(),
-          updatedAt: Date.now(),
+        transaction.update(doc(db, 'tickets', selectedTicket.id), { 
+          lastMessageAt: serverTimestamp(),
+          lastMessage: "Sent an attachment",
           status: 'open'
         });
       });
@@ -159,20 +159,20 @@ export default function SupportPage() {
     setSendingReply(true);
     try {
       const reply = {
-        message: replyMessage,
+        text: replyMessage,
         senderId: auth.currentUser.uid,
         senderEmail: auth.currentUser.email,
-        senderRole: 'user',
-        createdAt: Date.now(),
+        sender: 'user',
+        createdAt: serverTimestamp(),
         read: false
       };
 
-      await addDoc(collection(db, 'support_tickets', selectedTicket.id, 'replies'), reply);
+      await addDoc(collection(db, 'tickets', selectedTicket.id, 'messages'), reply);
       await runTransaction(db, async (transaction) => {
-        transaction.update(doc(db, 'support_tickets', selectedTicket.id), { 
+        transaction.update(doc(db, 'tickets', selectedTicket.id), { 
           status: 'open',
-          updatedAt: Date.now(),
-          lastMessageAt: Date.now()
+          lastMessage: replyMessage,
+          lastMessageAt: serverTimestamp()
         });
       });
 
@@ -188,10 +188,9 @@ export default function SupportPage() {
     if (!selectedTicket) return;
     try {
       await runTransaction(db, async (transaction) => {
-        transaction.update(doc(db, 'support_tickets', selectedTicket.id), { 
+        transaction.update(doc(db, 'tickets', selectedTicket.id), { 
           status: 'open',
-          updatedAt: Date.now(),
-          lastMessageAt: Date.now()
+          lastMessageAt: serverTimestamp()
         });
       });
       toast({ title: "Ticket Reopened", type: "default" });
@@ -208,21 +207,21 @@ export default function SupportPage() {
         userId: auth.currentUser.uid,
         userEmail: auth.currentUser.email,
         subject,
-        message,
+        lastMessage: message,
         status: 'open',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        lastMessageAt: Date.now()
+        createdAt: serverTimestamp(),
+        lastMessageAt: serverTimestamp(),
+        deleted: false
       };
-      const docRef = await addDoc(collection(db, 'support_tickets'), ticketData);
+      const docRef = await addDoc(collection(db, 'tickets'), ticketData);
       
-      // Also add the first message as a reply to maintain history structure
-      await addDoc(collection(db, 'support_tickets', docRef.id, 'replies'), {
-        message: message,
-        senderRole: 'user',
+      // Also add the first message as a message to maintain history structure
+      await addDoc(collection(db, 'tickets', docRef.id, 'messages'), {
+        text: message,
+        sender: 'user',
         senderId: auth.currentUser.uid,
         senderEmail: auth.currentUser.email,
-        createdAt: Date.now(),
+        createdAt: serverTimestamp(),
         read: true
       });
 
@@ -292,11 +291,11 @@ export default function SupportPage() {
                   </span>
                 </div>
                 <p className={`text-xs line-clamp-1 ${selectedTicket?.id === t.id ? 'text-blue-100' : 'text-gray-400'}`}>
-                  {t.message}
+                  {t.lastMessage}
                 </p>
                   <div className="flex justify-between items-center mt-2">
                   <span className={`text-[10px] ${selectedTicket?.id === t.id ? 'text-blue-200' : 'text-gray-400'}`}>
-                    {new Date(t.lastMessageAt || t.createdAt || Date.now()).toLocaleDateString()}
+                    {t.lastMessageAt?.seconds ? new Date(t.lastMessageAt.seconds * 1000).toLocaleDateString() : 'Just now'}
                   </span>
                 </div>
               </div>
@@ -362,26 +361,15 @@ export default function SupportPage() {
                 )}
               </div>
 
-              {/* Messages Area */}
               <div className="flex-grow overflow-y-auto p-4 space-y-4 bg-[#F8FAFC]">
-                {/* User's Original Message */}
-                <div className="flex flex-col items-start">
-                  <div className="bg-white border border-gray-200 p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%]">
-                    <p className="text-sm text-gray-800">{selectedTicket.message}</p>
-                  </div>
-                  <span className="text-[9px] text-gray-400 mt-1 px-1">
-                    {selectedTicket.createdAt ? new Date(selectedTicket.createdAt).toLocaleString() : 'Just now'}
-                  </span>
-                </div>
-
                 {replies.map((r, i) => (
-                  <div key={r.id || i} className={`flex flex-col ${r.senderRole === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div key={r.id || i} className={`flex flex-col ${r.sender === 'user' ? 'items-end' : 'items-start'}`}>
                     <div className={`p-3 rounded-2xl shadow-sm max-w-[85%] ${
-                      r.senderRole === 'user' 
+                      r.sender === 'user' 
                         ? 'bg-[#F97316] text-white rounded-tr-none' 
                         : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none'
                     }`}>
-                      <p className="text-sm">{r.message}</p>
+                      <p className="text-sm">{r.text}</p>
                       {r.attachmentUrl && (
                         <div className="mt-2">
                           <a href={r.attachmentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 bg-black/10 rounded-lg text-xs hover:bg-black/20 transition-colors">
@@ -389,15 +377,15 @@ export default function SupportPage() {
                           </a>
                         </div>
                       )}
-                      {r.senderRole === 'user' && (
+                      {r.sender === 'user' && (
                         <div className="flex justify-end mt-1">
                           {r.read ? <CheckCheck size={12} className="opacity-80" /> : <Check size={12} className="opacity-80" />}
                         </div>
                       )}
                     </div>
                     <span className="text-[9px] text-gray-400 mt-1 px-1">
-                      {r.senderRole === 'admin' ? 'Support Team • ' : ''}
-                      {r.createdAt ? new Date(r.createdAt).toLocaleString() : 'Just now'}
+                      {r.sender === 'admin' ? 'Support Team • ' : ''}
+                      {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleString() : 'Just now'}
                     </span>
                   </div>
                 ))}

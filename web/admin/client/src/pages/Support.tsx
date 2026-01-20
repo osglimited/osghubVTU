@@ -1,4 +1,4 @@
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,11 +51,11 @@ export default function SupportPage() {
     }
     
     try {
-      const ticketsRef = collection(db, 'support_tickets');
-      const q = query(ticketsRef, orderBy('createdAt', 'desc'));
+      const ticketsRef = collection(db, 'tickets');
+      const q = query(ticketsRef, orderBy('lastMessageAt', 'desc'));
       
       const unsubscribe = onSnapshot(q, (snap: any) => {
-        const ticketList = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+        const ticketList = snap.docs.filter((d: any) => !d.data().deleted).map((d: any) => ({ id: d.id, ...d.data() }));
         setTickets(ticketList);
         
         if (selectedTicket) {
@@ -79,14 +79,14 @@ export default function SupportPage() {
     }
 
     try {
-      const repliesRef = collection(db, 'support_tickets', selectedTicket.id, 'replies');
+      const repliesRef = collection(db, 'tickets', selectedTicket.id, 'messages');
       const q = query(repliesRef, orderBy('createdAt', 'asc'));
       
       const unsubscribe = onSnapshot(q, (snap: any) => {
         const replyList = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
         setReplies(replyList);
         
-        const unreadReplies = snap.docs.filter((d: any) => d.data().senderRole === 'user' && !d.data().read);
+        const unreadReplies = snap.docs.filter((d: any) => d.data().sender === 'user' && !d.data().read);
         unreadReplies.forEach((d: any) => {
           updateDoc(d.ref, { read: true }).catch((e: any) => console.error("Update read status error:", e));
         });
@@ -105,14 +105,21 @@ export default function SupportPage() {
   const handleReply = async (id: string) => {
     if (!replyMsg.trim()) return;
     try {
-      const ticketRef = doc(db, 'support_tickets', id);
-      const replyRef = collection(ticketRef, 'replies');
+      const ticketRef = doc(db, 'tickets', id);
+      const replyRef = collection(ticketRef, 'messages');
       
-      await addDoc(replyRef, reply);
+      const replyObj = {
+        text: replyMsg,
+        sender: 'admin',
+        createdAt: serverTimestamp(),
+        read: false
+      };
+      
+      await addDoc(replyRef, replyObj);
       await updateDoc(ticketRef, { 
-        status: 'replied',
-        updatedAt: Date.now(),
-        lastMessageAt: Date.now()
+        status: 'open',
+        lastMessage: replyMsg,
+        lastMessageAt: serverTimestamp()
       });
 
       toast({ title: "Success", description: "Reply sent" });
@@ -124,13 +131,24 @@ export default function SupportPage() {
 
   const markAsSolved = async (id: string) => {
     try {
-      const ticketRef = doc(db, 'support_tickets', id);
+      const ticketRef = doc(db, 'tickets', id);
       await updateDoc(ticketRef, { 
         status: 'solved', 
-        updatedAt: Date.now(),
-        lastMessageAt: Date.now()
+        lastMessageAt: serverTimestamp()
       });
       toast({ title: "Ticket Marked as Solved" });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const deleteTicket = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this ticket?")) return;
+    try {
+      const ticketRef = doc(db, 'tickets', id);
+      await updateDoc(ticketRef, { deleted: true });
+      setSelectedTicket(null);
+      toast({ title: "Ticket Deleted" });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
@@ -212,10 +230,10 @@ export default function SupportPage() {
                   </Badge>
                 </div>
                 <h4 className="text-sm font-bold text-gray-900 truncate mb-1">{t.subject || "Untitled Query"}</h4>
-                <p className="text-xs text-gray-400 line-clamp-1 font-medium">{t.message}</p>
+                <p className="text-xs text-gray-400 line-clamp-1 font-medium">{t.lastMessage}</p>
                   <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
                   <span className="text-[9px] font-bold text-gray-400 uppercase">
-                    {new Date(t.lastMessageAt || t.createdAt || Date.now()).toLocaleDateString()}
+                    {t.lastMessageAt?.seconds ? new Date(t.lastMessageAt.seconds * 1000).toLocaleDateString() : 'Just now'}
                   </span>
                   {t.lastMessageAt && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />}
                 </div>
@@ -264,6 +282,9 @@ export default function SupportPage() {
                   <Button variant="ghost" size="icon" className="md:hidden rounded-full hover:bg-gray-100" onClick={() => setSelectedTicket(null)}>
                     <X className="w-5 h-5 text-gray-500" />
                   </Button>
+                  <Button variant="ghost" size="icon" onClick={() => deleteTicket(selectedTicket.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full h-10 w-10">
+                    <Trash2 className="w-5 h-5" />
+                  </Button>
                   <div className="h-12 w-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-100">
                     <User className="w-6 h-6" />
                   </div>
@@ -284,40 +305,26 @@ export default function SupportPage() {
                 </div>
               </div>
 
-              {/* Chat Messages */}
               <div className="flex-grow overflow-y-auto p-6 space-y-6 bg-[#f0f2f5] pattern-dots relative scroll-smooth">
-                {/* Initial Ticket Message */}
-                <div className="flex flex-col items-start max-w-[85%] md:max-w-[70%]">
-                  <div className="bg-white p-5 rounded-3xl rounded-tl-none shadow-sm border border-gray-100">
-                    <div className="text-[10px] font-black text-blue-600 uppercase mb-2 tracking-widest border-b pb-1">Original Request</div>
-                    <p className="text-sm font-medium text-gray-800 leading-relaxed">{selectedTicket.message}</p>
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="text-[9px] font-bold text-gray-400 uppercase">
-                        {selectedTicket.createdAt ? new Date(selectedTicket.createdAt).toLocaleTimeString() : 'Just now'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
                 {replies.map((r, i) => (
-                  <div key={r.id || i} className={`flex flex-col ${r.senderRole === 'admin' ? 'items-end ml-auto' : 'items-start'} max-w-[85%] md:max-w-[70%]`}>
+                  <div key={r.id || i} className={`flex flex-col ${r.sender === 'admin' ? 'items-end ml-auto' : 'items-start'} max-w-[85%] md:max-w-[70%]`}>
                     <div className={`p-4 rounded-3xl shadow-md ${
-                      r.senderRole === 'admin' 
+                      r.sender === 'admin' 
                         ? 'bg-blue-600 text-white rounded-tr-none shadow-blue-100 border-b-4 border-blue-700' 
                         : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
                     }`}>
-                      <p className="text-sm font-medium leading-relaxed">{r.message}</p>
+                      <p className="text-sm font-medium leading-relaxed">{r.text}</p>
                       <div className="flex justify-end items-center gap-2 mt-2 opacity-70">
                         <span className="text-[9px] font-bold uppercase tracking-widest">
-                          {r.createdAt ? new Date(r.createdAt).toLocaleTimeString() : 'Just now'}
+                          {r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleTimeString() : 'Just now'}
                         </span>
-                        {r.senderRole === 'admin' && (
+                        {r.sender === 'admin' && (
                           r.read ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
                         )}
                       </div>
                     </div>
-                    <div className={`mt-1 text-[8px] font-black uppercase tracking-tighter ${r.senderRole === 'admin' ? 'text-blue-400 mr-2' : 'text-gray-400 ml-2'}`}>
-                      {r.senderRole === 'admin' ? 'Support Team' : 'User Response'}
+                    <div className={`mt-1 text-[8px] font-black uppercase tracking-tighter ${r.sender === 'admin' ? 'text-blue-400 mr-2' : 'text-gray-400 ml-2'}`}>
+                      {r.sender === 'admin' ? 'Support Team' : 'User Response'}
                     </div>
                   </div>
                 ))}
