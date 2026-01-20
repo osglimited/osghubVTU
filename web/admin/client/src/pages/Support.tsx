@@ -78,23 +78,26 @@ export default function SupportPage() {
       return;
     }
 
-    const unsubscribe = db.collection('support_tickets')
-      .doc(selectedTicket.id)
-      .collection('replies')
-      .orderBy('createdAt', 'asc')
-      .onSnapshot((snap: any) => {
+    try {
+      const repliesRef = collection(db, 'support_tickets', selectedTicket.id, 'replies');
+      const q = query(repliesRef, orderBy('createdAt', 'asc'));
+      
+      const unsubscribe = onSnapshot(q, (snap: any) => {
         const replyList = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
         setReplies(replyList);
         
         const unreadReplies = snap.docs.filter((d: any) => d.data().senderRole === 'user' && !d.data().read);
         unreadReplies.forEach((d: any) => {
-          d.ref.update({ read: true }).catch((e: any) => console.error("Update read status error:", e));
+          updateDoc(d.ref, { read: true }).catch((e: any) => console.error("Update read status error:", e));
         });
       }, (err: any) => {
         console.error("Replies listener error:", err);
       });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (e) {
+      console.error("Failed to setup replies listener:", e);
+    }
   }, [selectedTicket?.id]);
 
   useEffect(() => { loadData(); }, []);
@@ -102,15 +105,11 @@ export default function SupportPage() {
   const handleReply = async (id: string) => {
     if (!replyMsg.trim()) return;
     try {
-      const reply = {
-        message: replyMsg,
-        senderRole: 'admin',
-        createdAt: Date.now(),
-        read: false
-      };
-
-      await db.collection('support_tickets').doc(id).collection('replies').add(reply);
-      await db.collection('support_tickets').doc(id).update({ 
+      const ticketRef = doc(db, 'support_tickets', id);
+      const replyRef = collection(ticketRef, 'replies');
+      
+      await addDoc(replyRef, reply);
+      await updateDoc(ticketRef, { 
         status: 'replied',
         updatedAt: Date.now(),
         lastMessageAt: Date.now()
@@ -125,7 +124,8 @@ export default function SupportPage() {
 
   const markAsSolved = async (id: string) => {
     try {
-      await db.collection('support_tickets').doc(id).update({ 
+      const ticketRef = doc(db, 'support_tickets', id);
+      await updateDoc(ticketRef, { 
         status: 'solved', 
         updatedAt: Date.now(),
         lastMessageAt: Date.now()
@@ -213,8 +213,10 @@ export default function SupportPage() {
                 </div>
                 <h4 className="text-sm font-bold text-gray-900 truncate mb-1">{t.subject || "Untitled Query"}</h4>
                 <p className="text-xs text-gray-400 line-clamp-1 font-medium">{t.message}</p>
-                <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
-                  <span className="text-[9px] font-bold text-gray-400 uppercase">{new Date(t.lastMessageAt || t.createdAt).toLocaleDateString()}</span>
+                  <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
+                  <span className="text-[9px] font-bold text-gray-400 uppercase">
+                    {new Date(t.lastMessageAt || t.createdAt || Date.now()).toLocaleDateString()}
+                  </span>
                   {t.lastMessageAt && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />}
                 </div>
               </div>
@@ -290,7 +292,9 @@ export default function SupportPage() {
                     <div className="text-[10px] font-black text-blue-600 uppercase mb-2 tracking-widest border-b pb-1">Original Request</div>
                     <p className="text-sm font-medium text-gray-800 leading-relaxed">{selectedTicket.message}</p>
                     <div className="mt-3 flex items-center justify-between">
-                      <span className="text-[9px] font-bold text-gray-400 uppercase">{new Date(selectedTicket.createdAt).toLocaleTimeString()}</span>
+                      <span className="text-[9px] font-bold text-gray-400 uppercase">
+                        {selectedTicket.createdAt ? new Date(selectedTicket.createdAt).toLocaleTimeString() : 'Just now'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -304,7 +308,9 @@ export default function SupportPage() {
                     }`}>
                       <p className="text-sm font-medium leading-relaxed">{r.message}</p>
                       <div className="flex justify-end items-center gap-2 mt-2 opacity-70">
-                        <span className="text-[9px] font-bold uppercase tracking-widest">{new Date(r.createdAt).toLocaleTimeString()}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest">
+                          {r.createdAt ? new Date(r.createdAt).toLocaleTimeString() : 'Just now'}
+                        </span>
                         {r.senderRole === 'admin' && (
                           r.read ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
                         )}
