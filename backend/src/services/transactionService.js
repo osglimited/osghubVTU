@@ -23,20 +23,14 @@ class TransactionService {
       }
     }
 
-    // 2. Ensure wallet exists & has sufficient balance (do not debit yet)
-    await walletService.createWallet(userId);
-    const bal = await walletService.getBalance(userId);
-    if ((bal.mainBalance || 0) < amount) {
-      throw new Error('Insufficient funds');
-    }
-
-    // 3. Create Transaction Record (Pending)
-    const transactionRef = db.collection(TRANSACTION_COLLECTION).doc();
+    // 2. Calculate Prices First
     let userPrice = Number(amount || 0);
     let providerCost = Number(amount || 0);
     let smsCost = 0;
+
     try {
       if (type === 'data' && details && details.planId) {
+        // Fetch Plan Price from DB
         const planSnap = await db.collection('service_plans').where('metadata.variation_id', '==', String(details.planId)).limit(1).get();
         if (!planSnap.empty) {
           const p = planSnap.docs[0].data();
@@ -50,31 +44,48 @@ class TransactionService {
           const airtimeNetworks = st.airtimeNetworks || {};
           const netKey = String(details.network || details.networkId || '').toString().toUpperCase();
           const discount = Number((airtimeNetworks[netKey] && airtimeNetworks[netKey].discount) || 0);
-          const rate = (100 - discount) / 100;
-          providerCost = Math.round(Number(amount || 0) * rate);
+          
+          // Apply User Discount
+          if (discount > 0) {
+            const userRate = (100 - discount) / 100;
+            userPrice = Number((Number(amount || 0) * userRate).toFixed(2));
+          }
+          
+          // Provider Cost Estimation (e.g., 3% flat discount for us, just an estimate)
+          providerCost = Number((Number(amount || 0) * 0.97).toFixed(2));
         } catch {}
       }
     } catch {}
+
+    // 3. Ensure wallet exists & has sufficient balance
+    await walletService.createWallet(userId);
+    const bal = await walletService.getBalance(userId);
+    if ((bal.mainBalance || 0) < userPrice) {
+      throw new Error(`Insufficient funds. Required: ₦${userPrice}`);
+    }
+
+    // 4. Create Transaction Record (Pending)
+    const transactionRef = db.collection(TRANSACTION_COLLECTION).doc();
     const transactionData = {
       id: transactionRef.id,
       userId,
       type,
-      amount,
+      amount, // Face Value
       details,
       requestId: idempotencyKey,
       status: 'pending',
       createdAt: new Date(),
       provider: providerName,
-      userPrice,
+      userPrice, // Actual Charge
       providerCost,
       smsCost,
       serviceType: type
     };
     await transactionRef.set(transactionData);
 
-    // 4. Debit Wallet
+    // 5. Debit Wallet
     try {
-      await walletService.debitWallet(userId, amount, 'main', `${type} Purchase: ${details.phone}`);
+      await walletService.debitWallet(userId, userPrice, 'main', `${type} Purchase: ${details.phone}`);
     } catch (error) {
       await transactionRef.update({ status: 'failed', failureReason: 'Debit failed' });
       throw error;

@@ -305,6 +305,23 @@ export const getServiceBySlug = async (slug: string): Promise<ServiceDoc | null>
   return { id: local.slug, ...(local as any) } as ServiceDoc;
 };
 
+export const getAirtimeSettings = async (): Promise<Record<string, { discount: number; enabled: boolean }>> => {
+  const backendUrl = resolveBackendUrl();
+  try {
+    const res = await fetch(`${backendUrl}/api/settings/airtime`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    if (!res.ok) throw new Error('Failed to fetch settings');
+    return await res.json();
+  } catch (error) {
+    console.error('Get Airtime Settings Error:', error);
+    return {};
+  }
+};
+
 export const getServiceById = async (id: string): Promise<ServiceDoc | null> => {
   const ref = doc(db, 'services', id);
   const snap = await getDoc(ref);

@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Smartphone } from 'lucide-react';
 import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 import TransactionResultModal from '@/components/dashboard/TransactionResultModal';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { purchaseAirtime } from '@/lib/services';
+import { purchaseAirtime, getAirtimeSettings } from '@/lib/services';
 
 export default function AirtimePage() {
   const { user } = useAuth();
@@ -18,6 +18,22 @@ export default function AirtimePage() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
   
+  const [settings, setSettings] = useState<Record<string, { discount: number; enabled: boolean }>>({});
+
+  useEffect(() => {
+    getAirtimeSettings().then(setSettings);
+  }, []);
+
+  const discount = useMemo(() => {
+    return settings[network]?.discount || 0;
+  }, [network, settings]);
+
+  const finalPrice = useMemo(() => {
+    const amt = Number(amount);
+    if (!amt || isNaN(amt)) return 0;
+    return amt * (1 - discount / 100);
+  }, [amount, discount]);
+
   const [resultModal, setResultModal] = useState<{
     open: boolean;
     status: 'success' | 'error';
@@ -106,9 +122,9 @@ export default function AirtimePage() {
                     onChange={(e) => setNetwork(e.target.value)}
                   >
                     <option value="MTN">MTN</option>
-                    <option value="Glo">Glo</option>
-                    <option value="Airtel">Airtel</option>
-                    <option value="9mobile">9mobile</option>
+                    <option value="GLO">Glo</option>
+                    <option value="AIRTEL">Airtel</option>
+                    <option value="9MOBILE">9mobile</option>
                   </select>
                 </div>
 
@@ -135,6 +151,12 @@ export default function AirtimePage() {
                     min="50"
                     required
                   />
+                  {discount > 0 && (
+                     <p className="text-sm text-green-600 mt-2 font-medium">
+                        Discount applied: {discount}% off. <br/>
+                        You pay: <span className="text-lg font-bold">₦{finalPrice.toLocaleString()}</span>
+                     </p>
+                  )}
                 </div>
 
                 <div className="bg-blue-50 p-4 rounded-lg flex justify-between items-center text-sm text-blue-900">

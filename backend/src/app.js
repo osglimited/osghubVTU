@@ -82,6 +82,35 @@ app.get('/api/plans', async (_req, res) => {
   }
 });
 
+// Public Settings endpoint for airtime discounts
+app.get('/api/settings/airtime', async (_req, res) => {
+  try {
+    if (!db) return res.json({});
+    const doc = await db.collection('admin_settings').doc('settings').get();
+    const st = doc.exists ? doc.data() || {} : {};
+    // Return only necessary fields to public
+    const networks = st.airtimeNetworks || {};
+    const result = {};
+    for (const [key, val] of Object.entries(networks)) {
+      if (val.enabled !== false) {
+        result[key] = {
+          discount: Number(val.discount || 0),
+          enabled: true
+        };
+      }
+    }
+    // Ensure defaults if empty
+    if (Object.keys(result).length === 0) {
+      ['MTN', 'GLO', 'AIRTEL', '9MOBILE'].forEach(k => {
+        result[k] = { discount: 2, enabled: true };
+      });
+    }
+    res.json(result);
+  } catch (e) {
+    res.json({});
+  }
+});
+
 // Import Routes
 const walletRoutes = require('./routes/walletRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');

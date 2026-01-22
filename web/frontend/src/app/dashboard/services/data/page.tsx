@@ -7,8 +7,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { purchaseData } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 import TransactionResultModal from '@/components/dashboard/TransactionResultModal';
-import { DATA_PLANS, DataPlan } from '@/data/dataPlans';
 import { getServicePlans, ServicePlan } from '@/lib/services';
+
+interface DataPlan {
+  id: string;
+  name: string;
+  price: number;
+  networkId: number;
+  variation_id: string;
+}
 
 const NETWORKS = [
   { label: 'MTN', value: 'MTN', id: 1 },
@@ -22,11 +29,11 @@ export default function DataPage() {
   const { service, loading, error } = useService('data');
   const [network, setNetwork] = useState(NETWORKS[0]);
   const [phone, setPhone] = useState('');
-  // Initialize with empty or first plan of first network
-  const [selectedPlan, setSelectedPlan] = useState<DataPlan | undefined>(
-    DATA_PLANS[NETWORKS[0].value]?.[0]
-  );
-  const [dynamicPlans, setDynamicPlans] = useState<Record<string, DataPlan[]>>({});
+  
+  const [plans, setPlans] = useState<Record<string, DataPlan[]>>({});
+  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState<DataPlan | undefined>(undefined);
+
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
   
@@ -46,31 +53,46 @@ export default function DataPage() {
   useEffect(() => {
     let mounted = true;
     const loadPlans = async () => {
-      const rows = await getServicePlans();
-      if (!mounted || rows.length === 0) return;
-      // Group by network and map to DataPlan shape
-      const byNet: Record<string, DataPlan[]> = {};
-      for (const r of rows) {
-        const netKey = (r.network || '').toUpperCase();
-        const varId = r.metadata?.variation_id ? String(r.metadata.variation_id) : '';
-        const netId = r.metadata?.networkId ? Number(r.metadata.networkId) : undefined;
-        if (!varId || !netId) continue; // require provider mapping
-        const dp: DataPlan = {
-          id: `${netKey}_${varId}`,
-          name: r.name || 'Plan',
-          price: Number(r.priceUser || 0),
-          networkId: netId,
-          variation_id: varId
-        };
-        byNet[netKey] = byNet[netKey] ? [...byNet[netKey], dp] : [dp];
+      setLoadingPlans(true);
+      try {
+        const rows = await getServicePlans();
+        if (!mounted) return;
+        
+        // Group by network and map to DataPlan shape
+        const byNet: Record<string, DataPlan[]> = {};
+        for (const r of rows) {
+          const netKey = (r.network || '').toUpperCase();
+          const varId = r.metadata?.variation_id ? String(r.metadata.variation_id) : '';
+          const netId = r.metadata?.networkId ? Number(r.metadata.networkId) : undefined;
+          if (!varId || !netId) continue; // require provider mapping
+          const dp: DataPlan = {
+            id: `${netKey}_${varId}`,
+            name: r.name || 'Plan',
+            price: Number(r.priceUser || 0),
+            networkId: netId,
+            variation_id: varId
+          };
+          byNet[netKey] = byNet[netKey] ? [...byNet[netKey], dp] : [dp];
+        }
+        setPlans(byNet);
+      } catch (err) {
+        console.error("Failed to load plans", err);
+      } finally {
+        if (mounted) setLoadingPlans(false);
       }
-      setDynamicPlans(byNet);
-      const initial = byNet[NETWORKS[0].value] || DATA_PLANS[NETWORKS[0].value] || [];
-      setSelectedPlan(initial[0]);
     };
     loadPlans();
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => {
+    const currentNetPlans = plans[network.value] || [];
+    if (currentNetPlans.length > 0) {
+      setSelectedPlan(currentNetPlans[0]);
+    } else {
+      setSelectedPlan(undefined);
+    }
+  }, [network, plans]);
 
   const handlePurchase = (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,8 +171,6 @@ export default function DataPage() {
                     onChange={(e) => {
                       const n = NETWORKS.find(nn => nn.value === e.target.value) || NETWORKS[0];
                       setNetwork(n);
-                      const plans = (dynamicPlans[n.value] || DATA_PLANS[n.value] || dynamicPlans[NETWORKS[0].value] || DATA_PLANS[NETWORKS[0].value] || []);
-                      setSelectedPlan(plans[0]);
                     }}
                   >
                     {NETWORKS.map(n => (
@@ -178,16 +198,23 @@ export default function DataPage() {
                     className="input-field"
                     value={selectedPlan?.variation_id || ''}
                     onChange={(e) => {
-                        const plans = DATA_PLANS[network.value] || [];
-                        const plan = plans.find(p => p.variation_id === e.target.value) || plans[0];
-                        setSelectedPlan(plan);
+                        const currentPlans = plans[network.value] || [];
+                        const plan = currentPlans.find(p => p.variation_id === e.target.value);
+                        if (plan) setSelectedPlan(plan);
                     }}
+                    disabled={loadingPlans || !plans[network.value]?.length}
                   >
-                    {((dynamicPlans[network.value] || DATA_PLANS[network.value] || [])).map(plan => (
-                      <option key={plan.variation_id} value={plan.variation_id}>
-                        {plan.name} - ₦{plan.price.toLocaleString()}
-                      </option>
-                    ))}
+                    {loadingPlans ? (
+                      <option>Loading plans...</option>
+                    ) : (plans[network.value] || []).length === 0 ? (
+                      <option>No plans available</option>
+                    ) : (
+                      (plans[network.value] || []).map(plan => (
+                        <option key={plan.variation_id} value={plan.variation_id}>
+                          {plan.name} - ₦{plan.price.toLocaleString()}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
