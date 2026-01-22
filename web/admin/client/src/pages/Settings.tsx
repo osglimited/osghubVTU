@@ -87,7 +87,7 @@ export default function ApiSettingsPage() {
         <Card className="border-none shadow-sm md:col-span-2 lg:col-span-1">
           <CardHeader>
             <CardTitle>SMS Configuration</CardTitle>
-            <CardDescription>Manage SMS notifications, charges, per-service toggles, and balance codes.</CardDescription>
+            <CardDescription>Manage SMS notifications, charges, service toggles, and USSD balance codes.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between space-x-2 border p-3 rounded-md">
