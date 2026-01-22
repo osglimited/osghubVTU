@@ -75,6 +75,7 @@ export default function ApiSettingsPage() {
     };
     load();
     return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="space-y-6">
