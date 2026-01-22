@@ -249,4 +249,9 @@ export async function getFinanceUser(input: { uid?: string; email?: string }): P
   return await request("GET", `/api/admin/finance/user?${qs}`);
 }
 
+export async function getSmsHistory(limit = 100): Promise<any[]> {
+  const qs = new URLSearchParams({ limit: String(limit) }).toString();
+  return await request<any[]>("GET", `/api/admin/sms/history?${qs}`);
+}
+
 export { db };

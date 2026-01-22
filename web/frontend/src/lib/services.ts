@@ -39,6 +39,11 @@ export interface TransactionResult {
   success: boolean;
   message: string;
   transactionId?: string;
+  smsInfo?: {
+    cost: number;
+    status: string;
+    balanceCode?: string;
+  };
 }
 
 export const purchaseAirtimeViaCloud = async (
@@ -176,7 +181,12 @@ export const purchaseAirtime = async (
   if (!res.ok) {
     return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
   }
-  return { success: true, message: 'Airtime initiated' };
+  return { 
+    success: true, 
+    message: data.message || 'Airtime initiated',
+    transactionId: data.transactionId,
+    smsInfo: data.smsInfo
+  };
 };
 
 export const purchaseData = async (
@@ -242,13 +252,18 @@ export const purchaseData = async (
   if (!res.ok) {
     return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
   }
-  return { success: true, message: 'Data initiated' };
+  return { 
+    success: true, 
+    message: data.message || 'Data initiated',
+    transactionId: data.transactionId,
+    smsInfo: data.smsInfo
+  };
 };
 
 export const processTransaction = async (
   userId: string,
   amount: number,
-  type: 'cable' | 'electricity' | 'tv',
+  type: 'cable' | 'electricity' | 'tv' | 'exam',
   details: Record<string, any>
 ): Promise<TransactionResult> => {
   const backendUrl = resolveBackendUrl();
@@ -269,7 +284,12 @@ export const processTransaction = async (
   if (!res.ok) {
     return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
   }
-  return { success: true, message: 'Transaction initiated' };
+  return { 
+    success: true, 
+    message: data.message || 'Transaction initiated',
+    transactionId: data.transactionId,
+    smsInfo: data.smsInfo
+  };
 };
 
 

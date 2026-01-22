@@ -43,6 +43,11 @@ export default function DataPage() {
     title: string;
     message: string;
     transactionId?: string;
+    smsInfo?: {
+      cost: number;
+      status: string;
+      balanceCode?: string;
+    };
   }>({
     open: false,
     status: 'success',
@@ -122,7 +127,8 @@ export default function DataPage() {
           status: 'success',
           title: 'Purchase Successful',
           message: `You have successfully purchased ${selectedPlan.name} for ${phone}.`,
-          transactionId: result.transactionId
+          transactionId: result.transactionId,
+          smsInfo: result.smsInfo
         });
         setPhone('');
       } else {
@@ -247,6 +253,7 @@ export default function DataPage() {
             title={resultModal.title}
             message={resultModal.message}
             transactionId={resultModal.transactionId}
+            smsInfo={resultModal.smsInfo}
             actionLabel="Done"
           />
         </div>

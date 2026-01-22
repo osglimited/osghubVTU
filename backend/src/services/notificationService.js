@@ -37,9 +37,8 @@ class NotificationService {
 
   async sendSms(phone, message) {
     try {
-      if ((process.env.SEND_PURCHASE_SMS || '').toLowerCase() !== 'true') {
-        return;
-      }
+      // Config check is handled by caller (transactionService)
+      
       const apiKey = process.env.SMS_TERMII_API_KEY || '';
       const senderId = process.env.SMS_SENDER_ID || 'OSGHUB';
       const channel = process.env.SMS_CHANNEL || 'dnd';
@@ -47,9 +46,16 @@ class NotificationService {
         console.warn('SMS provider API key missing');
         return;
       }
+
+      // Format phone: 080... -> 23480...
+      let to = String(phone).replace(/\s/g, '');
+      if (to.startsWith('0')) {
+        to = '234' + to.slice(1);
+      }
+
       const payload = {
         api_key: apiKey,
-        to: String(phone),
+        to: to,
         from: senderId,
         sms: String(message),
         type: 'plain',
@@ -59,8 +65,10 @@ class NotificationService {
         headers: { 'Content-Type': 'application/json' },
         timeout: 15000
       });
+      console.log(`[SMS Sent] To: ${to}`);
     } catch (error) {
       console.error('Error sending SMS:', error?.response?.data || error?.message || String(error));
+      throw error; // Allow caller to handle failure logging
     }
   }
 }

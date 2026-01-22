@@ -189,6 +189,7 @@ export default function AirtimePage() {
             message={resultModal.message}
             transactionId={resultModal.transactionId}
             actionLabel="Done"
+            smsInfo={resultModal.smsInfo}
           />
         </div>
   );

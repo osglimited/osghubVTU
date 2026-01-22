@@ -11,6 +11,11 @@ interface TransactionResultModalProps {
   transactionId?: string;
   actionLabel?: string;
   onAction?: () => void;
+  smsInfo?: {
+    cost: number;
+    status: string;
+    balanceCode?: string;
+  };
 }
 
 export default function TransactionResultModal({
@@ -22,6 +27,7 @@ export default function TransactionResultModal({
   transactionId,
   actionLabel = 'Close',
   onAction,
+  smsInfo,
 }: TransactionResultModalProps) {
   if (!isOpen) return null;
 
@@ -55,6 +61,26 @@ export default function TransactionResultModal({
              <div className="bg-gray-50 px-3 py-2 rounded-md mb-6 w-full">
                <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Transaction ID</span>
                <p className="font-mono text-sm text-gray-800 break-all select-all">{transactionId}</p>
+             </div>
+          )}
+
+          {smsInfo && smsInfo.status === 'sent' && (
+             <div className="bg-blue-50 px-3 py-2 rounded-md mb-6 w-full text-left space-y-1">
+               <p className="text-xs font-bold text-blue-800 uppercase">SMS Notification</p>
+               <div className="flex justify-between text-sm">
+                 <span className="text-blue-700">Status:</span>
+                 <span className="font-medium text-green-600">Sent</span>
+               </div>
+               <div className="flex justify-between text-sm">
+                 <span className="text-blue-700">Charge:</span>
+                 <span className="font-medium text-red-600">-₦{smsInfo.cost}</span>
+               </div>
+               {smsInfo.balanceCode && (
+                 <div className="mt-2 pt-2 border-t border-blue-100">
+                    <span className="text-xs text-blue-600 block">Balance Check Code:</span>
+                    <p className="font-mono font-bold text-lg text-blue-900">{smsInfo.balanceCode}</p>
+                 </div>
+               )}
              </div>
           )}
           

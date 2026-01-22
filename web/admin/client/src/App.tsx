@@ -17,6 +17,7 @@ import ServicesPage from "@/pages/Services";
 import ApiSettingsPage from "@/pages/Settings";
 import ProfilePage from "@/pages/Profile";
 import LogsPage from "@/pages/Logs";
+import SMSHistoryPage from "@/pages/SMSHistory";
 import SupportPage from "@/pages/Support";
 import UserProfilePage from "@/pages/UserProfile";
 import FinancePage from "@/pages/Finance";
@@ -37,6 +38,7 @@ function Router() {
         <Route path="/settings/api" component={ApiSettingsPage} />
         <Route path="/profile" component={ProfilePage} />
         <Route path="/support" component={SupportPage} />
+        <Route path="/sms/history" component={SMSHistoryPage} />
         <Route path="/logs" component={LogsPage} />
         <Route component={NotFound} />
       </Switch>
