@@ -3,10 +3,10 @@
 import { GraduationCap } from 'lucide-react';
 import { useService } from '@/hooks/useServices';
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { processTransaction } from '@/lib/services';
 import TransactionResultModal from '@/components/dashboard/TransactionResultModal';
-import { PinModal } from '@/components/dashboard/PinModal';
+import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 
 export default function ExamPinsPage() {
   const { service, loading, error } = useService('exam-pins');
@@ -156,7 +156,7 @@ export default function ExamPinsPage() {
         </>
       )}
 
-      <PinModal 
+      <TransactionPinModal 
         isOpen={pinModalOpen}
         onClose={() => setPinModalOpen(false)}
         onSuccess={onPinSuccess}
