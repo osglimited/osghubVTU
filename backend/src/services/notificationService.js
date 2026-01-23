@@ -35,37 +35,51 @@ class NotificationService {
     }
   }
 
-  async sendSms(phone, message) {
+  async sendSms(phone, message, options = {}) {
     try {
-      // Config check is handled by caller (transactionService)
-      
-      const apiKey = process.env.SMS_TERMII_API_KEY || '';
-      const senderId = process.env.SMS_SENDER_ID || 'OSGHUB';
-      const channel = process.env.SMS_CHANNEL || 'dnd';
-      if (!apiKey) {
-        console.warn('SMS provider API key missing');
-        return;
-      }
+      const provider = String(process.env.SMS_PROVIDER || '').toLowerCase() || 'termii';
+      const senderId = options.senderId || process.env.SMS_SENDER_ID || 'OSGHUB';
 
-      // Format phone: 080... -> 23480...
       let to = String(phone).replace(/\s/g, '');
       if (to.startsWith('0')) {
         to = '234' + to.slice(1);
       }
 
-      const payload = {
-        api_key: apiKey,
-        to: to,
-        from: senderId,
-        sms: String(message),
-        type: 'plain',
-        channel
-      };
-      await axios.post('https://api.ng.termii.com/api/sms/send', payload, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 15000
-      });
-      console.log(`[SMS Sent] To: ${to}`);
+      if (provider === 'payless') {
+        const username = process.env.PAYLESS_SMS_USERNAME || '';
+        const password = process.env.PAYLESS_SMS_PASSWORD || '';
+        const baseUrl = process.env.PAYLESS_SMS_BASE_URL || 'https://portal.paylessbulksms.com.ng/components/com_spc/smsapi.php';
+        if (!username || !password) {
+          throw new Error('Missing Payless SMS credentials');
+        }
+        const params = new URLSearchParams({
+          username,
+          password,
+          sender: senderId,
+          recipient: to,
+          message: String(message)
+        }).toString();
+        const url = `${baseUrl}?${params}`;
+        await axios.get(url, { timeout: 15000 });
+      } else {
+        const apiKey = process.env.SMS_TERMII_API_KEY || '';
+        const channel = process.env.SMS_CHANNEL || 'dnd';
+        if (!apiKey) {
+          throw new Error('Missing Termii API key');
+        }
+        const payload = {
+          api_key: apiKey,
+          to: to,
+          from: senderId,
+          sms: String(message),
+          type: 'plain',
+          channel
+        };
+        await axios.post('https://api.ng.termii.com/api/sms/send', payload, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 15000
+        });
+      }
     } catch (error) {
       console.error('Error sending SMS:', error?.response?.data || error?.message || String(error));
       throw error; // Allow caller to handle failure logging
