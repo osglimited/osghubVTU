@@ -41,32 +41,14 @@ export default function CablePage() {
       );
 
       if (result.success) {
-        setResultModal({
-          open: true,
-          status: 'success',
-          title: 'Subscription Successful',
-          message: 'Cable subscription successful!',
-          transactionId: result.transactionId,
-          smsInfo: result.smsInfo
-        });
+        alert('Cable subscription successful!');
         setSmartcardNumber('');
         setAmount('');
       } else {
-        setResultModal({
-          open: true,
-          status: 'error',
-          title: 'Transaction Failed',
-          message: `Transaction failed: ${result.message}`,
-          transactionId: result.transactionId
-        });
+        alert(`Transaction failed: ${result.message}`);
       }
     } catch (err: any) {
-      setResultModal({
-        open: true,
-        status: 'error',
-        title: 'Error',
-        message: `Error: ${err.message}`,
-      });
+      alert(`Error: ${err.message}`);
     } finally {
       setProcessing(false);
     }

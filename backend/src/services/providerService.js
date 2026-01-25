@@ -77,20 +77,21 @@ class ProviderService {
         timeout: 30000 // 30s timeout
       });
 
-      // IA Café Success Response:
-      // { "code": "success", "message": "...", "data": { "status": "completed-api"|"processing-api", ... } }
+      // IA Café typical response:
+      // { code: 'success'|'error', message, data: { status: 'completed-api'|'processing-api'|... , order_id } }
       const data = response.data;
+      const txData = data?.data || {};
+      const status = String(txData.status || '').toLowerCase();
+      const statusImpliesSuccess = ['completed-api', 'processing-api', 'completed', 'success', 'successful'].includes(status);
+      const apiImpliesSuccess = data.code === 'success' || data.success === true || statusImpliesSuccess;
       
-      if (data.code === 'success' || data.success === true) {
-        const txData = data.data || {};
-        const isSuccessful = txData.status === 'completed-api' || txData.status === 'processing-api';
-        
+      if (apiImpliesSuccess) {
         return {
-          success: isSuccessful,
+          success: true,
           transactionId: txData.order_id || requestId,
-          message: data.message || 'Transaction Successful',
+          message: statusImpliesSuccess ? 'Transaction Successful' : (data.message || 'Transaction Successful'),
           apiResponse: data,
-          status: txData.status // Return specific status for further handling if needed
+          status: txData.status
         };
       } else {
         console.error('[Provider] Airtime API Returned Failure:', data);
@@ -142,15 +143,16 @@ class ProviderService {
       });
 
       const data = response.data;
+      const txData = data?.data || {};
+      const status = String(txData.status || '').toLowerCase();
+      const statusImpliesSuccess = ['completed-api', 'processing-api', 'completed', 'success', 'successful'].includes(status);
+      const apiImpliesSuccess = data.code === 'success' || data.success === true || statusImpliesSuccess;
 
-      if (data.code === 'success' || data.success === true) {
-        const txData = data.data || {};
-        const isSuccessful = txData.status === 'completed-api' || txData.status === 'processing-api';
-
+      if (apiImpliesSuccess) {
         return {
-          success: isSuccessful,
+          success: true,
           transactionId: txData.order_id || requestId,
-          message: data.message || 'Transaction Successful',
+          message: statusImpliesSuccess ? 'Transaction Successful' : (data.message || 'Transaction Successful'),
           apiResponse: data,
           status: txData.status
         };

@@ -10,7 +10,6 @@ router.use(isAdmin);
 
 router.post('/settings', adminController.updateSettings);
 router.get('/settings', adminController.getSettings);
-router.get('/sms/history', adminController.getSmsHistory);
 router.get('/transactions', adminController.getAllTransactions);
 router.post('/wallet/credit', adminController.creditWallet);
 router.post('/wallet/debit', adminController.debitWallet);

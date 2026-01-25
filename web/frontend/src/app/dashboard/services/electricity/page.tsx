@@ -6,7 +6,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useService } from '@/hooks/useServices';
 import { processTransaction } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
-import TransactionResultModal from '@/components/dashboard/TransactionResultModal';
 
 export default function ElectricityPage() {
   const { user, refreshUser } = useAuth();
@@ -17,24 +16,6 @@ export default function ElectricityPage() {
   const [amount, setAmount] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
-
-  const [resultModal, setResultModal] = useState<{
-    open: boolean;
-    status: 'success' | 'error';
-    title: string;
-    message: string;
-    transactionId?: string;
-    smsInfo?: {
-      cost: number;
-      status: string;
-      balanceCode?: string;
-    };
-  }>({
-    open: false,
-    status: 'success',
-    title: '',
-    message: ''
-  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,33 +41,15 @@ export default function ElectricityPage() {
       );
       
       if (result.success) {
-        setResultModal({
-          open: true,
-          status: 'success',
-          title: 'Payment Successful',
-          message: 'Payment successful!',
-          transactionId: result.transactionId,
-          smsInfo: result.smsInfo
-        });
+        alert('Payment successful!');
         setMeterNumber('');
         setAmount('');
         refreshUser();
       } else {
-        setResultModal({
-          open: true,
-          status: 'error',
-          title: 'Transaction Failed',
-          message: `Transaction failed: ${result.message}`,
-          transactionId: result.transactionId
-        });
+        alert(`Transaction failed: ${result.message}`);
       }
     } catch (err: any) {
-      setResultModal({
-        open: true,
-        status: 'error',
-        title: 'Error',
-        message: `Error: ${err.message}`,
-      });
+      alert(`Error: ${err.message}`);
     } finally {
       setProcessing(false);
     }
@@ -168,21 +131,10 @@ export default function ElectricityPage() {
       </div>
 
       <TransactionPinModal 
-            isOpen={showPinModal} 
-            onClose={() => setShowPinModal(false)} 
-            onSuccess={onPinSuccess}
-          />
-
-          <TransactionResultModal
-            isOpen={resultModal.open}
-            onClose={() => setResultModal(prev => ({ ...prev, open: false }))}
-            status={resultModal.status}
-            title={resultModal.title}
-            message={resultModal.message}
-            transactionId={resultModal.transactionId}
-            smsInfo={resultModal.smsInfo}
-            actionLabel="Done"
-          />
-        </div>
+        isOpen={showPinModal}
+        onClose={() => setShowPinModal(false)}
+        onSuccess={onPinSuccess}
+      />
+    </div>
   );
 }

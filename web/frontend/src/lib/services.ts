@@ -39,11 +39,6 @@ export interface TransactionResult {
   success: boolean;
   message: string;
   transactionId?: string;
-  smsInfo?: {
-    cost: number;
-    status: string;
-    balanceCode?: string;
-  };
 }
 
 export const purchaseAirtimeViaCloud = async (
@@ -145,7 +140,7 @@ export const purchaseAirtime = async (
     body,
   });
 
-  if (res.status === 401 && auth.currentUser) {
+  if ((res.status === 401 || res.status === 403) && auth.currentUser) {
      try {
        console.log('Token expired, refreshing...');
        token = await auth.currentUser.getIdToken(true);
@@ -167,8 +162,8 @@ export const purchaseAirtime = async (
      }
    }
    
-   // If the retry also failed with 401, force logout
-   if (res.status === 401) {
+   // If the retry also failed with 401/403, force logout
+   if (res.status === 401 || res.status === 403) {
      console.error('Request failed with 401 after refresh, forcing logout');
      await auth.signOut();
      if (typeof window !== 'undefined') {
@@ -181,12 +176,7 @@ export const purchaseAirtime = async (
   if (!res.ok) {
     return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
   }
-  return { 
-    success: true, 
-    message: data.message || 'Airtime initiated',
-    transactionId: data.transactionId,
-    smsInfo: data.smsInfo
-  };
+  return { success: true, message: 'Airtime initiated' };
 };
 
 export const purchaseData = async (
@@ -216,7 +206,7 @@ export const purchaseData = async (
     body,
   });
 
-  if (res.status === 401 && auth.currentUser) {
+  if ((res.status === 401 || res.status === 403) && auth.currentUser) {
      try {
        console.log('Token expired, refreshing...');
        token = await auth.currentUser.getIdToken(true);
@@ -238,8 +228,8 @@ export const purchaseData = async (
      }
    }
    
-   // If the retry also failed with 401, force logout
-   if (res.status === 401) {
+   // If the retry also failed with 401/403, force logout
+   if (res.status === 401 || res.status === 403) {
      console.error('Request failed with 401 after refresh, forcing logout');
      await auth.signOut();
      if (typeof window !== 'undefined') {
@@ -252,18 +242,13 @@ export const purchaseData = async (
   if (!res.ok) {
     return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
   }
-  return { 
-    success: true, 
-    message: data.message || 'Data initiated',
-    transactionId: data.transactionId,
-    smsInfo: data.smsInfo
-  };
+  return { success: true, message: 'Data initiated' };
 };
 
 export const processTransaction = async (
   userId: string,
   amount: number,
-  type: 'cable' | 'electricity' | 'tv' | 'exam',
+  type: 'cable' | 'electricity' | 'tv',
   details: Record<string, any>
 ): Promise<TransactionResult> => {
   const backendUrl = resolveBackendUrl();
@@ -284,12 +269,7 @@ export const processTransaction = async (
   if (!res.ok) {
     return { success: false, message: (data && (data.error || data.message)) || 'Transaction failed' };
   }
-  return { 
-    success: true, 
-    message: data.message || 'Transaction initiated',
-    transactionId: data.transactionId,
-    smsInfo: data.smsInfo
-  };
+  return { success: true, message: 'Transaction initiated' };
 };
 
 
@@ -323,23 +303,6 @@ export const getServiceBySlug = async (slug: string): Promise<ServiceDoc | null>
   const local = (sampleServices as any[]).find((s) => s.slug === slug);
   if (!local) return null;
   return { id: local.slug, ...(local as any) } as ServiceDoc;
-};
-
-export const getAirtimeSettings = async (): Promise<Record<string, { discount: number; enabled: boolean }>> => {
-  const backendUrl = resolveBackendUrl();
-  try {
-    const res = await fetch(`${backendUrl}/api/settings/airtime`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!res.ok) throw new Error('Failed to fetch settings');
-    return await res.json();
-  } catch (error) {
-    console.error('Get Airtime Settings Error:', error);
-    return {};
-  }
 };
 
 export const getServiceById = async (id: string): Promise<ServiceDoc | null> => {

@@ -95,27 +95,11 @@ const creditWallet = async (req, res) => {
   }
 };
 
-const getSmsHistory = async (req, res) => {
-  try {
-    const limit = Math.min(Number(req.query.limit || 100), 500);
-    const snap = await db.collection('sms_logs')
-      .orderBy('createdAt', 'desc')
-      .limit(limit)
-      .get();
-    
-    const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    res.json(logs);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
 module.exports = {
   updateSettings,
   getSettings,
   getAllTransactions,
-  creditWallet,
-  getSmsHistory
+  creditWallet
 };
 
 const listUsers = async (req, res) => {
