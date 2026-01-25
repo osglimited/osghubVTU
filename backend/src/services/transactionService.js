@@ -53,6 +53,38 @@ class TransactionService {
           const rate = (100 - discount) / 100;
           providerCost = Math.round(Number(amount || 0) * rate);
         } catch {}
+      } else if (type === 'electricity' && details && (details.serviceId || details.provider)) {
+        try {
+          const sid = String(details.serviceId || details.provider || '').toLowerCase();
+          const variation = String(details.variationId || details.variation || '').toLowerCase();
+          const q = db.collection('service_plans')
+            .where('type', '==', 'electricity')
+            .where('metadata.service_id', '==', sid)
+            .where('metadata.variation_id', '==', variation)
+            .limit(1);
+          const snap = await q.get();
+          if (!snap.empty) {
+            const p = snap.docs[0].data();
+            userPrice = Number(p.priceUser || userPrice);
+            providerCost = Number(p.priceApi || providerCost);
+          }
+        } catch {}
+      } else if (type === 'cable' && details && (details.serviceId || details.provider) && details.variationId) {
+        try {
+          const sid = String(details.serviceId || details.provider || '').toLowerCase();
+          const varId = String(details.variationId).toLowerCase();
+          const q = db.collection('service_plans')
+            .where('type', '==', 'cable')
+            .where('metadata.service_id', '==', sid)
+            .where('metadata.variation_id', '==', varId)
+            .limit(1);
+          const snap = await q.get();
+          if (!snap.empty) {
+            const p = snap.docs[0].data();
+            userPrice = Number(p.priceUser || userPrice);
+            providerCost = Number(p.priceApi || providerCost);
+          }
+        } catch {}
       }
     } catch {}
     const transactionData = {
@@ -74,7 +106,8 @@ class TransactionService {
 
     // 4. Debit Wallet
     try {
-      await walletService.debitWallet(userId, amount, 'main', `${type} Purchase: ${details.phone}`);
+      const descriptor = details.phone || details.meterNumber || details.smartcardNumber || details.customerId || '';
+      await walletService.debitWallet(userId, amount, 'main', `${type} Purchase: ${descriptor}`);
     } catch (error) {
       await transactionRef.update({ status: 'failed', failureReason: 'Debit failed' });
       throw error;
@@ -92,6 +125,22 @@ class TransactionService {
           throw new Error('Data plan ID (variation_id) is required for data purchase');
         }
         result = await providerService.purchaseData(idempotencyKey, details.phone, details.planId, details.network || details.networkId);
+      } else if (type === 'electricity') {
+        const customerId = details.customerId || details.meterNumber;
+        const serviceId = details.serviceId || details.provider || details.network;
+        const variationId = details.variationId || details.variation || 'prepaid';
+        if (!customerId || !serviceId || !variationId) {
+          throw new Error('Electricity requires customerId, serviceId, and variationId');
+        }
+        result = await providerService.purchaseElectricity(idempotencyKey, customerId, serviceId, variationId, amount);
+      } else if (type === 'cable') {
+        const customerId = details.customerId || details.smartcardNumber;
+        const serviceId = details.serviceId || details.provider || details.network;
+        const variationId = details.variationId || details.planId;
+        if (!customerId || !serviceId || !variationId) {
+          throw new Error('Cable TV requires customerId, serviceId, and variationId (plan id)');
+        }
+        result = await providerService.purchaseCableTV(idempotencyKey, customerId, serviceId, variationId, Number.isFinite(Number(amount)) ? Number(amount) : null);
       } else {
         // Fallback for other types
         result = { success: false, message: 'Service not implemented yet' };
@@ -105,7 +154,7 @@ class TransactionService {
           updatedAt: new Date()
         });
         try {
-          const maskedPhone = String(details.phone || '').replace(/^(\d{0,7})/, '*******');
+          const maskedPhone = String(details.phone || details.customerId || details.meterNumber || details.smartcardNumber || '').replace(/^(\d{0,7})/, '*******');
           const title = `${type.charAt(0).toUpperCase() + type.slice(1)} Purchase Successful`;
           const body = `You purchased ${type} for ${maskedPhone}. Amount: ₦${amount}. Ref: ${result.transactionId}.`;
           await notificationService.sendNotification(userId, title, body);

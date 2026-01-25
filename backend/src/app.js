@@ -71,6 +71,7 @@ app.get('/api/plans', async (_req, res) => {
         name: x.name || '',
         priceUser: Number(x.priceUser || x.price_user || 0),
         priceApi: Number(x.priceApi || x.price_api || 0),
+        type: x.type || null,
         active: x.active !== false,
         metadata: x.metadata || null,
         createdAt: x.createdAt || new Date(),

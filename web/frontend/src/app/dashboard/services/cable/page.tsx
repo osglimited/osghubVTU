@@ -1,26 +1,57 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Tv } from 'lucide-react';
 import { useService } from '@/hooks/useServices';
 import { useAuth } from '@/contexts/AuthContext';
-import { processTransaction } from '@/lib/services';
+import { processTransaction, getServicePlans } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 
-const CABLE_PROVIDERS = ['DSTV', 'GOTV', 'Startimes'];
+type CablePlan = { name: string; variation_id: string; priceUser: number };
 
 export default function CablePage() {
   const { user } = useAuth();
   const { service, loading, error } = useService('tv');
-  const [provider, setProvider] = useState(CABLE_PROVIDERS[0]);
+  const [providers, setProviders] = useState<{ label: string; value: string }[]>([]);
+  const [plansByProvider, setPlansByProvider] = useState<Record<string, CablePlan[]>>({});
+  const [provider, setProvider] = useState('');
+  const [planId, setPlanId] = useState('');
   const [smartcardNumber, setSmartcardNumber] = useState('');
   const [amount, setAmount] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
 
+  useEffect(() => {
+    let mounted = true;
+    const loadPlans = async () => {
+      const rows = await getServicePlans();
+      if (!mounted) return;
+      const cable = rows.filter(r => (r as any).type === 'cable' && r.metadata && r.metadata.variation_id && r.metadata.service_id);
+      const byProv: Record<string, CablePlan[]> = {};
+      const provs: { label: string; value: string }[] = [];
+      for (const r of cable) {
+        const sid = String(r.metadata?.service_id || '').toLowerCase();
+        const label = r.network || sid;
+        if (!provs.find(p => p.value === sid)) provs.push({ label, value: sid });
+        const varId = String(r.metadata?.variation_id || '');
+        const item = { name: r.name || varId, variation_id: varId, priceUser: Number(r.priceUser || 0) };
+        byProv[sid] = byProv[sid] ? [...byProv[sid], item] : [item];
+      }
+      setProviders(provs);
+      setPlansByProvider(byProv);
+      const firstProv = provs[0]?.value || '';
+      setProvider(firstProv);
+      const firstPlan = (byProv[firstProv] || [])[0];
+      setPlanId(firstPlan?.variation_id || '');
+      setAmount(firstPlan ? String(firstPlan.priceUser || '') : '');
+    };
+    loadPlans();
+    return () => { mounted = false; };
+  }, []);
+
   const handlePurchase = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!smartcardNumber || !amount) return;
+    if (!smartcardNumber || !amount || !planId || !provider) return;
     setShowPinModal(true);
   };
 
@@ -34,9 +65,9 @@ export default function CablePage() {
         Number(amount),
         'cable',
         {
-          provider,
-          smartcardNumber,
-          serviceProvider: service.slug
+          serviceId: provider,
+          customerId: smartcardNumber,
+          variationId: planId
         }
       );
 
@@ -76,9 +107,35 @@ export default function CablePage() {
                   <select 
                     className="input-field"
                     value={provider}
-                    onChange={(e) => setProvider(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setProvider(val);
+                      const firstPlan = (plansByProvider[val] || [])[0];
+                      setPlanId(firstPlan?.variation_id || '');
+                      setAmount(firstPlan ? String(firstPlan.priceUser || '') : '');
+                    }}
                   >
-                    {CABLE_PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
+                    {providers.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Package</label>
+                  <select
+                    className="input-field"
+                    value={planId}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setPlanId(v);
+                      const plan = (plansByProvider[provider] || []).find(pl => pl.variation_id === v);
+                      setAmount(plan ? String(plan.priceUser || '') : amount);
+                    }}
+                  >
+                    {(plansByProvider[provider] || []).map(pl => (
+                      <option key={pl.variation_id} value={pl.variation_id}>
+                        {pl.name} - ₦{Number(pl.priceUser || 0).toLocaleString()}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

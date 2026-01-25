@@ -1,21 +1,51 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useService } from '@/hooks/useServices';
-import { processTransaction } from '@/lib/services';
+import { processTransaction, getServicePlans } from '@/lib/services';
 import TransactionPinModal from '@/components/dashboard/TransactionPinModal';
 
 export default function ElectricityPage() {
   const { user, refreshUser } = useAuth();
   const { service, loading, error } = useService('electricity');
-  
-  const [provider, setProvider] = useState('ikedc');
+  const [providers, setProviders] = useState<{ label: string; value: string }[]>([]);
+  const [plansByProvider, setPlansByProvider] = useState<Record<string, Array<{ name: string; variation_id: string; priceUser: number }>>>({});
+  const [provider, setProvider] = useState('');
   const [meterNumber, setMeterNumber] = useState('');
   const [amount, setAmount] = useState('');
+  const [variationId, setVariationId] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadPlans = async () => {
+      const rows = await getServicePlans();
+      if (!mounted) return;
+      const electricity = rows.filter(r => (r as any).type === 'electricity' && r.metadata && r.metadata.service_id);
+      const byProv: Record<string, Array<{ name: string; variation_id: string; priceUser: number }>> = {};
+      const provs: { label: string; value: string }[] = [];
+      for (const r of electricity) {
+        const sid = String(r.metadata?.service_id || '').toLowerCase();
+        const label = r.network || sid;
+        if (!provs.find(p => p.value === sid)) provs.push({ label, value: sid });
+        const varId = String(r.metadata?.variation_id || '').toLowerCase();
+        const item = { name: r.name || varId || 'Plan', variation_id: varId, priceUser: Number(r.priceUser || 0) };
+        byProv[sid] = byProv[sid] ? [...byProv[sid], item] : [item];
+      }
+      setProviders(provs);
+      setPlansByProvider(byProv);
+      const firstProv = provs[0]?.value || '';
+      setProvider(firstProv);
+      const firstPlan = (byProv[firstProv] || [])[0];
+      setVariationId(firstPlan?.variation_id || '');
+      setAmount(firstPlan ? String(firstPlan.priceUser || '') : '');
+    };
+    loadPlans();
+    return () => { mounted = false; };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +67,7 @@ export default function ElectricityPage() {
         user.uid,
         Number(amount),
         'electricity',
-        { provider, meterNumber, serviceName: service.name }
+        { serviceId: provider, customerId: meterNumber, variationId }
       );
       
       if (result.success) {
@@ -80,18 +110,36 @@ export default function ElectricityPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Select Disco</label>
             <select 
               value={provider}
-              onChange={(e) => setProvider(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setProvider(val);
+                const firstPlan = (plansByProvider[val] || [])[0];
+                setVariationId(firstPlan?.variation_id || '');
+                setAmount(firstPlan ? String(firstPlan.priceUser || '') : '');
+              }}
               className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A1F44]"
             >
-              <option value="ikedc">Ikeja Electric (IKEDC)</option>
-              <option value="ekedc">Eko Electric (EKEDC)</option>
-              <option value="aedc">Abuja Electric (AEDC)</option>
-              <option value="ibedc">Ibadan Electric (IBEDC)</option>
-              <option value="kano">Kano Electric (KEDCO)</option>
-              <option value="ph">Port Harcourt Electric (PHED)</option>
-              <option value="jos">Jos Electric (JED)</option>
-              <option value="kaduna">Kaduna Electric (KAEDCO)</option>
-              <option value="enugu">Enugu Electric (EEDC)</option>
+              {providers.map(p => (<option key={p.value} value={p.value}>{p.label}</option>))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Account Type</label>
+            <select 
+              value={variationId}
+              onChange={(e) => {
+                const v = e.target.value;
+                setVariationId(v);
+                const plan = (plansByProvider[provider] || []).find(pl => pl.variation_id === v);
+                setAmount(plan ? String(plan.priceUser || '') : amount);
+              }}
+              className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A1F44]"
+            >
+              {(plansByProvider[provider] || []).map(pl => (
+                <option key={pl.variation_id} value={pl.variation_id}>
+                  {pl.name || (pl.variation_id === 'prepaid' ? 'Prepaid' : pl.variation_id)}
+                </option>
+              ))}
             </select>
           </div>
 
